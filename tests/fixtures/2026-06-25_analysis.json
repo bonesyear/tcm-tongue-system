@@ -1,0 +1,133 @@
+{
+  "record_id": "2026-06-25-1",
+  "date": "2026-06-25",
+  "timestamp": "2026-06-25T08:30:00+08:00",
+  "version": "1.2.0",
+  "confidence": "HIGH",
+  "photo_coverage": ["tongue", "head_face", "eye", "ear", "hand", "skin"],
+  "observations": {
+    "tongue": {
+      "body": {
+        "color": "淡红为底，花剥区偏红",
+        "luster": "荣润",
+        "shape": "偏胖大，边有齿痕",
+        "ecchymosis": "无瘀斑瘀点",
+        "tooth_marks": "轻度",
+        "cracks": "无明显裂纹",
+        "prickles": "舌尖散在点刺",
+        "dynamics": "伸舌自如，无歪斜颤动"
+      },
+      "coating": {
+        "color": "白",
+        "thickness": "薄白",
+        "moisture": "润",
+        "greasy": "不腻",
+        "peeling": "花剥，约占舌面五分之一",
+        "distribution": "分布不均，以舌中前部剥落为主"
+      },
+      "sublingual": {
+        "vein_color": "隐约浅淡蓝紫色，大致正常",
+        "vein_thickness": "不粗",
+        "vein_tortuosity": "无迂曲",
+        "petechiae": "无瘀点"
+      }
+    },
+    "head_face": {
+      "face": {
+        "color": "萎黄",
+        "edema": "无明显浮肿",
+        "luster": "光泽尚可"
+      },
+      "lips": {
+        "color": "淡红",
+        "moisture": "偏干",
+        "around": "口周轻度暗沉"
+      },
+      "nose": {
+        "color": "正常",
+        "flaring": "无",
+        "bleeding": "无"
+      }
+    },
+    "eye": {
+      "redness": "白睛少许红血丝",
+      "scleral_jaundice": "无黄染",
+      "eyelid_edema": "无明显浮肿",
+      "orbital_color": "无明显黯黑",
+      "sclera_color": "白，无黄染"
+    },
+    "ear": {
+      "color": "红赤",
+      "helix": "润泽"
+    },
+    "hand": {
+      "palm_color": "偏淡白",
+      "palm_temperature": "温",
+      "nail_bed": "淡白",
+      "nail_shape": "光滑",
+      "ecchymosis": "无"
+    },
+    "skin": {
+      "color": "萎黄偏淡",
+      "scaly_skin": "无甲错",
+      "yellow_sweat": "无",
+      "edema": "无",
+      "dryness": "轻度粗糙"
+    }
+  },
+  "inquiry_coverage": {
+    "covered": 15,
+    "total": 15
+  },
+  "pattern_differentiation": {
+    "three_views": {
+      "表里观": "里证为主",
+      "正邪观": "正虚为主，胃虚有热",
+      "津液观": "津液不足，虚热灼津"
+    },
+    "four_patterns": {
+      "水证": "轻度",
+      "火证": "轻度（虚热）",
+      "气证": "轻度",
+      "血证": "轻度"
+    },
+    "six_diseases": "太阴病为主，兼阳明虚热",
+    "core_pathomechanism": "脾虚失运，胃有虚热，营血不足，津液不布，舌苔花剥"
+  },
+  "formula": {
+    "name": "健脾清胃凉血养阴汤（自拟）",
+    "total_herbs": 12,
+    "ingredients": [
+      {"herb": "党参", "dosage": "15g"},
+      {"herb": "白术", "dosage": "10g"},
+      {"herb": "茯苓", "dosage": "15g"},
+      {"herb": "炙甘草", "dosage": "6g"},
+      {"herb": "生地黄", "dosage": "12g"},
+      {"herb": "牡丹皮", "dosage": "9g"},
+      {"herb": "赤芍", "dosage": "9g"},
+      {"herb": "当归", "dosage": "10g"},
+      {"herb": "麦冬", "dosage": "10g"},
+      {"herb": "石斛", "dosage": "10g"},
+      {"herb": "陈皮", "dosage": "6g"},
+      {"herb": "山药", "dosage": "15g"}
+    ],
+    "rationale": "舌淡红胖大有齿痕为脾虚；花剥苔伴局部偏红为胃阴不足虚热；面萎黄、掌甲淡白为营血不足",
+    "note": "剂量仅供参考，请在执业中医师指导下使用"
+  },
+  "danger_flags": {
+    "triggered": [],
+    "not_triggered": [
+      "daiyang",
+      "skin_cold",
+      "flesh_wasted",
+      "tongue_rigid",
+      "tongue_critical",
+      "mirror_tongue",
+      "acute_jaundice",
+      "wind_stroke",
+      "throat_erosion"
+    ]
+  },
+  "tags": ["fixture"],
+  "notes": "测试脱敏样例记录：字段结构与真实 LLM 产出（形状 B）一致，内容为构造数据，不对应任何真实个人。"
+}

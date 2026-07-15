@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# System
+.DS_Store
+.env
+.backup_manifest
+
+# 本地工具配置(Claude Code 会话本地设置,不入库)
+.claude/
+
+# Generated data
+records/daily/*
+records/weekly/*
+charts/*
+
+# Keep directory structures
+!records/daily/.gitkeep
+!records/weekly/.gitkeep
+!charts/.gitkeep
+
+# 版权物：《经方探源》全文仅限本地个人研究使用，不入版本库
+# （见 knowledge_base/README.md 版权说明）
+knowledge_base/jingfang_tanyuan_full.md
