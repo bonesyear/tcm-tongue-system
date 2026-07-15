@@ -1,0 +1,8 @@
+# 运行时依赖：仅 scripts/ 周报画图与示意图需要；
+# 核心 src/ 模块（dimensions/record/scoring/confidence/retrieval）零第三方依赖。
+matplotlib>=3.7
+numpy>=1.24
+Pillow>=10.0
+# 说明：PyYAML 为可选增强——synonym_loader 优先使用已安装的 PyYAML，
+# 未安装时自动回退到内置的受限格式解析器，故有意不在此声明（见
+# docs/architecture/retrieval-design.md 决策 1）。
