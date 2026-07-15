@@ -17,7 +17,7 @@
 - **定性→定量评分**：从自然语言描述到 0-10 分的映射引擎
 - **置信度与安全边界**：覆盖度→置信度→方剂建议安全控制
 - **知识检索**：Grep 优先 + 别名词典展开 + RAG 兜底的混合检索
-- **许家栋《经方探源》知识库**：全文约 9000 行，结构化辨证框架
+- **结构化知识库**：7 个 Markdown/YAML 文件，涵盖辨证框架、方剂体系、体质分型、食疗等
 
 **它不做什么**：不调 LLM API、不处理图片上传、不发 HTTP 请求。这些由外层 Agent 负责。
 
@@ -50,7 +50,7 @@
 | `src/confidence.py` | `from_coverage(n)`、`allows_formula(level)`、`allows_dosage(level)`、`is_consistent` | 覆盖度→置信度→安全边界 |
 | `src/paths.py` | `REPO_ROOT`、`DATA_ROOT`、`ensure_data_dirs()` | 路径配置（`TCM_DATA_ROOT` 环境变量覆盖） |
 | `src/retrieval/` | `retrieve(query)` → 结果列表 + 来源标注 | Grep + 同义词 + RAG 混合检索。⚠️ `search()` 接受原始正则，不受信输入请一律走 `retrieve()` |
-| `knowledge_base/` | Markdown/YAML 知识文件 | 经方探源全文、辨证框架、方剂体系、体质分型、别名词典 |
+| `knowledge_base/` | 7 个 Markdown/YAML 文件 | 辨证框架、方剂体系、体质分型、食疗、别名词典 |
 | `templates/` | prompt 模板 + JSON 记录模板 | LLM 分析指令、多维记录 schema |
 
 四个核心 module（`dimensions` / `record` / `scoring` / `confidence`）仅依赖 Python 标准库。
