@@ -145,7 +145,7 @@ scripts/
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
 tests/                     # 159 项 pytest（fixtures/ 内置脱敏样例记录）
-knowledge_base/            # 许家栋体系知识库（~10800 行，含版权说明见其 README）
+knowledge_base/            # 许家栋体系知识库（含版权说明见其 README）
 docs/                      # 用户指南、架构分析、审查报告
 ```
 
@@ -157,3 +157,11 @@ docs/                      # 用户指南、架构分析、审查报告
 - **深 module / 浅 interface**：每个 module 用小 interface 背后藏大量行为
 - **安全边界可断言**：`allows_formula(LOW) == False` 把"宁缺毋滥"变成可执行测试
 - **LLM 无关**：不 import 任何 LLM SDK，不硬编码 provider 或 endpoint
+
+---
+
+## 许可
+
+本项目代码（`src/`、`tests/`、`scripts/`）采用 [GNU General Public License v3.0](LICENSE)。
+
+知识库内容（`knowledge_base/`）版权说明见 [knowledge_base/README.md](knowledge_base/README.md)。
