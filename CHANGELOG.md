@@ -1,5 +1,11 @@
 # 更新日志
 
+## v1.3.4（许可与合规，2026-07-12）
+
+- 新增 `LICENSE`（GNU GPL v3）
+- README 新增"许可"章节
+- 移除文档中对版权著作的明确引用（README、knowledge_base/README.md）
+
 ## v1.3.3（全面审查修复，2026-07-12）
 
 > 依据 `docs/CODE_REVIEW_2026-07-12.md` 审查报告（13 项 Bug + 8 项安全/合规风险 +
