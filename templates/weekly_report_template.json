@@ -1,0 +1,33 @@
+{
+  "week_id": "YYYY-W{NN}",
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "daily_records_count": 7,
+  "trend_analysis": {
+    "舌质变化": "",
+    "舌苔变化": "",
+    "舌形变化": "",
+    "舌下络脉变化": "",
+    "head_face_trend": "",
+    "eye_trend": "",
+    "ear_trend": "",
+    "hand_trend": "",
+    "skin_trend": "",
+    "体质变化趋势": ""
+  },
+  "weekly_comparison": {
+    "与前一周对比": "",
+    "好转指标": [],
+    "恶化指标": [],
+    "稳定指标": []
+  },
+  "charts": [
+    {
+      "path": "",
+      "type": "",
+      "title": ""
+    }
+  ],
+  "summary": "",
+  "next_week_suggestion": ""
+}
