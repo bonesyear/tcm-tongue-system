@@ -10,7 +10,7 @@
 
 ## 一、项目理解摘要
 
-本项目是基于许家栋经方体系的六维望诊(舌/头面/目/耳/手/皮肤)数据模型库,核心为四个纯标准库模块:
+本项目是基于经典经方经方体系的六维望诊(舌/头面/目/耳/手/皮肤)数据模型库,核心为四个纯标准库模块:
 
 | 模块 | 职责 | 质量印象 |
 |:---|:---|:---|
@@ -61,7 +61,7 @@
 - 根因 a:[rag_search.py:184](../src/retrieval/rag_search.py:184) 用 `np.zeros((n, V))` 稠密矩阵存极稀疏的 TF-IDF。
 - 根因 b:[dispatcher.py:93](../src/retrieval/dispatcher.py:93) `rag=None` 时**每次调用新建** `RagSearch(kb_root=...)`,而 rag_search 模块自己的 `_default` 单例([rag_search.py:349](../src/retrieval/rag_search.py:349))从未被 dispatcher 使用。
 - 修复方向:①dispatcher 按 `kb_root` 缓存 RagSearch 实例;②TF-IDF 改稀疏表示(倒排索引 dict 或 `scipy.sparse`,后者需新增依赖需你决策;纯 dict 版零依赖即可把内存降到 ~20 MB)。
-- 附带:设计文档 `retrieval-design.md` 与 `grep_search.py` docstring 仍写"知识库仅 1752 行"——加入 9050 行《经方探源》全文后该前提已失效,文档需更新。
+- 附带:设计文档 `retrieval-design.md` 与 `grep_search.py` docstring 仍写"知识库仅 1752 行"——加入 9050 行全文后该前提已失效,文档需更新。
 
 **Bug 7|安全边界"LOW 禁方剂"在校验器里只算警告,exit code 为 0 🔍**
 - [input_validator.py:146-153](../scripts/input_validator.py:146):检出"🚨 安全边界违反"后放进 `warnings`,而 `main()` 只对 `errors` 返回退出码 1 → **违反安全铁律的记录照样通过校验**。README/CHANGELOG 都把"宁缺毋滥变成可执行断言"当卖点,这里执行强度不够。
@@ -112,7 +112,7 @@
 建议:①排除 `records/` 全部与 `charts/`;②如确需备份健康数据,启用客户端加密(如 `openssl enc`/age)+ OSS 桶策略最小化;③文档中写明数据留存与删除策略。
 
 **风险 B|版权内容整书入库并随备份上传(中-高)🔍**
-`knowledge_base/jingfang_tanyuan_full.md` 是《经方探源》(人民卫生电子音像出版社, 2020, ISBN 9787117306492)**约 9000 行全文**,并会被备份脚本一并上传 OSS。个人研究用途或可,但任何形式的再分发(公开仓库、共享 bucket、交付他人)都有侵权风险。
+`knowledge_base/jingfang_tanyuan_full.md` 是(人民卫生电子音像出版社, 2020, ISBN 9787117306492)**约 9000 行全文**,并会被备份脚本一并上传 OSS。个人研究用途或可,但任何形式的再分发(公开仓库、共享 bucket、交付他人)都有侵权风险。
 建议:确认使用授权;仓库若将来推远端,先把该文件移出版本库(纳入 .gitignore + 本地挂载);备份脚本排除之。
 
 **风险 C|正则注入 / ReDoS 面(中)🔍**
@@ -151,7 +151,7 @@
    - knowledge_base/README.md 目录树补 `jingfang_tanyuan_full.md` 与 `synonym_map.yaml`;
    - retrieval-design.md 与 grep_search docstring 的"1752 行"改为现状(~10800 行)并重新评估"亚毫秒"结论(实测 grep 单查询仍在几十 ms 量级,可接受,但应如实记录)。
 7. **周报小优化**:`generate_weekly_report_data` 与 `_check_confidence_for_records` 对同一条记录重复构造 `DailyRecord` 多次,可传一次构造的实例;趋势描述只比首末两天,建议注明或改用线性拟合斜率。
-8. **prompt 模板**:§1.1 "许家栋(许家栋)教授"重复笔误;建议按风险 F 增加数据/指令隔离条款。
+8. **prompt 模板**:§1.1 "经典经方(经典经方)教授"重复笔误;建议按风险 F 增加数据/指令隔离条款。
 
 ---
 
@@ -167,4 +167,4 @@
 **需要你决策的三个点:**
 1. Bug 4:正常舌象基线归零后,历史趋势图纵向不可比,是否接受?(可在周报里加一行"评分口径 v2"标注)
 2. 风险 A:OSS 备份是排除全部健康数据,还是加密后继续备份?
-3. 风险 B:《经方探源》全文文件的去留/授权确认。
+3. 风险 B:全文文件的去留/授权确认。
