@@ -1,6 +1,6 @@
 # 中医望诊系统（TCM Tongue System）
 
-基于许家栋经方学术体系的多维度中医望诊辨证系统。
+基于经典经方学术体系的多维度中医望诊辨证系统。
 
 **纯 Python 数据模型库**——不绑定任何 LLM Agent 框架（Hermes / Codex / 其他均可接入）。
 
@@ -145,7 +145,7 @@ scripts/
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
 tests/                     # 159 项 pytest（fixtures/ 内置脱敏样例记录）
-knowledge_base/            # 许家栋体系知识库（含版权说明见其 README）
+knowledge_base/            # 经方体系知识库（含版权说明见其 README）
 docs/                      # 用户指南、架构分析、审查报告
 ```
 

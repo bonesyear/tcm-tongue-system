@@ -59,7 +59,7 @@
 ### 安全与合规
 - **风险 A（健康隐私）**：备份脚本排除全部 `records/`（含周报）与 `charts/`
   ——个人健康数据不再上传 OSS。
-- **风险 B（版权）**：《经方探源》全文 `jingfang_tanyuan_full.md` 从备份
+- **风险 B（版权）**：全文 `jingfang_tanyuan_full.md` 从备份
   与版本库排除（.gitignore），仅本地保留供检索；knowledge_base/README
   增加版权说明。
 - **风险 C（ReDoS）**：`search()/search_and()` 接受原始正则的安全边界在
@@ -213,7 +213,7 @@ OpenCode/GLM-5.2 (初始审查) + Claude/Kimi K2.7 (独立验证) → 用户决�
 ### 核心架构变更
 - **维度体系重构**：从 9 个独立拍照维度重构为 6 个拍照维度 + 15 项可跳过问诊
   - 拍照维度：舌诊(舌面+舌底)、头面诊(面域+唇域+鼻域)、目诊、耳诊、手诊、皮肤诊
-  - 问诊项：15 项许家栋六病辨证核心问诊骨架，全部可跳过
+  - 问诊项：15 项经典经方六病辨证核心问诊骨架，全部可跳过
   - 移除独立拍照维度：面诊/唇诊/鼻诊 → 合并为头面诊；咽喉诊/形体诊 → 移入问诊
 - **置信度阈值调整**：1维→LOW, 2-3维→MEDIUM, 4-6维→HIGH（原 1-2→LOW, 3-4→MEDIUM, 5-9→HIGH）
 - **问诊数据独立角色**：不改变置信度等级，仅在等级内提升辨证精度
@@ -303,7 +303,7 @@ OpenCode/GLM-5.2 (初始审查) + Claude/Kimi K2.7 (独立验证) → 用户决�
 - weekly_report_template.json：trend_analysis 新增 face_trend/eye_trend/hand_trend/skin_trend，charts 改为对象数组格式
 
 ### 知识库
-- 新增 knowledge_base/diet-lifestyle/diet-therapy.md：基于许家栋《经方探源》体系的食疗方案（四气五味概述、九种体质食疗映射、药物与食物禁忌、六病代表方饮食建议）
+- 新增 knowledge_base/diet-lifestyle/diet-therapy.md：基于经典经方体系的食疗方案（四气五味概述、九种体质食疗映射、药物与食物禁忌、六病代表方饮食建议）
 - 新增 knowledge_base/diagnostics/constitution-types.md：九种体质多维判定标准（舌象+面象+目诊+手诊+皮肤+唇口六维交叉判定）
 
 ### 脚本
@@ -323,7 +323,7 @@ OpenCode/GLM-5.2 (初始审查) + Claude/Kimi K2.7 (独立验证) → 用户决�
 ## v1.0.0（初始版本，2026-06-18）
 
 - 多维度中医望诊系统初始发布
-- 基于许家栋经方学术体系的三观→四证→六病辨证路径
+- 基于经典经方经方学术体系的三观→四证→六病辨证路径
 - 支持舌诊/面诊/目诊/手诊/皮肤诊/唇口诊多维度照片采集
 - Doubao 视觉模型部位识别+望诊分析
 - DeepSeek V4 自适应辨证引擎（LOW/MEDIUM/HIGH 三档置信度）
