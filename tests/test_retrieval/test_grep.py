@@ -2,7 +2,6 @@
 加一条真实 KB 冒烟测试验证集成。"""
 
 import os
-import re
 
 import pytest
 
