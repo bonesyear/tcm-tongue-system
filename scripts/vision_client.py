@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""望诊识图统一入口 — Qwen3.8-Max (DashScope OpenAI 兼容)
+"""望诊识图统一入口 — 开放接口（OpenAI 兼容视觉模型，默认 Qwen3.8-Max）
+模型/端点/Key 通过环境变量 VISION_MODEL / VISION_BASE_URL / VISION_API_KEY 配置，可插拔任意 OpenAI 兼容服务。
 用法:
-  python3 vision_qwen.py classify <img>              # 2a 部位分类
-  python3 vision_qwen.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
+  python3 vision_client.py classify <img>              # 2a 部位分类
+  python3 vision_client.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
 """
 import base64, json, os, sys, time, urllib.request
 
