@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 """望诊识图统一入口 — Qwen3.8-Max (DashScope OpenAI 兼容)
 用法:
-  python3 vision_qwen.py classify <img>          # 2a 部位分类
-  python3 vision_qwen.py observe <img> <prompt>  # 2b 详细观察 (prompt 从 prompt_map 选)
+  python3 vision_qwen.py classify <img>              # 2a 部位分类
+  python3 vision_qwen.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
 """
 import base64, json, os, sys, time, urllib.request
 
 def load_key():
-    # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 既有 DASHSCOPE_API_KEY
+    # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 环境变量 DASHSCOPE_API_KEY > .env DASHSCOPE_API_KEY
     env_key = os.environ.get("VISION_API_KEY", "") or os.environ.get("DASHSCOPE_API_KEY", "")
     if env_key:
         return env_key
+    keys = {}
     for p in [os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
               os.path.expanduser("~/.hermes/.env")]:
         try:
-            for line in open(p):
-                line = line.strip()
-                if line.startswith("VISION_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.split("#", 1)[0].strip().strip('"').strip("'")
+                    if k not in keys and v:
+                        keys[k] = v
         except FileNotFoundError:
             pass
-    for p in [os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
-              os.path.expanduser("~/.hermes/.env")]:
-        try:
-            for line in open(p):
-                line = line.strip()
-                if line.startswith("DASHSCOPE_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-        except FileNotFoundError:
-            pass
-    return ""
+    return keys.get("VISION_API_KEY") or keys.get("DASHSCOPE_API_KEY", "")
 
 MODEL = os.environ.get("VISION_MODEL", "qwen3.8-max")
 URL = os.environ.get("VISION_BASE_URL",
@@ -48,7 +48,7 @@ PROMPTS = {
 
 def call(img_path, prompt, timeout=150):
     key = load_key()
-    assert key, "DASHSCOPE_API_KEY not found"
+    assert key, "VISION_API_KEY or DASHSCOPE_API_KEY not found"
     b64 = base64.b64encode(open(img_path, "rb").read()).decode()
     payload = {
         "model": MODEL,
