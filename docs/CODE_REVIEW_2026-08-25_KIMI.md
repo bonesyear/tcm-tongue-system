@@ -281,3 +281,61 @@ To resume this session: kimi -r session_1107b89d-3ddd-4113-9dde-5e13b0ea967e
 5. ✅ 配置化方向正确：优先级清晰、缺省回退兼容、未破坏调用契约
 
 **处置**：按用户指令暂缓修复，等 kimi 额度重置后与 P0/P1/P2 一并执行。
+
+---
+
+## 修改执行规划 v2（2026-08-25，按文件域统筹，替代 v1 批次规划）
+
+> 前提：#4/#18/A/B 已完成；#17 跳过；#13 待产品决策。实际待修：#1/#2/#3/#5/#6/#7/#8/#9/#10/#11/#12/#13/#14/#15/#16。
+> 注：kimi 会话内文件名为旧名 vision_qwen.py，实际已改名 scripts/vision_client.py，以下路径统一为新名。
+
+### 轮次 1：scripts/vision_client.py（域内按严重度）
+
+| 顺序 | 条目 | 标题 | 级别 |
+|---|---|---|---|
+| 1 | #2 | API/网络错误无处理 | P0 |
+| 2 | #3 | 命令行参数无边界检查 | P0 |
+| 3 | #1 | 文件句柄未关闭 | P1 |
+| 4 | #6 | 图片 MIME 写死 jpeg | P1 |
+| 5 | #7 | classify 不校验输出类别 | P1 |
+| 6 | #14 | 无测试覆盖（依赖 #2/#3/#6/#7） | P2 |
+
+- #2：call() 捕获 HTTPError/URLError/socket.timeout，检查 choices，抛 RuntimeError 带状态码；mock 测试断言非 KeyError
+- #3：入口校验 len(sys.argv)，classify≥3/observe≥4，不足 exit(2) 打印用法；subprocess 测试
+- #1：with open() 包住 b64 读取
+- #6：扩展名→MIME（png/jpg/jpeg/webp，未知回退 jpeg）
+- #7：输出 strip 取首行匹配 PROMPTS keys，不匹配回退"其他"+stderr 警告
+- #14：新建 tests/test_vision_qwen.py 覆盖正常/HTTP错误/参数/key未设/.env注释/MIME/类别
+
+**中断风险**：只完成 #2/#3 → 可安全发布（不裸崩溃、CLI 有保护）；#2 前中断 → API 失败仍 KeyError 裸崩溃（最坏）
+
+### 轮次 2：辨证层（confidence + scoring + record）
+
+| 顺序 | 条目 | 标题 | 级别 |
+|---|---|---|---|
+| 1 | #5 | 否定词"非"误杀"非正常" | P0 |
+| 2 | #8 | has_formula_content key 漏检 | P0 |
+| 3 | #9 | fallback 返回整个 diag | P0 |
+| 4 | #10 | 词边界不充分 | P1 |
+| 5 | #11 | 舌诊均值缺测试（#5 后做） | P1 |
+| 6 | #12 | danger_flags 形状 A 缺测试 | P1 |
+| 7 | #13 | 雷达图漏 body_luster（待决策） | P1 |
+
+- #5：_NEGATION_RE 移除"非"；补"非正常红润/非典型黄染"不否定断言
+- #8：白名单 + 兜底扫描剂量模式 \d+[g克]/经方名
+- #9：fallback 返回 {}（或显式历史 key 尝试）
+- #10：边界只接受空格/连字符/CJK/结尾；断言 HIGH1/HIGH_2 → None
+- #11：body_color=7+coating=7 断言 score==7.0
+- #12：shape A fixture daiyang.triggered=true → ["daiyang"]
+
+**中断风险**：#5 前中断 → 评分误杀"非正常"（影响辨证，最坏）；#5/#8/#9 完成 → 安全边界已修可发布
+
+### 轮次 3：文档层（#15 → #16）
+
+- #15：confidence.py:9 引用改指 templates/adaptive_analysis_prompt.md §3.1
+- #16：record.py:23 / dimensions.py:13 删除 /codebase-design 引用
+- 中断无运行时风险
+
+### 整体执行顺序
+
+轮次 1（vision_client.py）→ 轮次 2（辨证层）→ 轮次 3（文档层）；#13 单独决策。
