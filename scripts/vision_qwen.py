@@ -7,7 +7,19 @@
 import base64, json, os, sys, time, urllib.request
 
 def load_key():
-    # 环境变量优先，其次读常见 .env 位置（不随仓库分发）
+    # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 既有 DASHSCOPE_API_KEY
+    env_key = os.environ.get("VISION_API_KEY", "") or os.environ.get("DASHSCOPE_API_KEY", "")
+    if env_key:
+        return env_key
+    for p in [os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
+              os.path.expanduser("~/.hermes/.env")]:
+        try:
+            for line in open(p):
+                line = line.strip()
+                if line.startswith("VISION_API_KEY="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+        except FileNotFoundError:
+            pass
     for p in [os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
               os.path.expanduser("~/.hermes/.env")]:
         try:
@@ -17,10 +29,11 @@ def load_key():
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
         except FileNotFoundError:
             pass
-    return os.environ.get("DASHSCOPE_API_KEY", "")
+    return ""
 
-MODEL = "qwen3.8-max"
-URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+MODEL = os.environ.get("VISION_MODEL", "qwen3.8-max")
+URL = os.environ.get("VISION_BASE_URL",
+                     "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
 
 PROMPTS = {
     "舌面": "这是一张舌面照片，请精确观察并只输出JSON：舌质颜色、舌苔(颜色/厚薄/润燥/腻腐/剥落)、舌体(胖瘦/齿痕/裂纹/点刺)。注意区分舌面中央的浅沟是生理性正中沟还是深宽病理裂纹。",
