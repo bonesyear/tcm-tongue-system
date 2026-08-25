@@ -9,8 +9,6 @@ import re
 import pytest
 
 import generate_weekly_report as g
-from src.record import DailyRecord
-from src.dimensions import VisionDimension
 
 RECORD_PATH = os.path.join(
     os.path.dirname(__file__), "fixtures", "2026-06-25_analysis.json"

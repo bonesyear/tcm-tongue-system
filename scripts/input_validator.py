@@ -37,7 +37,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from src.record import DailyRecord, SCHEMA, has_formula_content  # noqa: E402
-from src.dimensions import DIMENSIONS, VisionDimension  # noqa: E402
+from src.dimensions import DIMENSIONS  # noqa: E402
 from src import confidence as confidence_mod  # noqa: E402
 
 # 顶层容器字段:键存在但类型不是 dict → 严重错误(不能静默按空处理,
