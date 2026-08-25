@@ -31,7 +31,7 @@ observation 可为 Record.get_observation() 返回的 {指标: 文本}（推荐�
 """
 
 import re
-from typing import Dict, Union
+from typing import Dict
 
 from .dimensions import VisionDimension
 
