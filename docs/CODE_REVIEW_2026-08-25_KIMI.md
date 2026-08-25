@@ -350,3 +350,22 @@ To resume this session: kimi -r session_1107b89d-3ddd-4113-9dde-5e13b0ea967e
 - vision_client.py PROMPTS["舌面"] 舌质部分加"润泽(润/干)"粗判字段，明确不判神气
 - scoring.py DIMENSION_RULES[TONGUE] 的 body_luster 规则保留但注释标注"仅粗判润燥，荣枯由用户肉眼确认"
 - 雷达图 TONGUE_RADAR_METRIC_KEYS 维持 8 轴，加注释说明排除荣枯的原因
+
+### "干燥/润泽"专项审查定案（2026-08-25，kimi 专项审查 + 用户确认方案 A）
+
+**语义澄清**：干燥/润泽从**评分层**降级（不机械计分、不进雷达图），但**辨证层保留**（视觉 JSON 全量进 LLM prompt，作为津亏/湿盛辅助信号）——"粗判给辨证、不给分数"。
+
+**方案 A 落地清单**（kimi 专项审查输出）：
+1. `vision_client.py` PROMPTS["舌面"] 增加"舌质润泽/干燥（粗判：润泽/偏干/干燥/干裂）"——让识图端真正产出
+2. `record.py` body_luster A 路径 `["舌质荣枯"]` → `["舌质润燥"]`（B 路径 ["body","luster"] 保留，key 不改历史兼容）
+3. `scoring.py` DIMENSION_RULES[TONGUE] **移除 body_luster**（核心：不再参与 score()）
+4. `scoring.py` TONGUE_BODY_LUSTER_MAP 保留原映射 + 注释"已降级仅历史兼容"
+5. `scoring.py` 评分基线注释删除"荣润"正常基线示例
+6. `scoring.py` TONGUE_RADAR_METRIC_KEYS 加注释（照片光线干扰大、静态照片不可判神气，故不纳入雷达图）
+7. `tests/test_scoring.py` 删/改 test_body_luster_scoring（断言 body_luster 分数为 0/不存在）
+8. `tests/test_scoring.py` 正常舌象 fixture 删除 "body_luster":"荣润" 或期望改 0
+9. `tests/test_record.py` 补形状 A/B"舌质润燥"路径解析测试
+10. `tests/fixtures/2026-06-25_analysis.json` 舌诊 score 期望更新（body_luster 不再计分 → **历史评分口径会变**，属正确方向）
+11. `templates/multi_dim_record_template.json` "舌质荣枯" → "舌质润燥"
+
+**双计结论**：当前无此问题（prompt 未输出该字段）；加字段后结构化输入不双计（body_luster 与 coating_moisture 独立字段）；纯文本输入重复计分是模块既有已知局限（scoring.py 已注释），不单独处理。
