@@ -266,3 +266,18 @@
   理由：#14 依赖批次 1 的修复才能覆盖错误路径；#15/#16/#18 是文档/注释；#17 建议不做或最后做。
 
 To resume this session: kimi -r session_1107b89d-3ddd-4113-9dde-5e13b0ea967e
+
+---
+
+## 增量确认补充（2026-08-25，kimi 复审 vision_qwen.py 配置化改造后）
+
+**审查对象**：commit 22f9ab8（MODEL/URL → VISION_MODEL/VISION_BASE_URL 环境变量，load_key 重构 VISION_API_KEY > DASHSCOPE_API_KEY）
+
+**确认结论（经本地实测校准）**：
+1. ✅ 新问题 A：load_key 两个循环重复读 .env —— 建议抽成"读一次→按优先级取"
+2. ✅ 新问题 B：assert 文案未随改造更新（仍写 DASHSCOPE_API_KEY not found）
+3. ⚠️ kimi 称"#4 注释行被误读"——**实测不成立**（startswith 免疫行首 #）；真实风险为**行内注释污染**（`KEY=xxx # 备注` → 值含 `# 备注`），防御性处理即可
+4. ✅ #18 docstring 歧义仍存在（observe <img> <prompt> 应为 <part-key>）
+5. ✅ 配置化方向正确：优先级清晰、缺省回退兼容、未破坏调用契约
+
+**处置**：按用户指令暂缓修复，等 kimi 额度重置后与 P0/P1/P2 一并执行。
