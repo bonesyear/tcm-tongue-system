@@ -80,3 +80,20 @@
 - 每轮：pytest tests/ -q 全量通过；vision_client.py 改动后实测 `python3 scripts/vision_client.py classify <图>` 输出"舌面"
 - 提交前：kimi 报告后自行 git diff review + 独立复验（测试/实测/ruff check --select F,E722）
 - 每轮独立 commit（不混批次）
+
+---
+
+## K3 复核待办（2026-08-28 补充）
+
+**背景**：2026-08-25 的审查/规划/修复全部由 K2.7（kimi-code/kimi-for-coding）完成——当日 config 默认模型为 K2.7。2026-08-28 已将 `default_model` 改为 `kimi-k3`（config.toml 16:44 修改）。
+
+**已豁免复核**：增量修复（load_key/assert/docstring）+ 卫生清理——已通过 159 测试/实测/ruff/diff review 客观验证，与模型无关。
+
+**待 K3 复核（判断层）**：18 条问题清单准确性、规划 v2 轮次设计、方案 A 落地清单 11 项、增量确认结论。K2.7 有错判前科（#4 注释行误读判断被实测推翻）。
+
+**执行方式**（配额恢复后，预计 2026-09 中旬）：
+```
+开新会话（勿 resume 旧会话——旧会话绑定 K2.7）
+kimi -m kimi-k3 -p "读 docs/CODE_REVIEW_2026-08-25_KIMI.md 与 docs/REPAIR_PLAN_2026-08-25.md，复核：①18条问题是否准确、有无遗漏重大问题 ②规划轮次是否合理 ③方案A落地清单有无漏洞"
+```
+复核结论追加到本文件。复核通过后才按轮次 1→2→3 执行修复。
