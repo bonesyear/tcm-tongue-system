@@ -1,10 +1,10 @@
 # 中医望诊系统（TCM Tongue System）
 
-基于经典经方学术体系的多维度中医望诊辨证系统。
+基于经典经方学术体系的多维度中医望诊辨证系统：六维望诊（舌/头面/目/耳/手/皮肤）的规范化记录、评分、置信度与知识检索。
 
 **纯 Python 数据模型库**——不绑定任何 LLM Agent 框架（Hermes / Codex / 其他均可接入）。
 
-当前版本：**v1.3.3**。详见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本：**v1.3.5**。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 
@@ -19,7 +19,7 @@
 - **知识检索**：Grep 优先 + 别名词典展开 + RAG 兜底的混合检索
 - **结构化知识库**：7 个 Markdown/YAML 文件，涵盖辨证框架、方剂体系、体质分型、食疗等
 
-**它不做什么**：不调 LLM API、不处理图片上传、不发 HTTP 请求。这些由外层 Agent 负责。
+**它不做什么**：不调用 LLM API、不接收或上传图片、不发起任何 HTTP 请求——以上均由外层 Agent 负责。
 
 ---
 
@@ -29,9 +29,9 @@
 你的 Agent（Hermes / Codex / 自定义）
   │
   ├─ 拍照片 → Vision API → 结构化望诊数据
-  ├─ 把数据扔给 src/record.py → 解析归一
+  ├─ 数据交给 src/record.py → 解析归一
   ├─ 调 scoring.py / confidence.py → 评分 + 安全边界
-  ├─ 拿 templates/adaptive_analysis_prompt.md → 塞进 LLM 做辨证
+  ├─ 取 templates/adaptive_analysis_prompt.md → 送入 LLM 做辨证
   └─ 可选：调 retrieval/ → 查经典依据
         │
         ▼
@@ -99,13 +99,13 @@ print(allows_formula(level))  # True/False
 
 源码不绑定任何框架。你需要补的唯一一件事是 **orchestration 层**：
 
-1. **拍照 → Vision API**：调你用的 Vision 模型（OpenAI GPT-4V / Claude Vision / 豆包等），用 `templates/adaptive_analysis_prompt.md` 作为 system prompt，让它产出结构化 JSON
-2. **JSON → 数据层**：`DailyRecord.parse()` 吃进去
+1. **拍照 → Vision API**：调你用的 Vision 模型（如 OpenAI、Anthropic、通义千问、豆包等），用 `templates/adaptive_analysis_prompt.md` 作为 system prompt，让它产出结构化 JSON
+2. **JSON → 数据层**：交给 `DailyRecord.parse()` 解析归一
 3. **评分 + 置信度**：调 `scoring` / `confidence` 模块
-4. **辨证 → LLM**：把评分结果 + 知识库检索结果塞进 prompt，调 LLM 出辨证结论
+4. **辨证 → LLM**：把评分结果 + 知识库检索结果并入 prompt，调 LLM 输出辨证结论
 5. **（可选）图表**：`scripts/generate_weekly_report.py` 生成周报趋势图
 
-如果你用 **Codex CLI**，直接在项目里 `import src.dimensions` 就行，Codex 能用标准 Python 库，不需要任何适配。
+任何能运行 Python 的 Agent 都能直接 `import src.dimensions`——标准库即够用，无需任何适配层。
 
 ---
 
@@ -142,6 +142,7 @@ scripts/
   input_validator.py       # 记录校验（安全边界违反=退出码 1）
   generate_weekly_report.py # 周报生成
   draw_hand_diagram.py     # 手部解剖示意图
+  vision_client.py         # 识图统一入口（OpenAI 兼容视觉模型，可用环境变量插拔）
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
 tests/                     # 159 项 pytest（fixtures/ 内置脱敏样例记录）
