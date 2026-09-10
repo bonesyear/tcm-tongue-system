@@ -1,5 +1,19 @@
 # 更新日志
 
+## v1.3.5（隐私声明与代码整理，2026-08-28）
+
+### 文档
+- README 新增「隐私与数据」章节：明确**程序本身不收集/不上传/不传输任何用户数据**（无遥测、无统计上报、无回传）；照片与记录仅存本地；网络调用仅发生于使用者自配置的外层 Agent（自备 API key）；OSS 备份脚本默认排除健康数据与版权全文。
+
+### 代码整理
+- `scripts/vision_qwen.py` → **`scripts/vision_client.py`**：开放接口更名（模型/端点/Key 由环境变量 `VISION_MODEL`/`VISION_BASE_URL`/`VISION_API_KEY` 配置，可插拔任意 OpenAI 兼容视觉服务，默认 Qwen3.8-Max）
+- vision_client.py 增量修复：`load_key()` 合并重复循环、跳过注释行、处理行内注释；assert 提示文案更新；docstring 参数名修正
+- 代码卫生：清理 6 处未使用 import（ruff F401）+ 15 处空白行尾随空格（W293）
+
+### 审查与规划（待执行）
+- Kimi 代码审查报告归档 `docs/CODE_REVIEW_2026-08-25_KIMI.md`（18 条问题 + 增量确认 + 决策记录）
+- 修改执行规划归档 `docs/REPAIR_PLAN_2026-08-25.md`（3 轮次 14 条 + "干燥/润泽"方案 A 落地清单）
+
 ## v1.3.4（许可与合规，2026-07-12）
 
 - 新增 `LICENSE`（GNU GPL v3）
