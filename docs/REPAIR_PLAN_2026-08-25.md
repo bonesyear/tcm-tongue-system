@@ -174,6 +174,36 @@ kimi -m kimi-k3 -p "读 docs/CODE_REVIEW_2026-08-25_KIMI.md 与 docs/REPAIR_PLAN
 
 **用户决策**：方向 **B** = 扩展 record.py 支持实际档案结构（新增"形状 C"），而非改写档案为 B 形状、也非放弃解析层。
 
-**待评估**：C 规范设计（键名/粒度）、实现路线（新增 C 路径 vs C→B 转换层）、自然语言值 + 关键词评分的复用/否定词风险、历史档案迁移取舍、与轮次 2 的先后 —— 已发 K3 征询建议（输出 `/tmp/kimi_shapeC_advice.md`）。
+**待评估**：C 规范设计（键名/粒度）、实现路线（新增 C 路径 vs C→B 转换层）、自然语言值 + 关键词评分的复用/否定词风险、历史档案迁移取舍、与轮次 2 的先后 —— **已发 K3 征询建议（2026-09-17，报告 `/tmp/kimi_shapeC_advice.md`），采纳要点如下。**
 
-**关键提醒**：形状 C 落地前，轮次 2 的评分层改动（方案 A 等）对实际数据仍是空转 —— 顺序上 C 应优先于轮次 2（待 K3 确认）。
+**关键提醒**：形状 C 落地前，轮次 2 的评分层改动（方案 A 等）对实际数据仍是空转 —— **顺序：C → 历史迁移 → 轮次 2**（K3 确认）。
+
+### K3 建议（已决议采纳，实施以此为准）
+
+**① C 规范：扁平版，键名严格复用 `_DIMENSION_INDICATORS` 的规范指标名**
+
+- 维度顶层键用规范英文名：`tongue`/`head_face`/`eye`/`ear`/`hand`/`skin`（与 `VisionDimension.english_name` 一致）；`face`/`palm` 仅作**兼容别名**
+- 指标键 = 规范指标名（`body_color`/`tooth_marks`/`body_size`/`coating_thickness`…），**不是** `body_shape`/`teeth_marks`（历史漂移勿沿用）
+- **HEAD_FACE 必须带前缀**（`face_color`/`lip_color`/`nose_color`）——该维度跨面/唇/鼻三子域，省前缀会撞名
+- C 路径因此是**恒等映射**：`"C": ["body_color"]`
+- 粒度：值为**当前状态短语**；**历史对比/括号夹注不进指标值**（放 `lessons` 或 `*_note`）
+- 缺失维度不写该键（与 `is_covered`、`_dig` 缺失即空串天然兼容）
+
+**② 实现路线：原生加 C 路径，不写转换层、不动 vision_client**
+
+- `_DIMENSION_INDICATORS` 每指标加一行 `"C": [指标名]`（≈40 行机械改动）；`get_observation` 的回落链（record.py:242）天然支持三形状
+- 形状检测（record.py:188-196）：`observations`→B；`doubao_vision_analysis`→A；否则顶层含任一维度键（含别名）→C；都没有→维持默认 B
+- `_dimension_root`（record.py:214-229）加 C 分支 + 别名 `{face→head_face, palm→hand}`
+- `get_pattern_differentiation` 认 `pattern_update`；`get_formula` 加别名列表（`formula_adjust`/`formula_with_dosage`）
+- ⚠️ `get_inquiry_coverage`（record.py:308-325）需 C 分支：C 的 `inquiry` 是 `{问题: 回答字符串}`，现有 `item.get("asked")` 会算成 0，应按"**非空字符串值计数**"
+- validator：`_DICT_FIELDS`（input_validator.py:45-47）补 `tongue`/`head_face`/`eye`/`ear`/`hand`/`skin`/`pattern_update`
+
+**③ 评分可行性（已推演）**：`'边缘轻度齿痕(无明显加重)'` → 最长匹配"轻度"(2字) > "无"(1字)，前置小句无否定词 → 命中 4 分，**不误杀** ✅
+- 但两条边角风险须入测试：①夹注若写"前期重度→现轻度"会命中"重度"=7 **高估**（→ 这就是"值只写当前状态"约定的理由）②"稍腻"别塞进 `coating_moisture`（低估，fail-safe 可接受）
+
+**④ 步骤**：record.py → validator → 模板/文档 → 测试（新 fixture + 检测优先级/别名/08-28 真实值三条断言/inquiry 扁平计数/pattern_update/端到端 validator）
+**④ 风险**：07-09 后档案多数**无 `danger_flags`**，现有 validator 缺失放行（打印"✅ 无触发"）→ C 落地后在真实档案首次暴露，建议至少加 warning
+
+**⑤ 历史迁移**：**值得做，但手工逐份改（8 份），不写通用脚本**（三种样式各异 + 整句拆分需医学判断）；validator 当验收；价值=周报趋势不断档。降级选项：只迁 08 月 4 份
+**⑥ 顺序**：C → 历史迁移 → 轮次 2；方案 A 项 2（`舌质荣枯`→`舌质润燥`）落地时 **C 的 `body_luster` 路径须同 commit 对齐**
+**工作量**：约 **1-1.5 个工作日**（record.py+validator 120-180 行 0.5 天 / 测试 0.5 天 / 模板文档 0.5 小时 / 迁移 1-2 小时）
