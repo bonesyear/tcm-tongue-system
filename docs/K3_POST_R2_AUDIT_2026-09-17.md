@@ -1,13 +1,13 @@
 kimi version 2.0.0
 • This is a substantial read-only audit task. I should delegate deep investigation to subagents, but I need to understand the codebase enough first. The task asks for sections ①-④ with file:line evidence and test outputs. Given the complexity, I could do it myself or delegate. The repo is small enough — let me look at key files directly. Key files: src/record.py, src/scoring.py, src/dimensions.py, src/confidence.py, scripts/generate_weekly_report.py, scripts/vision_client.py, scripts/input_validator.py, tests.
 
-  Plan: run git show cbbd58f to see the diff, read the relevant files, run targeted python experiments, check consumers of records/daily. This is a lot of work — maybe delegate parallel explorations. But subagents can't easily run experiments and report back with the same fidelity... actually coder/explore agents can run bash. Read-only constraint: I can use explore agents with explicit "read-only, python -c allowed" instructions.
+  Plan: run git show ef2f40a to see the diff, read the relevant files, run targeted python experiments, check consumers of records/daily. This is a lot of work — maybe delegate parallel explorations. But subagents can't easily run experiments and report back with the same fidelity... actually coder/explore agents can run bash. Read-only constraint: I can use explore agents with explicit "read-only, python -c allowed" instructions.
 
   Let me structure: 
   1. First, I read the commit diff and repair plan myself (core context).
   2. Then launch parallel subagents for the detailed probes? Or just do it myself — the repo is small.
 
-  I'll do it mostly myself since evidence quality matters. Start with git show stat and reading key files.commit cbbd58fa0cf76ed421bd5069dff4de82af12e5bf
+  I'll do it mostly myself since evidence quality matters. Start with git show stat and reading key files.commit ef2f40aa0cf76ed421bd5069dff4de82af12e5bf
 Author: bonesyear <199043401+bonesyear@users.noreply.github.com>
 Date:   Thu Sep 17 21:13:15 2026 +0800
 
@@ -34,15 +34,15 @@ Date:   Thu Sep 17 21:13:15 2026 +0800
  tests/test_record.py                     | 74 ++++++++++++++++++++++++++++++++
  tests/test_scoring.py                    | 40 +++++++++++++----
  8 files changed, 193 insertions(+), 38 deletions(-)
-7f59e18 docs: 轮次2后深查发现入档(备份污染周报已修 + 周报glob缺陷 + 轮次1审查遗留3点)
-2de0041 docs: 轮次2完成入档(含实测明细/取舍记录/红润词表缺口发现)
-cbbd58f fix(round2): 辨证层修复6条 + 方案A落地10项 + #19平局取高分
-fddd2ef docs: 决策'老档案不用在意'(评分口径扩展不追溯/不标注趋势断点)
-78abd96 docs: K3评分层意见归档 + 轮次3(评分覆盖扩展)入档 + 更正coating_thickness已有规则
-cc77b9f docs: C档案端到端实测发现两问题(同长度关键词低估湿盛/剥落斑无评分规则)
-4034f05 feat(record): 形状C支持 — 顶层规范英文维度键档案可被解析(0/6→6/6)
-adc648f docs: ⑤历史迁移决策=不做(C只对新档案生效,旧档保留原样)
-commit cbbd58fa0cf76ed421bd5069dff4de82af12e5bf
+8e97be5 docs: 轮次2后深查发现入档(备份污染周报已修 + 周报glob缺陷 + 轮次1审查遗留3点)
+ddf3427 docs: 轮次2完成入档(含实测明细/取舍记录/红润词表缺口发现)
+ef2f40a fix(round2): 辨证层修复6条 + 方案A落地10项 + #19平局取高分
+311fa3a docs: 决策'老档案不用在意'(评分口径扩展不追溯/不标注趋势断点)
+bf3fd71 docs: K3评分层意见归档 + 轮次3(评分覆盖扩展)入档 + 更正coating_thickness已有规则
+5b37335 docs: C档案端到端实测发现两问题(同长度关键词低估湿盛/剥落斑无评分规则)
+3711410 feat(record): 形状C支持 — 顶层规范英文维度键档案可被解析(0/6→6/6)
+728514c docs: ⑤历史迁移决策=不做(C只对新档案生效,旧档保留原样)
+commit ef2f40aa0cf76ed421bd5069dff4de82af12e5bf
 Author: bonesyear <199043401+bonesyear@users.noreply.github.com>
 Date:   Thu Sep 17 21:13:15 2026 +0800
 
@@ -1302,7 +1302,7 @@ All consistent — TONGUE_BODY_LUSTER_MAP fully removed, no stale references exc
 
 • # 轮次 2 独立审查报告
 
-  复核基线：commit `cbbd58f` 工作区现状，`pytest` 198 passed、`ruff --select F,E722` All passed（已亲测复现）。以下全部为只读实测。
+  复核基线：commit `ef2f40a` 工作区现状，`pytest` 198 passed、`ruff --select F,E722` All passed（已亲测复现）。以下全部为只读实测。
 
   ## ① 轮次 2 改动本身的隐患与边角
 

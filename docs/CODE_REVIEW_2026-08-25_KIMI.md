@@ -274,7 +274,7 @@ To resume this session: kimi -r session_1107b89d-3ddd-4113-9dde-5e13b0ea967e
 
 ## 增量确认补充（2026-08-25，kimi 复审 vision_qwen.py 配置化改造后）
 
-**审查对象**：commit 22f9ab8（MODEL/URL → VISION_MODEL/VISION_BASE_URL 环境变量，load_key 重构 VISION_API_KEY > DASHSCOPE_API_KEY）
+**审查对象**：commit bc2facc（MODEL/URL → VISION_MODEL/VISION_BASE_URL 环境变量，load_key 重构 VISION_API_KEY > DASHSCOPE_API_KEY）
 
 **确认结论（经本地实测校准）**：
 1. ✅ 新问题 A：load_key 两个循环重复读 .env —— 建议抽成"读一次→按优先级取"
