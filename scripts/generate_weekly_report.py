@@ -85,6 +85,20 @@ _DIMENSION_STYLE = {
 # ============================================================
 
 
+# 雷达图轴的展示标签（口径提示）；轴集合以 TONGUE_RADAR_METRIC_KEYS 为准，
+# 新轴未在此配置时退回轴名本身（见 generate_radar_chart）
+_RADAR_AXIS_LABELS = {
+    "舌质颜色": "舌质颜色\n(偏离)",
+    "舌苔厚度": "舌苔厚度\n(厚腻)",
+    "舌苔润燥": "舌苔润燥\n(燥/滑)",
+    "齿痕": "齿痕",
+    "瘀斑": "瘀斑",
+    "舌下络脉": "舌下络脉\n(迂曲)",
+    "裂纹": "裂纹",
+    "舌体胖瘦": "舌体胖瘦\n(偏离)",
+    "舌苔剥落": "舌苔剥落\n(剥落/地图)",
+}
+
 # 同日期档案竞争排除模式：备份/副本/临时/旧格式快照不参与档案选择——
 # 它们是历史快照，选上会读到旧口径数据（实测：08-28 的 .bak 曾让周报
 # 偏离度静默变 0.0）
@@ -189,7 +203,8 @@ def extract_tongue_metrics(record: Dict[str, Any]) -> Dict[str, float]:
     obs = rec.get_observation(VisionDimension.TONGUE)
     indicators = score_indicators(VisionDimension.TONGUE, obs)
 
-    # 雷达图 8 指标名 → Scoring 规范指标 key
+    # 雷达图指标名 → Scoring 规范指标 key（轴集合由 TONGUE_RADAR_METRIC_KEYS
+    # 单一来源决定；轮次 3 起为 9 轴，含「舌苔剥落」）
     return {
         metric_name: float(indicators.get(ind_key, 0))
         for metric_name, ind_key in TONGUE_RADAR_METRIC_KEYS.items()
@@ -258,27 +273,11 @@ def generate_radar_chart(metrics_list: List[Dict[str, float]],
         print(f"⚠️ 无法导入 matplotlib: {e}", file=sys.stderr)
         return None
 
-    # 雷达图指标（8 个维度）
-    categories = [
-        "舌质颜色",
-        "舌苔厚度",
-        "舌苔润燥",
-        "齿痕",
-        "瘀斑",
-        "舌下络脉",
-        "裂纹",
-        "舌体胖瘦",
-    ]
-    category_labels = [
-        "舌质颜色\n(偏离)",
-        "舌苔厚度\n(厚腻)",
-        "舌苔润燥\n(燥/滑)",
-        "齿痕",
-        "瘀斑",
-        "舌下络脉\n(迂曲)",
-        "裂纹",
-        "舌体胖瘦\n(偏离)",
-    ]
+    # 雷达图轴集合直接取自 TONGUE_RADAR_METRIC_KEYS（单一来源，避免
+    # 硬编码轴数假设——轮次 3 新增「舌苔剥落」后为 9 轴）；
+    # category_labels 为带口径提示的展示名，未配置时退回轴名本身
+    categories = list(TONGUE_RADAR_METRIC_KEYS.keys())
+    category_labels = [_RADAR_AXIS_LABELS.get(c, c) for c in categories]
 
     N = len(categories)
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()

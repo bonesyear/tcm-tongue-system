@@ -44,6 +44,8 @@ from .dimensions import VisionDimension
 # 舌质颜色（偏红/偏淡 → 偏离正常程度；0 = 正常基线）
 TONGUE_BODY_COLOR_MAP = {
     "淡红": 0,   # 正常基线
+    "红润": 0,   # 正常基线（轮次 3 补词表缺口：正常描述"红润"曾靠单字"红"
+                 # 命中被判 7 分误报；"红润"靠最长匹配压过"红"）
     "淡白": 7,   # 偏寒
     "红": 7,     # 偏热
     "红绛": 8,   # 热甚
@@ -109,6 +111,63 @@ TONGUE_BODY_SIZE_MAP = {
     "肿胀": 9,
 }
 
+# ============================================================
+# 轮次 3（评分覆盖扩展）新增映射表 —— 分值经用户签认（2026-09-17）
+# ------------------------------------------------------------
+# 统一原则：评分层只收"静态照片可客观判读"的指标；需动态观察或对
+# 光线/拍摄条件敏感的主观判断，降级为辨证层。剥落/腻腐/苔色/点刺/
+# 舌下颜色与粗细均为静态可判的形态学体征，故补入评分；对称地，
+# body_dynamics（颤动/痿软/歪斜）静态照片不可判、coating_distribution
+# （异常语义已被剥落/厚度覆盖）不收规则。
+# 0 = 正常基线，越高越异常；正常描述（"无剥落/不腻/无点刺"）由否定
+# 守卫归零，无需显式 0 词条。
+# ============================================================
+
+# 舌苔剥落（结构性形态，静态照片完全可判；核心观察点）
+TONGUE_COATING_PEELING_MAP = {
+    "剥落": 6,
+    "剥脱": 6,
+    "花剥": 6,
+    "地图舌": 7,
+    "镜面": 9,
+}
+
+# 舌苔腻腐（苔质附着形态；"不腻"中"腻"被前置否定守卫拦截）
+TONGUE_COATING_GREASY_MAP = {
+    "稍腻": 3,
+    "腻": 5,
+    "厚腻": 8,
+    "腐苔": 7,
+}
+
+# 舌苔颜色（颜色是照片最可靠的维度；"灰黑"靠最长匹配压过"灰"）
+TONGUE_COATING_COLOR_MAP = {
+    "白": 0,
+    "黄": 3,
+    "灰": 6,
+    "黑": 7,
+    "灰黑": 8,
+}
+
+# 点刺（凸起红点，分辨率敏感 → 分值保守）
+TONGUE_PRICKLES_MAP = {
+    "点刺": 5,
+    "芒刺": 6,
+}
+
+# 舌下络脉颜色（前提：拍了舌下照；淡紫为正常基线）
+SUBLINGUAL_COLOR_MAP = {
+    "淡紫": 0,
+    "紫暗": 6,
+    "青紫": 8,
+}
+
+# 舌下络脉粗细
+SUBLINGUAL_THICKNESS_MAP = {
+    "增粗": 5,
+    "怒张": 7,
+}
+
 # 面部光泽
 FACE_LUSTER_MAP = {
     "荣润": 0,   # 有神
@@ -140,6 +199,14 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "sublingual_varicosity": SUBLINGUAL_VARICOSITY_MAP,
         "fissure": FISSURE_MAP,
         "body_size": TONGUE_BODY_SIZE_MAP,
+        # 轮次 3 新增（统一原则：均为静态照片可判的形态学体征）
+        "coating_peeling": TONGUE_COATING_PEELING_MAP,
+        "coating_greasy": TONGUE_COATING_GREASY_MAP,
+        "coating_color": TONGUE_COATING_COLOR_MAP,
+        "prickles": TONGUE_PRICKLES_MAP,
+        "sublingual_color": SUBLINGUAL_COLOR_MAP,
+        "sublingual_thickness": SUBLINGUAL_THICKNESS_MAP,
+        "sublingual_petechiae": PETECHIAE_MAP,  # 直接复用既有瘀斑表
     },
     VisionDimension.HEAD_FACE: {
         "face_color":    {"萎黄": 5, "晦暗": 5, "黧黑": 5, "青灰": 5, "红如妆": 9},
@@ -190,6 +257,9 @@ TONGUE_RADAR_METRIC_KEYS = {
     "舌下络脉": "sublingual_varicosity",
     "裂纹": "fissure",
     "舌体胖瘦": "body_size",
+    # 轮次 3 新增第 9 轴：剥落是核心观察点，
+    # 不进雷达图则只在维度均分里体现，趋势图看不到
+    "舌苔剥落": "coating_peeling",
 }
 
 
