@@ -1,11 +1,13 @@
 """Record module 测试。
 
-用脱敏样例记录 tests/fixtures/2026-06-25_analysis.json（形状 B，字段结构
-与真实 LLM 产出一致）作为 fixture，断言新架构能正确解析、按维度取观测、
-取方剂/辨证/红线，且不丢失信息。
+用合成示例记录 tests/fixtures/2026-06-25_analysis.json（形状 B，字段结构
+与真实 LLM 产出一致，内容为构造数据、不对应任何真实个人）作为 fixture，
+断言新架构能正确解析、按维度取观测、取方剂/辨证/红线，且不丢失信息。
 
 fixture 入库原因：原先依赖 records/daily/ 下的真实记录，而该目录被
 .gitignore 排除且含个人健康数据 → 新环境克隆后测试必挂（历史 Bug 1）。
+
+fixture 必须是合成数据：本仓库为公开仓库，不允许出现任何真实个人的健康信息。
 """
 import json
 import os
@@ -37,7 +39,7 @@ def test_get_observation_tongue_has_content(real_record):
     assert isinstance(obs, dict)
     non_empty = {k: v for k, v in obs.items() if v}
     assert len(non_empty) > 0, "舌诊观测不应全空"
-    # 真实记录舌质颜色为「淡红为底，局部偏红」
+    # 示例记录舌质颜色为「淡红」
     assert "淡红" in obs["body_color"]
 
 
@@ -49,7 +51,7 @@ def test_get_observation_text_non_empty(real_record):
 def test_get_formula_non_empty(real_record):
     formula = real_record.get_formula()
     assert formula, "方剂不应为空"
-    assert formula.get("name") == "示例方（合成数据）"
+    assert formula.get("name") == "示例方（合成数据，12 味）"
     assert formula.get("total_herbs") == 12
     assert len(formula.get("ingredients", [])) == 12
 

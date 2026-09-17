@@ -1,29 +1,29 @@
 {
-  "date": "2026-08-28",
-  "session": "随访（脱敏样例，字段与值风格仿真实自由格式记录）",
-  "confidence": "HIGH",
+  "date": "2026-01-15",
+  "session": "示例档案（合成数据，字段与值风格仿形状 C 记录，不对应任何真实个人）",
+  "confidence": "MEDIUM",
   "tongue": {
-    "body_color": "示例舌色",
-    "body_size": "胖大",
-    "tooth_marks": "边缘轻度齿痕(无明显加重)",
-    "fissure": "仅中央浅窄正中沟(生理性, 非病理裂纹)",
-    "prickles": "舌尖及边部散在红色点刺, 剥落区内亦见红点",
+    "body_color": "淡红",
+    "body_size": "正常",
+    "tooth_marks": "边缘轻度齿痕（无明显加重）",
+    "fissure": "无",
+    "prickles": "舌尖散在点刺",
     "coating_color": "白",
-    "coating_thickness": "中央及根部偏厚边尖较薄",
-    "coating_moisture": "湿润偏滑, 稍腻",
-    "coating_peeling": "无明显剥落迹象, 苔面覆盖完整、分布尚匀",
+    "coating_thickness": "薄白",
+    "coating_moisture": "润",
+    "coating_peeling": "无明显剥落迹象，苔面覆盖完整、分布尚匀",
     "sublingual_color": "正常",
     "sublingual_thickness": "正常",
     "sublingual_varicosity": "无迂曲"
   },
   "head_face": {
-    "face_color": "萎黄",
+    "face_color": "淡黄",
     "lip_color": "淡红",
     "nose_color": "正常"
   },
   "eye": {
     "redness": "无明显充血",
-    "dark_orbit": "轻度黑眼圈"
+    "dark_orbit": "无"
   },
   "ear": {
     "color": "正常"
@@ -34,21 +34,21 @@
   },
   "skin": {
     "color": "正常",
-    "dryness": "轻度干燥"
+    "dryness": "无"
   },
   "inquiry": {
-    "大便": "成型, 稍微偏软",
-    "睡眠": "有改善, 但仍有点入睡困难",
-    "急性情况": "无(无感冒/咳嗽/发热)",
-    "剥落区不适": ""
+    "食欲": "正常",
+    "睡眠": "尚可",
+    "大便": "正常",
+    "小便": ""
   },
   "pattern_update": {
-    "pattern": "太阴脾虚(减轻)+胃阴不足(反弹)+湿象(轻)",
-    "trend": "示例变化描述, 养阴不宜骤停"
+    "pattern": "示例辨证（合成数据）",
+    "trend": "示例趋势描述（合成数据）"
   },
   "formula": {
-    "name": "健脾养阴方(自拟, 脱敏样例)",
-    "logic": "健脾燥湿+养阴主攻+安神"
+    "name": "示例方（合成数据）",
+    "logic": "示例方义（合成数据）"
   },
   "disclaimer": "本分析仅供参考，不构成医疗诊断，请咨询专业中医师"
 }

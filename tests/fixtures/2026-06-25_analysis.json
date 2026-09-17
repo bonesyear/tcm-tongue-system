@@ -8,7 +8,7 @@
   "observations": {
     "tongue": {
       "body": {
-        "color": "淡红为底，局部偏红",
+        "color": "淡红",
         "luster": "荣润",
         "shape": "偏胖大，边有齿痕",
         "ecchymosis": "无瘀斑瘀点",
@@ -23,7 +23,7 @@
         "moisture": "润",
         "greasy": "不腻",
         "peeling": "花剥",
-        "distribution": "分布不均，以舌中前部剥落为主"
+        "distribution": "分布尚匀"
       },
       "sublingual": {
         "vein_color": "隐约浅淡蓝紫色，大致正常",
@@ -82,36 +82,36 @@
   "pattern_differentiation": {
     "three_views": {
       "表里观": "里证为主",
-      "正邪观": "正虚为主，胃虚有热",
-      "津液观": "津液不足，虚热灼津"
+      "正邪观": "正虚为主",
+      "津液观": "津液不足"
     },
     "four_patterns": {
       "水证": "轻度",
-      "火证": "轻度（虚热）",
+      "火证": "轻度",
       "气证": "轻度",
       "血证": "轻度"
     },
-    "six_diseases": "太阴病为主，兼阳明虚热",
-    "core_pathomechanism": "（示例病机，合成数据）"
+    "six_diseases": "示例六经归属（合成数据）",
+    "core_pathomechanism": "示例病机描述（合成数据，无临床含义）"
   },
   "formula": {
-    "name": "示例方（合成数据）",
+    "name": "示例方（合成数据，12 味）",
     "total_herbs": 12,
     "ingredients": [
-      {"herb": "党参", "dosage": "15g"},
-      {"herb": "白术", "dosage": "10g"},
-      {"herb": "茯苓", "dosage": "15g"},
-      {"herb": "炙甘草", "dosage": "6g"},
-      {"herb": "生地黄", "dosage": "12g"},
-      {"herb": "牡丹皮", "dosage": "9g"},
-      {"herb": "赤芍", "dosage": "9g"},
-      {"herb": "当归", "dosage": "10g"},
-      {"herb": "麦冬", "dosage": "10g"},
-      {"herb": "石斛", "dosage": "10g"},
+      {"herb": "甘草", "dosage": "6g"},
+      {"herb": "茯苓", "dosage": "10g"},
       {"herb": "陈皮", "dosage": "6g"},
-      {"herb": "山药", "dosage": "15g"}
+      {"herb": "山药", "dosage": "10g"},
+      {"herb": "莲子", "dosage": "10g"},
+      {"herb": "薏苡仁", "dosage": "10g"},
+      {"herb": "桔梗", "dosage": "6g"},
+      {"herb": "生姜", "dosage": "3g"},
+      {"herb": "大枣", "dosage": "10g"},
+      {"herb": "白扁豆", "dosage": "10g"},
+      {"herb": "芡实", "dosage": "10g"},
+      {"herb": "砂仁", "dosage": "3g"}
     ],
-    "rationale": "（示例方义，合成数据）",
+    "rationale": "示例方义：健脾化湿、和中养胃（合成数据，无临床含义）",
     "note": "剂量仅供参考，请在执业中医师指导下使用"
   },
   "danger_flags": {
@@ -129,5 +129,5 @@
     ]
   },
   "tags": ["fixture"],
-  "notes": "测试脱敏样例记录：字段结构与真实 LLM 产出（形状 B）一致，内容为构造数据，不对应任何真实个人。"
+  "notes": "合成示例记录：字段结构与形状 B 产出一致，全部内容为构造数据，不对应任何真实个人。"
 }
