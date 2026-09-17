@@ -44,7 +44,10 @@ from src import confidence as confidence_mod  # noqa: E402
 # 否则红线/方剂等安全数据会被类型错误"清零"后放行)
 _DICT_FIELDS = ("observations", "doubao_vision_analysis", "inquiry",
                 "inquiry_coverage", "deepseek_diagnosis",
-                "pattern_differentiation", "danger_flags", "formula")
+                "pattern_differentiation", "danger_flags", "formula",
+                # 形状 C 顶层维度键与辨证键
+                "tongue", "head_face", "eye", "ear", "hand", "skin",
+                "pattern_update")
 
 
 def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
@@ -226,7 +229,8 @@ def print_report(filepath: str, record: DailyRecord,
     print("=" * 60)
     print(f"📂 文件: {filepath}")
     print(f"📅 记录日期: {record.date if record else '未知'}")
-    print(f"🧩 记录形状: {record.shape if record else '?'}（A=模板/中文键, B=真实产出/英文键）")
+    print(f"🧩 记录形状: {record.shape if record else '?'}"
+          "（A=模板/中文键, B=observations/英文键, C=顶层英文维度键）")
     print()
 
     if record:
