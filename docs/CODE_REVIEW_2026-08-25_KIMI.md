@@ -4,6 +4,9 @@
   > 审查纪律：编码规范/Fowler 坏味道 + 功能忠实度 + ponytail + karpathy-guidelines。  
   > 未修改任何文件，未执行 git 操作。
 
+  > ⚠️ **K3 复核修订（2026-09-17）**——本报告有 4 处判断被 `docs/K3_REVIEW_2026-09-17.md` 推翻：**#15 确凿误判**（引用的 `docs/architecture/dimension-overlap-analysis.md` 实际存在且 §5.2 内容吻合）、**#11 前提不成立**（多异常均值断言已存在）、**#9 范围多算一个方法**（仅 `get_pattern_differentiation`）、**#4 原判不成立**（`startswith` 免疫行首 `#`，本文档增量确认已自行推翻，但下方"总体结论"仍列 #4 为最值得修——残留矛盾，以 K3 结论为准）。
+  > **执行时以 `docs/REPAIR_PLAN_2026-08-25.md` 的「K3 复核修订」章节为准。**
+
   ---
 
   # A) 代码审查报告
