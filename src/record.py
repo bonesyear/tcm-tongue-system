@@ -21,11 +21,12 @@ Interface（小而稳）：
 校验器与周报生成器都退化为本 module 的 adapter，只认 Record interface，
 不再各自手抄字段路径 → 形状只在一处定义，改一次全改。
 
-设计语汇（/codebase-design）：这是首选深 module——删掉它，"记录形状"的
+设计语汇：这是首选深 module——删掉它，"记录形状"的
 复杂度会立刻重现到模板、校验器、周报三个调用方。
 """
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .dimensions import VisionDimension, DIMENSIONS, from_english, from_chinese
@@ -46,7 +47,7 @@ from .dimensions import VisionDimension, DIMENSIONS, from_english, from_chinese
 _DIMENSION_INDICATORS: Dict[VisionDimension, Dict[str, Dict[str, List[str]]]] = {
     VisionDimension.TONGUE: {
         "body_color":              {"A": ["舌质颜色"],         "B": ["body", "color"],              "C": ["body_color"]},
-        "body_luster":             {"A": ["舌质荣枯"],         "B": ["body", "luster"],             "C": ["body_luster"]},
+        "body_luster":             {"A": ["舌质润燥"],         "B": ["body", "luster"],             "C": ["body_luster"]},
         "body_size":               {"A": ["舌体胖瘦"],         "B": ["body", "shape"],              "C": ["body_size"]},
         "petechiae":               {"A": ["瘀斑瘀点"],         "B": ["body", "ecchymosis"],         "C": ["petechiae"]},
         "tooth_marks":             {"A": ["齿痕"],             "B": ["body", "tooth_marks"],        "C": ["tooth_marks"]},
@@ -142,6 +143,17 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
+# 方剂内容兜底扫描：剂量模式（如 "桂枝10g"、"10 g"、"10克"）
+_DOSAGE_RE = re.compile(r"\d+\s*[gG克]")
+# 常见经方名（白名单键未命中时，值中出现方名即算有方剂内容）
+_CLASSIC_FORMULA_RE = re.compile(
+    r"桂枝汤|麻黄汤|葛根汤|小青龙汤|大青龙汤|白虎汤|大承气汤|小承气汤|"
+    r"调胃承气汤|小柴胡汤|大柴胡汤|柴胡桂枝干姜汤|半夏泻心汤|生姜泻心汤|"
+    r"甘草泻心汤|五苓散|苓桂术甘汤|真武汤|四逆汤|当归四逆汤|芍药甘草汤|"
+    r"桂枝茯苓丸|桃核承气汤|抵当汤|茵陈蒿汤|栀子豉汤|小建中汤|炙甘草汤"
+)
+
+
 def has_formula_content(formula: Any) -> bool:
     """判断方剂对象是否携带任何实质内容(方名/成分/药组/剂量)。
 
@@ -149,6 +161,10 @@ def has_formula_content(formula: Any) -> bool:
     "无方名但携带 12 味药材+具体剂量" 的记录——处方的实质是药物与剂量,
     不是方名。非 dict 的非空值(如整段方剂文本)同样算有内容,
     结构异常不能成为安全检查的放行理由(fail-closed)。
+
+    键白名单之外还有兜底扫描：任意值中出现剂量模式（\\d+[g克]）或
+    常见经方名（如桂枝汤/小柴胡汤）即判为有方剂内容——白名单键名
+    漂移（如 {"description": "含桂枝10g"}）不能成为放行理由。
     """
     if not formula:
         return False
@@ -156,7 +172,10 @@ def has_formula_content(formula: Any) -> bool:
         return bool(str(formula).strip())
     content_keys = ("name", "主方", "合方", "ingredients", "核心药组",
                     "剂量建议", "加减", "dosage", "herbs")
-    return any(formula.get(k) for k in content_keys)
+    if any(formula.get(k) for k in content_keys):
+        return True
+    text = _flatten_to_text(formula)
+    return bool(_DOSAGE_RE.search(text) or _CLASSIC_FORMULA_RE.search(text))
 
 
 def _flatten_to_text(obj: Any) -> str:
@@ -178,6 +197,20 @@ def _flatten_to_text(obj: Any) -> str:
         s = str(obj).strip()
         return s if s else ""
     return " ".join(parts)
+
+
+# danger_flags 的宽松真值判定：LLM 可能把布尔输出为字符串 "true"/"yes"
+# 或数值 1，严格 `is True` 会让真值意图的红线静默不触发（fail-open）。
+# 注意：validator 对形状 A 的非布尔 triggered 仍报 error（输入层把关），
+# 这里的宽松化面向 Record 的消费方（周报/报告），双保险不冲突。
+_TRUE_FLAG_STRINGS = ("true", "yes", "1")
+
+
+def _is_triggered(value: Any) -> bool:
+    """danger_flags.triggered 的宽松真值判断（True/'true'/'yes'/1 均算触发）。"""
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUE_FLAG_STRINGS
+    return value is True or value == 1
 
 
 class DailyRecord:
@@ -281,7 +314,9 @@ class DailyRecord:
 
         形状 B：pattern_differentiation；形状 C：pattern_update（别名）；
         形状 A：deepseek_diagnosis.许家栋经方辨证。
-        容器类型不对时返回空 dict（结构错误由 validator 报告）。
+        容器类型不对时返回空 dict（结构错误由 validator 报告）；
+        形状 A 找不到辨证键时返回 {}，不得回落为整个 diagnosis dict
+        （否则"综合辨证结论"等无关字段会污染辨证结果）。
         """
         for key in ("pattern_differentiation", "pattern_update"):
             if key in self.raw:
@@ -290,7 +325,7 @@ class DailyRecord:
         diag = self.raw.get("deepseek_diagnosis") or {}
         if not isinstance(diag, dict):
             return {}
-        return diag.get("许家栋经方辨证", diag) or {}
+        return diag.get("许家栋经方辨证") or {}
 
     def get_formula(self) -> Any:
         """取方剂建议。
@@ -315,7 +350,9 @@ class DailyRecord:
     def get_triggered_danger_flags(self) -> List[str]:
         """取已触发的红线列表。
 
-        形状 B：danger_flags.triggered（列表）；形状 A：遍历 flag 对象 triggered=True。
+        形状 B：danger_flags.triggered（列表）；形状 A：遍历 flag 对象，
+        triggered 按宽松真值判定（True/'true'/'yes'/1 均算触发）——
+        严格 `is True` 会让 LLM 输出的字符串 "true" 静默不触发（fail-open）。
         """
         df = self.get_danger_flags()
         if not isinstance(df, dict):
@@ -324,7 +361,7 @@ class DailyRecord:
             return list(df["triggered"])
         triggered = []
         for name, flag in df.items():
-            if isinstance(flag, dict) and flag.get("triggered") is True:
+            if isinstance(flag, dict) and _is_triggered(flag.get("triggered")):
                 triggered.append(name)
         return triggered
 

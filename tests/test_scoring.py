@@ -62,7 +62,7 @@ def test_negation_guard_on_eye_edema():
 
 
 def test_negation_guard_extended_words():
-    # 否定词集扩充：未/没/非（历史 Bug 5——真实 LLM 产出常用"未见/没有"）
+    # 否定词集扩充：未/没（历史 Bug 5——真实 LLM 产出常用"未见/没有"）
     assert score_indicators(VisionDimension.HEAD_FACE,
                             {"face_edema": "未见明显浮肿"})["face_edema"] == 0
     assert score_indicators(VisionDimension.EYE,
@@ -70,6 +70,15 @@ def test_negation_guard_extended_words():
     # 窗口放宽：否定词距关键词 4 字（"无明显的浮肿"）也应被拦截
     assert score_indicators(VisionDimension.EYE,
                             {"edema": "无明显的浮肿"})["edema"] == 0
+
+
+def test_fei_is_not_negation_for_abnormal_prefix():
+    """"非" 不是否定词："非正常/非典型" 修饰的是"正常/典型"，
+    误判为否定会把真异常漏报成正常（历史 Bug——"非正常红润" 被误否定）。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "非正常红润"})["body_color"] == 7
+    assert score_indicators(VisionDimension.EYE,
+                            {"jaundice": "非典型黄染"})["jaundice"] == 4
 
 
 def test_negation_guard_clause_boundary():
@@ -120,7 +129,6 @@ def test_normal_tongue_scores_zero():
         "sublingual_varicosity": "无",
         "fissure": "无",
         "body_size": "适中",
-        "body_luster": "荣润",
     }
     assert score(VisionDimension.TONGUE, normal) == 0.0
     inds = score_indicators(VisionDimension.TONGUE, normal)
@@ -132,14 +140,28 @@ def test_tongue_score_sparse_not_diluted():
     assert score(VisionDimension.TONGUE, "青紫") == 10
 
 
-def test_body_luster_scoring():
-    # 舌质荣枯：枯槁高分、荣润正常
+def test_body_luster_not_scored():
+    """方案 A：body_luster（舌质润燥，原"舌质荣枯"）已从 DIMENSION_RULES
+    移除——光泽受照片光线干扰、静态照片不可判神气/荣枯，降级到辨证层，
+    不再参与 score()。"""
     inds = score_indicators(VisionDimension.TONGUE, {"body_luster": "枯槁"})
-    assert inds["body_luster"] == 8
-    inds2 = score_indicators(VisionDimension.TONGUE, {"body_luster": "少泽"})
-    assert inds2["body_luster"] == 5
-    inds3 = score_indicators(VisionDimension.TONGUE, {"body_luster": "荣润"})
-    assert inds3["body_luster"] == 0
+    assert "body_luster" not in inds
+
+
+def test_tie_break_prefers_higher_score():
+    """同长度关键词命中时取分值最高者（fail-loud：宁可高估不漏估）。
+    端到端实测发现："湿润偏滑" 曾因 "润":0 排在 "滑":7 之前被判 0 分，
+    湿盛信号被系统性掩盖。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_moisture": "湿润偏滑"})["coating_moisture"] == 7
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_moisture": "湿润"})["coating_moisture"] == 0
+    # 两个异常词平局：取更高的 "燥"=8 而非 "滑"=7
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_moisture": "滑燥并见"})["coating_moisture"] == 8
+    # 否定后平局不触发："燥" 被 "不" 否定，只剩 "润"=0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_moisture": "苔润不燥"})["coating_moisture"] == 0
 
 
 def test_face_luster_scoring():
