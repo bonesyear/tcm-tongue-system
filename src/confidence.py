@@ -72,14 +72,24 @@ _CHINESE_LEVEL_INDEX = {
 _CHINESE_LEVEL_SUFFIXES = ("", "度", "度确信", "度置信", "置信", "置信度", "等")
 
 
+def _is_word_boundary(ch: str) -> bool:
+    """英文规范值之后的合法边界字符：空格、连字符或 CJK 字符。
+
+    数字/下划线/英文字母都不是边界（"HIGH1"/"HIGH_2"/"HIGHEST" 不算
+    HIGH——fail-closed，认不出的置信度交给覆盖度推断执行安全检查）。
+    CJK 字符是合法边界且不能用 isalpha() 判断（CJK 的 isalpha() 为 True）。
+    """
+    return ch in " -" or "一" <= ch <= "鿿"
+
+
 def parse_level(text: Optional[str]) -> Optional[ConfidenceLevel]:
     """把记录自报的置信度字符串解析为枚举。无法识别（含空白串）返回 None。
 
     兼容三类写法：
       - 英文规范值："HIGH" / "high"（大小写不敏感）
-      - 英文带后缀："HIGH CONFIDENCE"、"HIGH置信度" 等——仅当规范值后
-        紧跟非英文字母（"HIGHEST" 不算 HIGH；CJK 字符是合法边界，
-        不能用 isalpha() 判断——CJK 的 isalpha() 为 True）
+      - 英文带后缀："HIGH CONFIDENCE"、"HIGH置信度" 等——规范值之后
+        只认可空格/连字符/CJK 字符/字符串结尾作为词边界
+        （"HIGHEST"/"HIGH1"/"HIGH_2" 都不算 HIGH）
       - 中文："高" / "高度" / "高度确信" / "高置信度" / "中等"（中/低 同理）
     """
     if text is None:
@@ -93,10 +103,10 @@ def parse_level(text: Optional[str]) -> Optional[ConfidenceLevel]:
         value = lvl.value
         if upper == value:
             return lvl
-        # 词边界前缀：后随字符不是 ASCII 字母即可（空格/连字符/中文均可）
+        # 词边界前缀：后随字符必须是空格/连字符/CJK
         if (upper.startswith(value)
                 and len(upper) > len(value)
-                and not ("A" <= upper[len(value)] <= "Z")):
+                and _is_word_boundary(upper[len(value)])):
             return lvl
     first = name[0]
     if first in _CHINESE_LEVEL_INDEX and name[1:] in _CHINESE_LEVEL_SUFFIXES:
