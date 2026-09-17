@@ -27,6 +27,7 @@ Interface（小而稳）：
 
 import json
 import re
+import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .dimensions import VisionDimension, DIMENSIONS, from_english, from_chinese
@@ -244,6 +245,8 @@ class DailyRecord:
             # 三种判据都不满足：默认按 B 处理，
             # 各维度观测将返回空，由 validator/调用方判定。
             self._shape = "B"
+        # 形状 C 混合形状警告的去重记录（每维度至多打一次）
+        self._warned_mixed_shape: set = set()
 
     # ---- 解析入口（interface） ----
     @classmethod
@@ -302,7 +305,33 @@ class DailyRecord:
         for indicator, paths in _DIMENSION_INDICATORS[dim].items():
             path = paths.get(shape_key) or paths.get("B") or paths.get("A") or []
             result[indicator] = _dig(root, path)
+        self._warn_if_mixed_shape(dim, root, result)
         return result
+
+    def _warn_if_mixed_shape(self, dim: VisionDimension,
+                             root: Dict[str, Any], result: Dict[str, str]) -> None:
+        """形状 C 下维度节点非空却解析不到任何规范指标时打 warning。
+
+        混合形状档案（顶层有 tongue 被判为 C，内层却是 B 式嵌套
+        body/coating/sublingual 或漂移键名 body_shape/teeth_marks）会被
+        恒等映射静默取空 → 覆盖 0/6 全程无提示（实测 08-09/08-14）。
+        仅打警告：不抛异常、不改变返回语义；每记录每维度至多打一次。
+        正常 C 档案（观测能解析出值，或维度键根本没写）不触发。
+        """
+        if (self._shape != "C" or dim in self._warned_mixed_shape
+                or not isinstance(root, dict) or not root
+                or any(result.values())):
+            return
+        if not _flatten_to_text(root):
+            return  # 节点只有空值占位，不算"有内容却解析不到"
+        self._warned_mixed_shape.add(dim)
+        print(
+            f"⚠️ 警告: 形状 C 记录的维度节点 {dim.english_name!r} 非空，"
+            f"但按规范指标名解析不到任何观测——可能是混合形状"
+            f"（B 式嵌套 body/coating/sublingual）或键名漂移"
+            f"（如 body_shape/teeth_marks），请核对形状 C 规范",
+            file=sys.stderr,
+        )
 
     def get_observation_text(self, dimension: VisionDimension) -> str:
         """按维度取观测的纯文本拼接（供打分/展示）。"""
