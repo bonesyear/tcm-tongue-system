@@ -202,6 +202,56 @@ def test_weekly_summary_flags_safety_violation():
     assert "安全边界警示" in data["summary"]
 
 
+def test_select_daily_file_prefers_canonical_name(monkeypatch, tmp_path, capsys):
+    """同日存在 _b 副本时，规范名 {date}_analysis.json 优先（实测 07-15 曾
+    被 sorted()[-1] 静默选中 _b 副本而丢弃正档）。"""
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    (daily / "2026-07-15_analysis.json").write_text(
+        json.dumps({"date": "2026-07-15", "tag": "canonical"}), encoding="utf-8")
+    (daily / "2026-07-15_b_analysis.json").write_text(
+        json.dumps({"date": "2026-07-15", "tag": "copy_b"}), encoding="utf-8")
+    monkeypatch.setattr(g, "RECORDS_DIR", str(daily))
+    chosen = g._select_daily_file("2026-07-15")
+    assert chosen.endswith("2026-07-15_analysis.json")
+    assert capsys.readouterr().err == ""  # 规范名命中即无歧义，不打 warning
+
+
+def test_select_daily_file_warns_on_multiple_noncanonical(
+        monkeypatch, tmp_path, capsys):
+    """无规范名且有多份非规范候选时：打 warning（列出全部候选与选用者），
+    取 mtime 最新者。"""
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    older = daily / "2026-07-15_b_analysis.json"
+    newer = daily / "2026-07-15_c_analysis.json"
+    older.write_text(json.dumps({"date": "2026-07-15"}), encoding="utf-8")
+    newer.write_text(json.dumps({"date": "2026-07-15"}), encoding="utf-8")
+    os.utime(older, (1000000000, 1000000000))
+    os.utime(newer, (1000000100, 1000000100))
+    # .bak 备份不参与竞争（选上会读到旧口径数据）
+    bak = daily / "2026-07-15_analysis.bak.json"
+    bak.write_text(json.dumps({"date": "2026-07-15"}), encoding="utf-8")
+    os.utime(bak, (1000000200, 1000000200))  # mtime 最新但被排除
+    monkeypatch.setattr(g, "RECORDS_DIR", str(daily))
+    chosen = g._select_daily_file("2026-07-15")
+    assert chosen.endswith("2026-07-15_c_analysis.json")
+    err = capsys.readouterr().err
+    assert "2026-07-15_b_analysis.json" in err
+    assert "2026-07-15_c_analysis.json" in err
+    assert "mtime" in err
+
+
+def test_select_daily_file_no_match_silent(monkeypatch, tmp_path, capsys):
+    """无候选时返回 None 且静默跳过（不报错、不打 warning）。"""
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    (daily / "2026-07-14_analysis.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(g, "RECORDS_DIR", str(daily))
+    assert g._select_daily_file("2026-07-15") is None
+    assert capsys.readouterr().err == ""
+
+
 def test_empty_records_report_structure():
     """空记录列表返回完整结构（含 confidence_checks 空列表）。"""
     data = g.generate_weekly_report_data([])

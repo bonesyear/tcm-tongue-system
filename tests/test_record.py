@@ -233,6 +233,40 @@ def test_shape_a_danger_flags_triggered():
                                                  "flesh_wasted"]
 
 
+def test_mixed_shape_c_warns_when_unparseable(capsys):
+    """混合形状档案（顶层 tongue 被判为 C，内层是 B 式嵌套或漂移键名）：
+    维度节点非空却解析不到规范指标时必须打 warning——否则静默零分
+    （实测 records/daily/2026-08-09、08-14 覆盖 0/6 全程无提示）。
+    正常 C 档案不得触发。"""
+    mixed = DailyRecord({
+        "date": "2026-08-09",
+        "tongue": {"body": {"color": "淡红"}, "coating": {"thickness": "薄白"}},
+    })
+    assert mixed.shape == "C"
+    obs = mixed.get_observation(VisionDimension.TONGUE)
+    assert not any(obs.values())  # 恒等映射取不到值（返回语义不变）
+    err = capsys.readouterr().err
+    assert "tongue" in err and "混合形状" in err
+    # 每维度至多打一次：重复调用不重复告警
+    mixed.get_observation(VisionDimension.TONGUE)
+    assert capsys.readouterr().err == ""
+    # 漂移键名同样触发
+    drifted = DailyRecord({
+        "date": "2026-08-14",
+        "tongue": {"body_shape": "胖大", "teeth_marks": "轻度"},
+    })
+    drifted.get_observation(VisionDimension.TONGUE)
+    assert "tongue" in capsys.readouterr().err
+    # 正常 C 档案（规范指标名）不触发
+    good = DailyRecord({"date": "2026-08-28", "tongue": {"body_color": "淡红"}})
+    good.get_observation(VisionDimension.TONGUE)
+    assert capsys.readouterr().err == ""
+    # 维度键根本没写的 C 档案也不触发（缺失 ≠ 混合形状）
+    sparse = DailyRecord({"date": "2026-09-01", "eye": {"redness": "无"}})
+    sparse.get_observation(VisionDimension.TONGUE)
+    assert capsys.readouterr().err == ""
+
+
 def test_no_information_loss_against_raw(real_record):
     """新架构取出的观测文本应是原始记录的子集，不丢失关键信息。"""
     raw = real_record.raw

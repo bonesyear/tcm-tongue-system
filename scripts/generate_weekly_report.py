@@ -23,6 +23,7 @@
 
 import json
 import os
+import re
 import sys
 import glob
 from datetime import datetime, timedelta
@@ -84,6 +85,43 @@ _DIMENSION_STYLE = {
 # ============================================================
 
 
+# 同日期档案竞争排除模式：备份/副本/临时/旧格式快照不参与档案选择——
+# 它们是历史快照，选上会读到旧口径数据（实测：08-28 的 .bak 曾让周报
+# 偏离度静默变 0.0）
+_SUSPECT_ARCHIVE_RE = re.compile(r"\.bak|copy|tmp|_旧格式", re.IGNORECASE)
+
+
+def _select_daily_file(date_str: str) -> Optional[str]:
+    """为某一天选出唯一的 analysis JSON 档案（三级规则）。
+
+    ① 规范名 {date}_analysis.json 精确存在即选用——系统唯一认可的命名，
+       存在即无歧义，同日副本再多也不参与竞争；
+    ② 无规范名时，排除文件名含 .bak/copy/tmp/_旧格式 的备份/临时快照后，
+       取剩余候选中 mtime 最新者（"字典序最新"启发式不可靠：07-15 曾
+       静默选中 _b 副本而丢弃正档）；
+    ③ 排除后仍有多份候选时向 stderr 打印 warning（列出全部候选与实际
+       选用者），再取 mtime 最新——多份候选必须可见，不得静默选一。
+    无候选（或排除后为空）时返回 None，该日静默跳过。
+    """
+    exact = os.path.join(RECORDS_DIR, f"{date_str}_analysis.json")
+    if os.path.exists(exact):
+        return exact
+    pattern = os.path.join(RECORDS_DIR, f"{date_str}*analysis*.json")
+    matches = [m for m in glob.glob(pattern)
+               if not _SUSPECT_ARCHIVE_RE.search(os.path.basename(m))]
+    if not matches:
+        return None
+    filepath = max(matches, key=os.path.getmtime)
+    if len(matches) > 1:
+        print(
+            f"⚠️ 警告: {date_str} 有多份非规范命名的 analysis 候选: "
+            f"{sorted(os.path.basename(m) for m in matches)}；"
+            f"选用 mtime 最新者 {os.path.basename(filepath)}",
+            file=sys.stderr,
+        )
+    return filepath
+
+
 def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
     """
     加载指定日期之前 7 天的所有 daily analysis JSON 记录。
@@ -108,17 +146,13 @@ def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, 
         day = target_date - timedelta(days=i)
         date_str = day.strftime("%Y-%m-%d")
 
-        # 查找该日期的所有 analysis JSON 文件
-        pattern = os.path.join(RECORDS_DIR, f"{date_str}*analysis*.json")
-        matches = glob.glob(pattern)
+        # 三级规则选出该日唯一档案（见 _select_daily_file）
+        filepath = _select_daily_file(date_str)
 
-        if not matches:
+        if filepath is None:
             # 该日无记录，静默跳过
             continue
 
-        # 同日多份记录时取字典序最新的一份（glob 返回顺序依赖文件系统，
-        # 不排序会导致选择不可复现）
-        filepath = sorted(matches)[-1]
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 record = json.load(f)
