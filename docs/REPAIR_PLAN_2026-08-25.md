@@ -208,3 +208,19 @@ kimi -m kimi-k3 -p "读 docs/CODE_REVIEW_2026-08-25_KIMI.md 与 docs/REPAIR_PLAN
   - K3 原建议备查：手工逐份改（8 份）优于通用脚本（三种样式各异 + 整句拆分需医学判断）
 **⑥ 顺序**：C → 历史迁移 → 轮次 2；方案 A 项 2（`舌质荣枯`→`舌质润燥`）落地时 **C 的 `body_luster` 路径须同 commit 对齐**
 **工作量**：约 **1-1.5 个工作日**（record.py+validator 120-180 行 0.5 天 / 测试 0.5 天 / 模板文档 0.5 小时 / 迁移 1-2 小时）
+
+### 端到端验证发现（2026-09-17，8/28 档案按 C 规范重写后实测）
+
+**验证结果**：档案重写为 C 后 → validator 形状 C / 覆盖 6/6 / 问诊 5/5 / **0 错误 0 警告**；评分链路通（舌诊 5.5 分、置信度 HIGH、allows_formula=True、辨证与方剂可读）✅
+
+**但实测抓到两个 K3 静态分析未发现的问题**：
+
+1. **同长度关键词取首词 → 湿盛信号被掩盖（评分低估）**
+   - 现象：`coating_moisture="湿润偏滑"` → **0 分**（对照：`"滑"`→7 分 ✅、`"湿润"`→0 分）
+   - 根因：`scoring.py:265` `len(kw) > len(best_kw)` —— 同长度时取 dict 遍历**最先**命中的词；TONGUE_MOISTURE_MAP 中 `"润":0` 先于 `"滑":7` → "润"胜出
+   - 影响：**湿盛（滑=7）系统性被正常（润=0）掩盖**——对湿盛型舌象（苔偏滑）正是关键信号
+   - 处置建议：**轮次 2 增加条目**——同长度时取**最高分**（或按 map 严重度排序），而非遍历首词
+2. **多数舌部指标不参与评分（既有设计缺项）**
+   - 现象：`DIMENSION_RULES[TONGUE]`（scoring.py:143-149）仅含 8 指标；`coating_color`/`coating_thickness`/`coating_greasy`/**`coating_peeling`**/`prickles`/`sublingual_color`/`sublingual_thickness`/`body_dynamics` 无评分规则（`score_indicators` 返回 None）
+   - 影响：**剥落斑（随访对象复望的核心观察点）在评分与周报趋势中完全不体现**
+   - 处置建议：新议题（是否补评分规则需用户决定；注意与方案 A「评分层收敛」倾向相反，需要权衡）
