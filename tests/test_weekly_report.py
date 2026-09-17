@@ -34,11 +34,13 @@ def test_compute_dimension_deviation_non_zero(real_raw):
 def test_extract_tongue_metrics_non_zero(real_raw):
     metrics = g.extract_tongue_metrics(real_raw)
     assert any(v > 0 for v in metrics.values()), f"舌象指标不应全零: {metrics}"
-    # 八项指标齐全
+    # 九项指标齐全（轮次 3 新增「舌苔剥落」轴）
     assert set(metrics.keys()) == {
         "舌质颜色", "舌苔厚度", "舌苔润燥", "齿痕",
-        "瘀斑", "舌下络脉", "裂纹", "舌体胖瘦",
+        "瘀斑", "舌下络脉", "裂纹", "舌体胖瘦", "舌苔剥落",
     }
+    # fixture 舌苔 "花剥" 应命中剥落轴（轮次 3 新增口径）
+    assert metrics["舌苔剥落"] == 6.0
 
 
 def test_weekly_report_data_valid_output(real_raw):
