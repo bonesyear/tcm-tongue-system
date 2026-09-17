@@ -10,7 +10,7 @@
       "body": {
         "color": "淡红",
         "luster": "荣润",
-        "shape": "偏胖大，边有齿痕",
+        "shape": "偏胖大",
         "ecchymosis": "无瘀斑瘀点",
         "tooth_marks": "轻度",
         "cracks": "无明显裂纹",
@@ -22,7 +22,7 @@
         "thickness": "薄白",
         "moisture": "润",
         "greasy": "不腻",
-        "peeling": "花剥",
+        "peeling": "局部剥落",
         "distribution": "分布尚匀"
       },
       "sublingual": {
@@ -34,7 +34,7 @@
     },
     "head_face": {
       "face": {
-        "color": "萎黄",
+        "color": "晦暗",
         "edema": "无明显浮肿",
         "luster": "光泽尚可"
       },
@@ -68,7 +68,7 @@
       "ecchymosis": "无"
     },
     "skin": {
-      "color": "萎黄偏淡",
+      "color": "偏淡",
       "scaly_skin": "无甲错",
       "yellow_sweat": "无",
       "edema": "无",
