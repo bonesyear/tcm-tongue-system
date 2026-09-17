@@ -391,3 +391,26 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 1. 舌诊**逐指标细分**（舌质颜色/齿痕/裂纹等）在解析不到的档案上仍显示「整体稳定（0.0 → 0.0）」——该路径走 `extract_tongue_metrics`（逐指标），未加 n 检查；维度级已修。影响仅限"解析不到的老档案"（已决定不管）
 2. 全员 n=0 时文案仍写「当前偏离度最高的维度为「舌诊」（0.0 分）」——所有维度皆无数据时该句无意义
 3. `detail` 中 `mean=0`（int）与 `max=0.0`（float）类型不一致（极轻微）
+
+---
+
+## 轮次 5：周报无观测语义收尾（2026-09-17 完成，commit `0fa031e`）
+
+**依据**：`docs/K3_NO_OBSERVATION_ANALYSIS_2026-09-17.md`（K3 实测：9 份档案中 **5 份**存在逐指标级全零误导——"常态而非边角"；雷达图全零多边形为"最强误导"）
+
+**实现 4 项**（`scripts/generate_weekly_report.py` + `src/scoring.py` 一行 + 测试）：
+
+1. **1a 逐指标观测标注**：新增 `extract_tongue_observation_flags`（判据 = `get_observation(dim)` 文本 `.strip()` 非空——因缺失指标以空串占位，不能靠"键是否存在"）+ `_metric_trend` 包装传 `n=int(flag)`；**分组短路**防冗长（全无观测时整组一句并列出缺哪些轴）
+2. **2 全 n=0 联动**：summary → 「本周各维度均无有效观测，不作偏离度排名」；suggestion → 「请按规范形状（形状 C）核对档案或重传照片」（修掉原「偏离度总体较低，建议维持现状」把无数据说成状况良好）
+3. **3 mean 类型**：`src/scoring.py:402` → `round(float(...), 1)`（mean 恒为 float）
+4. **③-1 雷达图**：`generate_radar_chart` 新增观测 flags 可选参数 → 全无观测日**不绘制多边形** + 输出提示
+
+**复验（独立实跑）**：
+
+- **230 passed**（223+7）｜7 个新测试（含 `test_metric_trend_observed_normal_zero_verbatim_compatible` 钉住"有观测且 0 分"逐字兼容）｜ruff 全过
+- **回归判据 ✅**：8/28 输出与修复前（`/tmp/wk3.txt`）**逐字一致**（正常路径零变化）
+- **08-09 实测 ✅**：`ℹ️ 雷达图: 2026-08-09 全部轴无有效观测，未绘制该日多边形`；趋势 4 句组级短路（`舌苔变化: 本周无有效观测（舌苔厚度/舌苔润燥/舌苔剥落均未解析到）`）；summary 不再排名；suggestion 不再误报
+- **mean 类型 ✅**：`first.mean=0.0(float)`、`max=0.0(float)`（原 `mean=0` int）
+- 未改 `describe_trend` 判定逻辑与 `extract_tongue_metrics` 返回语义 ✅
+
+**残留小瑕疵**：summary 拼接组级文案时缺组名前缀——出现孤立的「本周无有效观测（舌质颜色未解析到）」（`trend_analysis` 中该文本是键「舌质变化」的值，summary 直接取 value 拼接）。极轻，暂不处理。
