@@ -329,3 +329,16 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 | 9 | `has_formula_content("无")→True`（**字符串入参**） | 不动（fail-closed 方向；实际调用走 dict，实测 `{'note':'无'}`→False 无实际触发） |
 
 **建议**：必修 1-3 + 可选 4-5 合并为「轮次 2.5 收尾」（约 0.5-1 天）；6-7 归轮次 3。
+
+### 轮次 2.5 执行结果（2026-09-17 完成，commit `11707b4`）
+
+✅ 必修 1-3 + 建议 4 + 可选 5 **全部完成** → **207 passed**（198+9）｜ruff `F,E722` 全过｜独立复验 5 项实测逐条通过：
+
+- ① `苔并非黄厚`/`并非黄厚`/`绝非黄厚`/`巩膜并非黄染`/`绝非黄染` → **0**（原 7）✅；对照 `苔黄厚`→7、**`非典型黄染`→7（原断言保留）**、`无黄染`→0、`非黄染`→7（fail-loud 取舍保留）
+- ② 新增 `_select_daily_file`（三级规则 + 历史教训注释）；**实测 7/15 现选中规范档** `2026-07-15_analysis.json`（keys=10，原错误选中 `_b` 的 keys=14）✅
+- ③ `observe` 传无效 part → stderr `[warn] observe 收到未知部位 '鼻子'，回退为 '其他'（可用类别：舌面/舌底/头面部/眼部/耳部/手掌/皮肤/其他）` + 正常回退 ✅
+- ④ `08-09` 混合档案 → warning「形状 C 记录的维度节点 'tongue' 非空，但按规范指标名解析不到任何观测——可能是混合形状（B 式嵌套 body/coating/sublingual）或键名漂移（如 body_shape/teeth_marks），请核对形状 C 规范」；`08-28` **不误触发** ✅
+- ⑤ 新增 9 测试：`test_bingfei_juefei_are_true_negations` / `test_select_daily_file_prefers_canonical_name` / `test_select_daily_file_warns_on_multiple_noncanonical` / `test_select_daily_file_no_match_silent` / `test_observe_unknown_part_warns_and_falls_back` / `test_mixed_shape_c_warns_when_unparseable` / `test_call_invalid_json_response` / `test_call_socket_timeout` / `test_tongue_prompt_declares_rzao_key_name`
+- **端到端**：周报重跑偏离度 **6.0**、无 safety_violation ✅
+
+**剩余（归轮次 3）**：条目 6（6 部位 PROMPTS 键名，待"自动转档案"再修）、条目 7（`_DOSAGE_RE` 单位扩充）、条目 8-9（不动）。
