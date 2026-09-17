@@ -75,6 +75,17 @@ def test_parse_level_word_boundary():
     assert C.parse_level("HIGH-CONF") is ConfidenceLevel.HIGH
 
 
+def test_parse_level_strict_boundary():
+    """严格词边界：数字/下划线不是合法边界——"HIGH1"/"HIGH_2" 不得
+    被解析成 HIGH（fail-closed，认不出就交给覆盖度推断）。"""
+    assert C.parse_level("HIGH1") is None
+    assert C.parse_level("HIGH_2") is None
+    # 合法边界不受影响：空格/连字符/CJK
+    assert C.parse_level("HIGH CONFIDENCE") is ConfidenceLevel.HIGH
+    assert C.parse_level("HIGH-置信") is ConfidenceLevel.HIGH
+    assert C.parse_level("HIGH置信度") is ConfidenceLevel.HIGH
+
+
 def test_is_consistent_accepts_chinese():
     assert C.is_consistent("高度确信", 6) is True
     assert C.is_consistent("低度确信", 6) is False
