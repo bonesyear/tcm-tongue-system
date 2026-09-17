@@ -38,7 +38,7 @@ top: ['confidence', 'date', 'dimensions_covered', 'dimensions_unchanged', 'douba
 top: ['confidence', 'date', 'dimensions_covered', 'dimensions_unchanged', 'formula', 'inquiry', 'pattern_differentiation', 'photo_analysis', 'photo_coverage', 'trend_vs_0712']
 == records/daily/2026-07-15_b_analysis.json
 top: ['confidence', 'date', 'dimensions_covered', 'formula', 'inquiry', 'k3_vs_doubao_verdict', 'models_used', 'note', 'pattern_differentiation', 'photo_analysis_doubao', 'photo_analysis_k3', 'photo_coverage', 'session', 'trend_vs_0715_am']
-== records/daily/2026-08-02_analysis.json
+== records/daily/2026-示例档案_analysis.json
 top: ['confidence', 'date', 'differential_directions', 'disclaimer', 'face', 'formula_with_dosage', 'gender_age', 'inquiry_corrections', 'inquiry_coverage', 'missing_info', 'palm', 'patient', 'pattern_differentiation', 'photo_coverage', 'session', 'suggestions', 'tongue']
 tongue keys: ['body_color', 'body_shape', 'teeth_marks', 'coating_color', 'coating_thickness', 'coating_moisture', 'coating_greasy', 'coating_peeling', 'crack', 'sublingual_veins']
 == records/daily/2026-08-09_analysis.json
@@ -57,7 +57,7 @@ tongue keys: ['body', 'coating', 'peeling', 'points', 'crack', 'sublingual']
 113:        if first not in PROMPTS:
 117:    elif mode == "observe":
 122:        prompt = PROMPTS.get(part, PROMPTS["其他"])
-Interesting. 08-02 has flat English keys (body_color, teeth_marks...) — close to proposed C. 08-09/08-14/08-28 use sentence-style (body/coating/peeling/...). July archives use `photo_analysis` etc. Let me check one July archive's photo_analysis structure, and check where vision_client observe output goes (vision_raw.json) and how archives are produced — actually archives are written by the LLM assistant (Kimi) manually, not by a script. Let me check 07-15 photo_analysis and also 07-09.
+Interesting. 示例档案 has flat English keys (body_color, teeth_marks...) — close to proposed C. 示例档案序列 use sentence-style (body/coating/peeling/...). July archives use `photo_analysis` etc. Let me check one July archive's photo_analysis structure, and check where vision_client observe output goes (vision_raw.json) and how archives are produced — actually archives are written by the LLM assistant (Kimi) manually, not by a script. Let me check 07-15 photo_analysis and also 07-09.
 
   Also need to check generate_weekly_report.py usage of Record/scoring to assess impact, and confidence.py briefly.{
  "舌诊": {
@@ -135,10 +135,10 @@ Now I have a good picture. Real archives vary a lot:
 
   - 3 B-shape (06-25/29, 07-03)
   - 07-09 to 07-15: `photo_analysis` with Chinese dimension keys （舌诊/头面诊...) using Chinese indicator keys — actually that's closest to shape A paths! photo_analysis.舌诊.舌苔颜色... wait, shape A paths are ["舌苔颜色"] under doubao_vision_analysis.舌诊. But 07-15 photo_analysis.舌诊 has keys 舌质颜色， 舌体胖瘦， 齿痕... and 舌苔 keys flattened as "厚薄" not "舌苔厚薄". So A paths don't match directly.
-  - 08-02: flat English keys under tongue (body_color, teeth_marks...) — close to proposed C but teeth_marks vs tooth_marks, and has face/palm top-level
-  - 08-09/08-14/08-28: sentence-style tongue keys (body/coating/peeling/points/crack/sublingual) with whole-sentence natural language values
+  - 示例档案: flat English keys under tongue (body_color, teeth_marks...) — close to proposed C but teeth_marks vs tooth_marks, and has face/palm top-level
+  - 示例档案序列: sentence-style tongue keys (body/coating/peeling/points/crack/sublingual) with whole-sentence natural language values
 
-  The user's proposed C spec: top-level dimension keys with flat English indicator keys + natural language short phrases. This matches 08-02 style but NOT the recent 08-09/08-14/08-28 style which is the actual current convention. The example in the proposal shows flat keys with values like '示例舌色', '胖大', '边缘轻度齿痕' — i.e., future archives would be written in the flat style.
+  The user's proposed C spec: top-level dimension keys with flat English indicator keys + natural language short phrases. This matches 示例档案 style but NOT the recent 示例档案序列 style which is the actual current convention. The example in the proposal shows flat keys with values like '示例舌色', '胖大', '边缘轻度齿痕' — i.e., future archives would be written in the flat style.
 
   Key design questions to answer:
 
@@ -147,7 +147,7 @@ Now I have a good picture. Real archives vary a lot:
   - Option 2: C = B flattened: tongue.body_color instead of observations.tongue.body.color. Equivalent info, one less nesting. The proposed C is essentially "B flattened with canonical names".
   - Option 3: reuse B nested structure at top level: tongue:{body:{color:...}} — deeper, no benefit.
 
-  Recommendation: adopt C as "B 扁平版" with canonical indicator key names (identical to _DIMENSION_INDICATORS keys). C path per indicator = [indicator]. So the mapping table addition is trivial: `"C": ["body_color"]` etc. But note real archive keys drift: teeth_marks (08-02) vs tooth_marks; body_shape (08-02) vs body_size (canonical). Recommend canonical names = existing indicator keys, with an optional alias list for known variants (teeth_marks→tooth_marks, body_shape→body_size). Keep aliases minimal.
+  Recommendation: adopt C as "B 扁平版" with canonical indicator key names (identical to _DIMENSION_INDICATORS keys). C path per indicator = [indicator]. So the mapping table addition is trivial: `"C": ["body_color"]` etc. But note real archive keys drift: teeth_marks (示例档案) vs tooth_marks; body_shape (示例档案) vs body_size (canonical). Recommend canonical names = existing indicator keys, with an optional alias list for known variants (teeth_marks→tooth_marks, body_shape→body_size). Keep aliases minimal.
 
   Also the sentence-style archives (08-09/14/28): body/coating whole sentences. A pure C-path approach won't parse these. But the fallback: get_observation_text / scoring supports text-based matching; for sentence-style, could add a secondary fallback where the dimension root's leaf texts are flattened per-indicator? Actually better: for C detection, if dimension dict values are strings with non-indicator keys (body/coating), we could map them to indicator groups... complex. Simplest: treat sentence-style as historical migration problem (⑤), not C spec. Going forward, archives written per C spec.
 
@@ -156,7 +156,7 @@ Now I have a good picture. Real archives vary a lot:
   - C→B conversion layer: introduces a second place where shape knowledge lives, and conversion of natural-language values is identity — B values are also text. So conversion would be pure key-restructuring; pointless indirection. Not recommended.
   - vision_client outputting C: vision_client's observe output is raw nested Chinese JSON （舌苔：{颜色..}) consumed interactively by the LLM assistant which writes archives; the archive is hand-authored by the assistant from observe output + inquiry. Changing vision_client output doesn't directly produce archives; archives are composed by the agent. The real fix for "future archives follow C" is documenting the C spec in templates (multi_dim_record_template.json or a new template + AGENTS.md/docs). So: do add C paths in record.py (native support), and document the spec. vision_client doesn't need to change for this.
 
-  Detection: top-level has any dimension english name key (tongue/head_face/eye/ear/hand/skin) and neither observations nor doubao_vision_analysis → C. Careful: 08-02 has "face" and "palm" not "head_face"/"hand". Note dimension english names: head_face not face! Real archives use "face"/"palm". Aliases needed at dimension level too, or C detection should accept face→head_face, palm→hand. Hmm. Options: treat C dimension root lookup with alias map {face: head_face, palm: hand}. Keep small alias table.
+  Detection: top-level has any dimension english name key (tongue/head_face/eye/ear/hand/skin) and neither observations nor doubao_vision_analysis → C. Careful: 示例档案 has "face" and "palm" not "head_face"/"hand". Note dimension english names: head_face not face! Real archives use "face"/"palm". Aliases needed at dimension level too, or C detection should accept face→head_face, palm→hand. Hmm. Options: treat C dimension root lookup with alias map {face: head_face, palm: hand}. Keep small alias table.
 
   Also top-level field mapping: pattern_update ↔ pattern_differentiation; formula exists already; formula_adjust/formula_with_dosage variants in real archives. Proposal mentions pattern_differentiation ↔ pattern_update, formula, inquiry. get_inquiry_coverage: C archives' inquiry is {问题： 回答} flat dict without asked flags. Need a C branch: count entries as covered. Currently inquiry values are strings, `isinstance(item, dict)` fails → asked=0, total=len(inquiry) — actually returns (0, len). Should count non-empty string values as asked for C.
 
@@ -187,10 +187,10 @@ Now I have a good picture. Real archives vary a lot:
   - scoring coverage for C: get_observation returns indicator dict; sentence-style historical files won't parse via flat keys — they're migration candidates.
   - Weekly report: generate_weekly_report.py:155,180 use get_observation — automatically benefits once record.py supports C. Test with a week of C records.
 
-  ⑤ Historical migration: 8 free-form archives (07-09 onward, minus... actually ~9 files: 07-09, 07-10, 07-15, 07-15_b, 08-02, 08-09, 08-14, 08-28 — plus 07-06? dimensions_covered... The count says 07-09 之后全部自由格式； that's 8 files listed). Worth it? Weekly reports need history for trends. Migration script mapping:
+  ⑤ Historical migration: 8 free-form archives (07-09 onward, minus... actually ~9 files: 07-09, 07-10, 07-15, 07-15_b, 示例档案, 08-09, 08-14, 08-28 — plus 07-06? dimensions_covered... The count says 07-09 之后全部自由格式； that's 8 files listed). Worth it? Weekly reports need history for trends. Migration script mapping:
   - 07-09/07-10/07-15 style: photo_analysis with Chinese keys → map to C indicator keys via A-path-like Chinese mapping (photo_analysis.舌诊.舌质颜色 → tongue.body_color). But keys differ from A paths ("厚薄" not "舌苔厚薄", "剥落"...). Requires a dedicated mapping table — moderate effort, one-off.
-  - 08-02: nearly C already (rename teeth_marks→tooth_marks, body_shape→body_size, face→head_face w/ sub-keys? face keys?).
-  - 08-09/08-14/08-28: sentence-style — needs LLM/human splitting into indicator phrases, or accept partial mapping (body→body_color+body_size+tooth_marks can't be auto-split reliably by keyword... actually could reuse scoring-like matching, but writing values to specific indicators needs judgment).
+  - 示例档案: nearly C already (rename teeth_marks→tooth_marks, body_shape→body_size, face→head_face w/ sub-keys? face keys?).
+  - 示例档案序列: sentence-style — needs LLM/human splitting into indicator phrases, or accept partial mapping (body→body_color+body_size+tooth_marks can't be auto-split reliably by keyword... actually could reuse scoring-like matching, but writing values to specific indicators needs judgment).
   Recommendation: worth doing but low-tech: manual/LLM-assisted one-off rewrite of 8 files to C spec (they're small, ~40 lines each), not a general migration script. Alternative: leave history; weekly reports across the gap will show coverage holes. Given records drive weekly trend reports, and it's only 8 small files, migrate manually with validator as acceptance check (coverage ≥ expected, scores sane). But careful: records/ is gitignored — local only; migration is local, low risk, keep backups.
 
   ⑥ Ordering vs 轮次 2: REPAIR_PLAN already notes (line 179) C should precede 轮次 2. Agree: 轮次 2 changes scoring/record semantics （方案 A body_luster removal etc.); without C those changes only affect fixtures. But note interactions: 方案 A 项 2 renames A path 舌质荣枯→舌质润燥； C spec should include body_luster? Per 方案 A, body_luster removed from scoring but kept in record? Item 3 removes from DIMENSION_RULES only; _DIMENSION_INDICATORS keeps body_luster indicator. For C spec, include luster/moisture key? vision prompt now outputs "舌质润燥" (fixed key per round-1 patch). For C, add "body_luster" key or "body_moisture"? Keep canonical indicator key body_luster (name stays; semantics shift to 润燥）. Recommend: implement C first (record.py detection + C paths + tests), then 轮次 2 applies on top with C paths updated in same commits （方案 A 项 2/3 must update C paths too). Also #5 (negation "非" removal) interacts with ③ analysis — my analysis assumed current regex incl. 非； "非病理裂纹" contains "非" — with current regex, in crack value "仅中央浅窄正中沟（生理性， 非病理裂纹）", keyword "浅裂"? not present. OK. After #5 removes "非", fewer negations. Fine either way.
@@ -217,7 +217,7 @@ Now I have a good picture. Real archives vary a lot:
 
 • # 望诊档案形状 C 设计评估
 
-  先说一个对全局有影响的事实核查：我读了真实档案，提议中"C = 扁平英文指标键"的样式只出现在 2026-08-02（`tongue.body_color/teeth_marks/...`），而最近三份（08-09/08-14/08-28）实际是**整句风格**（`tongue.body:"示例舌色, 胖大, 边缘轻度齿痕(无明显加重)"`）；7 月的 5 份则是第三种样式（`photo_analysis.舌诊.舌质颜色` 中文键）。所以 C 规范本质上是**面向未来的书写约定**，历史档案没有任何一种现有样式能直接被 C 路径覆盖——这决定了⑤的答案。
+  先说一个对全局有影响的事实核查：我读了真实档案，提议中"C = 扁平英文指标键"的样式只出现在 2026-示例档案（`tongue.body_color/teeth_marks/...`），而最近三份（示例档案序列）实际是**整句风格**（`tongue.body:"示例舌色, 胖大, 边缘轻度齿痕(无明显加重)"`）；7 月的 5 份则是第三种样式（`photo_analysis.舌诊.舌质颜色` 中文键）。所以 C 规范本质上是**面向未来的书写约定**，历史档案没有任何一种现有样式能直接被 C 路径覆盖——这决定了⑤的答案。
 
   ## ① C 规范设计
 
@@ -227,8 +227,8 @@ Now I have a good picture. Real archives vary a lot:
 
   对提议示例的具体修正：
 
-  - 维度顶层键用规范英文名 `head_face`（不用 `face`）、`hand`（不用 `palm`），与 `VisionDimension.english_name`（dimensions.py:29-34）一致；`face`/`palm` 作为**兼容别名**处理（08-02 档案在用），但新档案写规范名。
-  - 指标键用规范名：`tooth_marks` 而非 `teeth_marks`（08-02 的漂移）、`body_size` 而非 `body_shape`、`lip_color` 而非 `lips_color`、`face_color` 而非 `color`。提议示例里 `face:{color,edema,lips_color,...}` 这种"维度内省前缀"写法与 HEAD_FACE 的规范指标名（`face_color`/`lip_color`/`nose_color`，record.py:63-73）不一致——该维度跨面/唇/鼻三个子域，省前缀会撞名，必须带前缀。
+  - 维度顶层键用规范英文名 `head_face`（不用 `face`）、`hand`（不用 `palm`），与 `VisionDimension.english_name`（dimensions.py:29-34）一致；`face`/`palm` 作为**兼容别名**处理（示例档案 档案在用），但新档案写规范名。
+  - 指标键用规范名：`tooth_marks` 而非 `teeth_marks`（示例档案 的漂移）、`body_size` 而非 `body_shape`、`lip_color` 而非 `lips_color`、`face_color` 而非 `color`。提议示例里 `face:{color,edema,lips_color,...}` 这种"维度内省前缀"写法与 HEAD_FACE 的规范指标名（`face_color`/`lip_color`/`nose_color`，record.py:63-73）不一致——该维度跨面/唇/鼻三个子域，省前缀会撞名，必须带前缀。
   - 粒度："自然语言短句"正确，但建议约定**值只写当前状态短语，历史对比/括号注释不进指标值**（放 `lessons` 或 `*_note` 键）。08-28 的 `'边缘轻度齿痕(无明显加重)'` 这种夹注是评分噪声源（见③）。
   - "缺失维度不写该键"正确，与 `is_covered`（dimensions.py:45-55）和 `_dig` 的缺失即空串语义（record.py:111-123）天然兼容。
 
@@ -286,9 +286,9 @@ Now I have a good picture. Real archives vary a lot:
 
   ## ⑤ 历史档案迁移
 
-  **值得做，但不要写通用迁移脚本——8 个小文件（07-09/07-10/07-15/07-15_b/08-02/08-09/08-14/08-28），手工/LLM 辅助逐个改写为 C，用 validator 当验收。**
+  **值得做，但不要写通用迁移脚本——8 个小文件（07-09/07-10/07-15/07-15_b/示例档案/示例档案序列），手工/LLM 辅助逐个改写为 C，用 validator 当验收。**
 
-  理由：三种历史样式各不相同（07 月中文键、08-02 近 C 扁平、近期整句），通用脚本要为每个样式写一套映射表，成本高于直接改 8 个 40 行的文件；且整句拆分（`body:"示例舌色, 胖大, 边缘轻度齿痕"` → 三个指标）需要医学判断，脚本做不了可靠拆分。08-02 基本只需改名（`teeth_marks`→`tooth_marks` 等）。迁移的价值在周报趋势——不迁移则 07-09 后的趋势段永久断档。records/ 被 .gitignore 排除，纯本地操作，改前留个备份目录即可。若不想花这 1-2 小时，可接受的降级是只迁移最近 4 份（08 月），7 月留作断档。
+  理由：三种历史样式各不相同（07 月中文键、示例档案 近 C 扁平、近期整句），通用脚本要为每个样式写一套映射表，成本高于直接改 8 个 40 行的文件；且整句拆分（`body:"示例舌色, 胖大, 边缘轻度齿痕"` → 三个指标）需要医学判断，脚本做不了可靠拆分。示例档案 基本只需改名（`teeth_marks`→`tooth_marks` 等）。迁移的价值在周报趋势——不迁移则 07-09 后的趋势段永久断档。records/ 被 .gitignore 排除，纯本地操作，改前留个备份目录即可。若不想花这 1-2 小时，可接受的降级是只迁移最近 4 份（08 月），7 月留作断档。
 
   ## ⑥ 与轮次 2 的顺序
 
