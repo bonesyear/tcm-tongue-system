@@ -280,7 +280,8 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 ### 已修（本轮自查发现并修复）
 
 **备份文件污染周报** —— 重写 C 档案时创建的备份 `records/daily/2026-08-28_analysis.v1.bak.json` 被 `generate_weekly_report.py:112,121` 的 `glob("{date}*analysis*.json")` + `sorted()[-1]`（"取字典序最新"）选中（`v1.bak` 字典序排在 `analysis.json` 之后）→ 周报读到**旧格式档案**：舌诊偏离度 **0.0**（应 6.0）、误报 `safety_violation: "LOW 置信度下不应输出方剂"`。
-**已修**：备份移至 `records/_backup/2026-08-28_analysis_v1_旧格式.json`（非 `.json` 结尾 + 移出 daily）→ 重跑周报验证：偏离度 **6.0**、`claimed=HIGH/covered=6/consistent=true`、无 safety_violation ✅
+**已修**：备份移至 `records/_backup/2026-08-28_analysis_v1_旧格式.json` → 重跑周报验证：偏离度 **6.0**、`claimed=HIGH/covered=6/consistent=true`、无 safety_violation ✅
+（⚠️ **K3 校正**：文件名**仍是 `.json` 结尾**——真正起作用的是**移出 `daily` 目录**，因为 glob 按目录隔离；先前的"改名非 .json 结尾"表述不准确。另 `records/_backup/` 不在 git 追踪内，长期靠约定。）
 
 **根因是系统缺陷（未修，建议新增条目）**：周报 glob 过宽 + "字典序最新"启发式脆弱——任何同日期前缀的 json（`.bak`/副本/中间文件）都会参与竞争且可能胜出。建议：① 优先精确匹配 `{date}_analysis.json`；② 排除 `*.bak*`/`*copy*`/`*tmp*`；③ 多份命中时**打印警告**而非静默选一。
 
@@ -295,3 +296,36 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 - 旧档案 validator `rc=1` 共 8 个（覆盖 0/6、置信度声称与实际不符）——"老档案不用在意"，不迁移
 - `body_color` 词表缺口 `"红润"` → 7 分（既有，非本轮引入）→ 轮次 3 一并定
 - 档案计数口径：`records/daily/*_analysis.json` 顶层 **11** 个（另有子目录/图片，`records` 未纳入 git 无法用 git 复核）；曾记"60 个"疑为含图片与子目录的口径，**无删除痕迹**
+
+---
+
+## K3 独立审查结论（2026-09-17，报告 `docs/K3_POST_R2_AUDIT_2026-09-17.md`，102KB）
+
+**总评：轮次 2 可视为完成**——7 项改动实现正确、测试真实无假覆盖、文档与代码一致；但**有 1 个本轮新引入的未声明取舍必须修**。
+
+### K3 新发现（已独立复验 ✅）
+
+1. 🔴 **`并非/绝非` 失效（本轮 #5 引入的 fail-open）** —— 实测：`苔并非黄厚`→**7**（应 0）、`巩膜并非黄染`→**7**（应 0）、`无黄染`→0 ✅。移除"非"时未保留真否定短语。修法：`_NEGATION_RE` 加回 `并非|绝非`（`scoring.py:202`，1 行 + 2 测试）
+2. 🟠 **周报 glob 缺陷不是假设——现行档案正在踩** —— 实测 `records/daily/2026-07-15*analysis*.json` 命中 **2 份**（`2026-07-15_analysis.json` + `2026-07-15_b_analysis.json`），`sorted()[-1]` **静默选中 `_b`**（第一份被丢弃）；周报无此选择逻辑的测试覆盖
+3. 🟡 **混合形状档案静默零分（我未想到）** —— `08-02/08-09/08-14` 被判形状 C（顶层有 `tongue`）但内层是 B 式嵌套（`body`/`coating`）或漂移键名（`body_shape`/`teeth_marks`）→ 恒等映射取不到 → 覆盖 0/6、周报 0.0、**无任何提示**。与备份污染同属一类系统病：**解析/选择失败时静默降级而非报警**
+4. **爆炸半径确认**：除周报外**无其他 daily 消费方**（validator 走显式路径、`backup_to_oss.sh` 排除 records/、retrieval 只 glob knowledge_base）→ glob 缺陷仅影响周报
+5. **指标缺口现状（实测）**：舌诊 18 指标中 **10 个无评分规则**（含有意移除的 body_luster）、头面诊 3 个（lip_around / nose_color / nose_bleeding）、其余维度全覆盖 → 与轮次 3 计划一致，非回归
+6. **测试有效性**：8 个新测试**逐一双向验证、无假覆盖**；但 `test_fei_is_not_negation_for_abnormal_prefix` **缺"代价侧"**（未钉住"并非/绝非"行为）→ 正是敞口未被发现的原因；质量最高为 `test_tie_break_prefers_higher_score`（含否定交互用例）
+
+**K3 对 A–D 核验**：A 准确（2 处措辞偏差已校正）、B 准确且更严重、C 三点全属实（① observe 无警告而 classify 有——**不对称**）、D 准确。
+
+### 收尾轮次（轮次 2.5）—— K3 最终清单
+
+| # | 条目 | 定级 |
+|---|---|---|
+| 1 | `_NEGATION_RE` 加回 `并非\|绝非`（轮次 2 自引入 fail-open） | **必修** |
+| 2 | 周报 glob 收口：优先 `{date}_analysis.json` → 排除 `*.bak*`/`*copy*`/`*tmp*`/`*_旧格式*` → 多份命中打 warning（`generate_weekly_report.py:112-121`）+ 2-3 测试（含同日 `_b` 场景） | **必修** |
+| 3 | observe 无效 part-key 打 warning（对齐 classify 行为，`vision_client.py:122`） | **必修**（极小） |
+| 4 | 混合形状档案静默零分的检测/警告（形状 C 维度节点非空但观测全空 → warning，`record.py` `_dimension_root` 附近，约 10 行 + 1 测试） | 可选，建议做 |
+| 5 | `tests/test_vision_client.py` 补 3 用例（JSONDecodeError / timeout / "舌质润燥"键名断言） | 可选 |
+| 6 | 6 部位 PROMPTS 键名声明 | 可不动（待"自动转档案"再修） |
+| 7 | `_DOSAGE_RE` 单位扩充（毫克/mg/钱/两 + 中文数字）与白名单扩充 | 可选 → 并入轮次 3 |
+| 8 | D 两项（旧档 rc=1×8、`红润`→7） | 不动 |
+| 9 | `has_formula_content("无")→True`（**字符串入参**） | 不动（fail-closed 方向；实际调用走 dict，实测 `{'note':'无'}`→False 无实际触发） |
+
+**建议**：必修 1-3 + 可选 4-5 合并为「轮次 2.5 收尾」（约 0.5-1 天）；6-7 归轮次 3。
