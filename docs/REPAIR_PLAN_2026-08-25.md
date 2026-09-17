@@ -11,6 +11,14 @@
 - 待修：**14 条**，分 3 轮
 - 执行顺序：轮次 1（vision_client.py）→ 轮次 2（辨证层）→ 轮次 3（文档层）
 
+## 执行进度
+
+- ✅ **轮次 1 完成**（2026-09-17）：`vision_client.py` #1/#2/#3/#6/#7 + 方案 A 项 1（prompt 舌质润燥粗判，含"不判舌神/荣枯"否定指令）+ 新建 `tests/test_vision_client.py`（14 函数/20 用例，全 mock）→ **179 passed**（159+20）｜ classify 实测输出"舌面" ｜ 参数/未知 mode 退出码 2 ｜ ruff `F,E722` 全过 ｜ 独立 diff 审查通过
+  - 附带完成 K3 补充：`assert key` → 显式 RuntimeError（`-O` 安全）
+  - 残留风格告警（非项目标准，可选后续）：`S110`/`BLE001`（HTTP body 读取的 `except Exception: pass`，设计取舍）、`UP041`（`socket.timeout` 可用 `TimeoutError` 替代）、`I001`（import 排序）、`EXE001`（shebang 不可执行）
+- ⏳ **轮次 2 待执行**：辨证层 #5/#8/#9/#10/#12 + 方案 A 项 2~11 + 文档层 #16（K3 修订：并入轮次 2 末尾）；#11 降级为可选，#15 已删除
+- ⏳ 轮次 3：已取消（并入轮次 2）
+
 ---
 
 ## 轮次 1 — scripts/vision_client.py（6 条）
