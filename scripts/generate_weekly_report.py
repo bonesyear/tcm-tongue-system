@@ -53,14 +53,22 @@ def _configure_cjk_font(matplotlib) -> Optional[str]:
     """
     candidates = [
         "PingFang SC", "Hiragino Sans GB", "Heiti SC", "STHeiti",   # macOS
-        "Noto Sans CJK SC", "Droid Sans Fallback",                   # Linux
-        "WenQuanYi Micro Hei", "Microsoft YaHei", "SimHei",          # 其他
+        # Linux：Noto CJK 的 .ttc 集合常只注册 "JP" 名（"SC" 名在
+        # font_manager 里不可见，实测本机只有 "Noto Sans CJK JP"），
+        # 故 JP 必须列入；"Droid Sans Fallback" 名字含 Fallback 但实测
+        # 其部分版本缺 ASCII/数字字形（l/p/2/(/— 渲染成方块），排到后面。
+        "Noto Sans CJK SC", "Noto Sans CJK JP", "Source Han Sans SC",
+        "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+        "Droid Sans Fallback",                                       # 末位兜底
+        "Microsoft YaHei", "SimHei",                                 # 其他
     ]
     from matplotlib import font_manager
     installed = {f.name for f in font_manager.fontManager.ttflist}
     for name in candidates:
         if name in installed:
-            matplotlib.rcParams["font.sans-serif"] = [name]
+            # 回退链：DejaVu Sans 兜底 ASCII/数字/标点。matplotlib ≥3.6
+            # 会逐字体补缺字形，避免 CJK 字体缺 ASCII 时渲染成方块。
+            matplotlib.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
             matplotlib.rcParams["axes.unicode_minus"] = False
             return name
     return None
@@ -462,6 +470,10 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
             describe_trend("舌苔厚度", first_tm["舌苔厚度"], last_tm["舌苔厚度"])
             + "；"
             + describe_trend("舌苔润燥", first_tm["舌苔润燥"], last_tm["舌苔润燥"])
+            + "；"
+            # 轮次 3 起剥落进入雷达图与评分；文字趋势同步纳入，
+            # 否则核心观察点（花剥苔/地图舌）在摘要里看不到
+            + describe_trend("舌苔剥落", first_tm["舌苔剥落"], last_tm["舌苔剥落"])
         ),
         "舌形变化": (
             describe_trend("齿痕程度", first_tm["齿痕"], last_tm["齿痕"])
