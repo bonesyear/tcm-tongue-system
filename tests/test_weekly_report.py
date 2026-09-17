@@ -420,6 +420,27 @@ def test_summary_no_ranking_when_all_dims_unobserved():
     assert "偏离度总体较低" not in data["next_week_suggestion"]
 
 
+def test_summary_short_circuit_sentence_has_group_prefix():
+    """无观测周的 summary：组级短路句须带"舌质变化："前缀，不出现孤立句
+    （实测 W32 summary 曾出现无前缀的"本周无有效观测（舌质颜色未解析到）"）。
+    trend_analysis 字典里的原始短句保持不变，前缀只在 summary 拼接处补。"""
+    raw = {"date": "2026-01-01", "observations": {"tongue": {}}}
+    data = g.generate_weekly_report_data([raw])
+    assert "舌质变化：本周无有效观测（舌质颜色未解析到）" in data["summary"]
+    assert "。本周无有效观测（舌质颜色" not in data["summary"]
+    assert data["trend_analysis"]["舌质变化"] == "本周无有效观测（舌质颜色未解析到）"
+
+
+def test_summary_observed_tongue_color_no_prefix():
+    """正常观测路径逐字不变：summary 中舌质趋势句原样保留，
+    不得加"舌质变化："前缀。"""
+    raw = {"date": "2026-01-01",
+           "observations": {"tongue": {"body": {"color": "淡红"}}}}
+    data = g.generate_weekly_report_data([raw])
+    assert "舌质颜色偏离度整体稳定（0.0 → 0.0）" in data["summary"]
+    assert "舌质变化：" not in data["summary"]
+
+
 def test_radar_chart_skips_unobserved_day(monkeypatch, tmp_path, capsys):
     """全部轴无观测的日期不绘制多边形（全零多边形视觉上=一切正常），
     并有显式提示；不传 flags 时保持旧行为（向后兼容）。"""
