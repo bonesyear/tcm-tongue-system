@@ -39,7 +39,7 @@ def test_extract_tongue_metrics_non_zero(real_raw):
         "舌质颜色", "舌苔厚度", "舌苔润燥", "齿痕",
         "瘀斑", "舌下络脉", "裂纹", "舌体胖瘦", "舌苔剥落",
     }
-    # fixture 舌苔 "花剥" 应命中剥落轴（轮次 3 新增口径）
+    # fixture 舌苔 "局部剥落" 应命中剥落轴（轮次 3 新增口径）
     assert metrics["舌苔剥落"] == 6.0
 
 

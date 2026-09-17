@@ -242,9 +242,9 @@ C
   tongue detail: {'mean': 0.0, 'max': 0.0, 'n': 0}
 Excellent — this confirms everything:
 
-  1. 08-09/08-14 (shape C mixed): all obs empty → radar metrics all 0.0 → 逐指标趋势 prints "整体稳定（0.0 → 0.0）" — misleading. Note: 08-09's actual tongue text describes 胖大/齿痕/点刺/示例值 — real abnormalities invisible in weekly per-metric trends. (Though dimension-level now says 无有效观测.)
+  1. 08-09/08-14 (shape C mixed): all obs empty → radar metrics all 0.0 → 逐指标趋势 prints "整体稳定（0.0 → 0.0）" — misleading. Note: 08-09's actual tongue text does contain abnormality descriptions（示例值） — real abnormalities invisible in weekly per-metric trends. (Though dimension-level now says 无有效观测.)
 
-  2. Interesting: 08-02 partial — radar metrics all 0.0! Even though body_color="示例值..." （紫暗 9? "示例值" not in map; "紫暗" not substring... text "示例值 （用户确认...)" — kw "紫暗" not in text; "淡白"? no. So 0), coating_thickness "薄~中 （根部稍厚）" — no kw hit → 0. So 08-02 radar shows all-zero despite real observations （明显齿痕 etc. unparsed due to key drift teeth_marks). Also a misleading case but caused by key drift + keyword gaps.
+  2. Interesting: 08-02 partial — radar metrics all 0.0! Even though body_color="示例值..." （紫暗 9? "示例值" not in map; "紫暗" not substring... text "示例值（示例注记）" — kw "紫暗" not in text; "淡白"? no. So 0), coating_thickness "薄~中 （根部稍厚）" — no kw hit → 0. So 08-02 radar shows all-zero despite real observations （齿痕类异常 etc. unparsed due to key drift teeth_marks). Also a misleading case but caused by key drift + keyword gaps.
 
   3. 07-15 shape B but no tongue observations at all (photo_analysis shape, "tongue node MISSING") → n=0, radar all 0.0.
 

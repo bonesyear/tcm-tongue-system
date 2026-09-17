@@ -227,7 +227,7 @@ kimi -m kimi-k3 -p "读 docs/CODE_REVIEW_2026-08-25_KIMI.md 与 docs/REPAIR_PLAN
 2. **9 个舌部指标不参与评分（既有设计缺项）** ⚠️ 原稿误列 `coating_thickness`（K3 实证纠正，见下）
    - 实证（`scoring.py:140-150`）：`DIMENSION_RULES[TONGUE]` 含 **9** 个指标 —— body_color / **coating_thickness** / coating_moisture / tooth_marks / petechiae / sublingual_varicosity / fissure / body_size / body_luster；舌部指标实为 **18** 个（`record.py:47-66`）
    - **无规则 9 个**：`coating_color` / `coating_greasy` / **`coating_peeling`** / `coating_distribution` / `prickles` / `body_dynamics` / `sublingual_color` / `sublingual_thickness` / `sublingual_petechiae`
-   - 影响：**剥落斑（随访对象[REDACTED]的核心观察点）在评分与周报趋势中完全不体现**
+   - 影响：**剥落苔（剥落类舌象随访中的核心观察点）在评分与周报趋势中完全不体现**
    - **K3 意见（2026-09-17，报告 `docs/K3_SCORING_ADVICE_2026-09-17.md`）**：**应补**。统一原则 = 「评分层只收**静态照片可客观判读**的指标；需动态观察或对光线敏感的主观判断降级到辨证层」——方案 A 是该原则的**减法**（移除 body_luster），发现 2 是**加法**（补 7 个形态指标），`body_dynamics` 排除是同一原则的**对称应用**（静态照片判不了舌体动态），三者互不冲突
    - 处置：**单列轮次 3「评分覆盖扩展」**（map 草稿见 K3 报告 ② 节；分值需用户临床签认后执行）
    - **回归冲突点（K3 实证指出，执行时必须处理）**：`tests/test_scoring.py:130-132` 的 `test_tongue_score_sparse_not_diluted` 用纯文本 `"青紫"` 断言 `score==10`；若 `sublingual_color` 收 `"青紫": 8`，纯文本输入下两指标同命中 → 均值 9.0 → 测试红。**解法（K3 倾向 ①）**：① 该测试改结构化 dict 入参（"稀疏不稀释"用 dict 表达更准）；② map 不收"青紫"仅收"紫暗/瘀紫"。另：`test_normal_tongue_scores_zero` fixture 补新指标正常值；周报 fixture 期望分（`test_weekly_report.py:49-50` 期望 5.5）若文本含"腻/剥/黄"会变 → 跑全量核对后更新期望并注明"评分口径扩展导致的历史期望变化"。
@@ -255,7 +255,7 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 
 | 指标 | map 草稿（0=正常基线，越高越异常） | 依据 |
 |---|---|---|
-| `coating_peeling` | `{"剥落":6,"剥脱":6,"花剥":6,"地图舌":7,"镜面":9}` | **最高优先**（花剥苔随访对象[REDACTED]的核心观察点）；结构性形态，静态照片完全可判 |
+| `coating_peeling` | `{"剥落":6,"剥脱":6,"花剥":6,"地图舌":7,"镜面":9}` | **最高优先**（剥落苔随访场景的核心观察点）；结构性形态，静态照片完全可判 |
 | `coating_greasy` | `{"稍腻":3,"腻":5,"厚腻":8,"腐苔":7}` | 苔质附着形态可判；"不腻"由否定守卫归零 |
 | `coating_color` | `{"白":0,"黄":3,"灰":6,"黑":7,"灰黑":8}` | 颜色是最可靠维度（"灰黑"靠最长匹配压过"灰"） |
 | `prickles` | `{"点刺":5,"芒刺":6}` | 凸起红点，分辨率敏感 → 分值保守 |
