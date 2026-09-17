@@ -692,11 +692,16 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         ranking_phrase = "本周各维度均无有效观测，不作偏离度排名。"
     else:
         ranking_phrase = f"当前偏离度最高的维度为「{max_dim}」（{max_score:.1f} 分）。"
+    # 组级短路句（"本周无有效观测（…未解析到）"）不含组名，补"舌质变化："前缀
+    # 避免孤立句；正常观测文案自带指标名（describe_trend 以 name 开头），原样保留
+    tongue_color_trend = trend_analysis["舌质变化"]
+    if tongue_color_trend.startswith("本周无有效观测（"):
+        tongue_color_trend = f"舌质变化：{tongue_color_trend}"
     summary = (
         f"本周（{first_date} 至 {last_date}）共 {len(records)} 条日分析记录。"
         f"{tongue_phrase}；"
         f"{ranking_phrase}"
-        f"{trend_analysis['舌质变化']} "
+        f"{tongue_color_trend} "
         f"{trend_analysis['head_face_trend']}。"
     )
 
