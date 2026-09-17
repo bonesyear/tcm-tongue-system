@@ -74,9 +74,11 @@ def test_negation_guard_extended_words():
 
 def test_fei_is_not_negation_for_abnormal_prefix():
     """"非" 不是否定词："非正常/非典型" 修饰的是"正常/典型"，
-    误判为否定会把真异常漏报成正常（历史 Bug——"非正常红润" 被误否定）。"""
+    误判为否定会把真异常漏报成正常（历史 Bug——"非正常红润" 被误否定）。
+    轮次 3 起 "红润":0 入表，最长匹配会压过 "红"，故本用例改用
+    "非正常偏红"（不含"红润"）继续钉住"非不否定"的意图。"""
     assert score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "非正常红润"})["body_color"] == 7
+                            {"body_color": "非正常偏红"})["body_color"] == 7
     assert score_indicators(VisionDimension.EYE,
                             {"jaundice": "非典型黄染"})["jaundice"] == 4
 
@@ -143,6 +145,14 @@ def test_normal_tongue_scores_zero():
         "sublingual_varicosity": "无",
         "fissure": "无",
         "body_size": "适中",
+        # 轮次 3 新增指标的正常值——把"正常舌象全 0"钉在新规则上
+        "coating_peeling": "无剥落",
+        "coating_greasy": "不腻",
+        "coating_color": "白",
+        "prickles": "无点刺",
+        "sublingual_color": "淡紫",
+        "sublingual_thickness": "正常",
+        "sublingual_petechiae": "无",
     }
     assert score(VisionDimension.TONGUE, normal) == 0.0
     inds = score_indicators(VisionDimension.TONGUE, normal)
@@ -150,8 +160,12 @@ def test_normal_tongue_scores_zero():
 
 
 def test_tongue_score_sparse_not_diluted():
-    # 单条「青紫」只覆盖舌质颜色一项，不应被固定 8 项均值稀释为 1.2
-    assert score(VisionDimension.TONGUE, "青紫") == 10
+    # 单条「青紫」只覆盖舌质颜色一项，不应被固定 8 项均值稀释为 1.2。
+    # 轮次 3 起用结构化 dict 表达：sublingual_color 也收「青紫」(8)，
+    # 纯文本输入会双命中变均值 9.0——"稀疏不稀释"的意图用结构化
+    # 入参（Record.get_observation 产出，推荐的精确路径）表达更准确，
+    # 断言强度不变（仍 == 10）
+    assert score(VisionDimension.TONGUE, {"body_color": "青紫"}) == 10
 
 
 def test_body_luster_not_scored():
@@ -186,6 +200,96 @@ def test_face_luster_scoring():
     assert inds2["face_luster"] == 8
     inds3 = score_indicators(VisionDimension.HEAD_FACE, {"face_luster": "荣润"})
     assert inds3["face_luster"] == 0
+
+
+# ============================================================
+# 轮次 3：评分覆盖扩展（剥落/腻腐/苔色/点刺/舌下，分值用户签认）
+# ============================================================
+
+def test_coating_peeling_scoring():
+    inds = score_indicators(VisionDimension.TONGUE, {"coating_peeling": "剥落斑"})
+    assert inds["coating_peeling"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_peeling": "花剥"})["coating_peeling"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_peeling": "剥脱"})["coating_peeling"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_peeling": "地图舌"})["coating_peeling"] == 7
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_peeling": "镜面舌"})["coating_peeling"] == 9
+    # 否定守卫："无剥落"归零
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_peeling": "无剥落"})["coating_peeling"] == 0
+
+
+def test_coating_greasy_scoring():
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "稍腻"})["coating_greasy"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "腻"})["coating_greasy"] == 5
+    # "厚腻" 最长匹配压过单字 "腻"(5)
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "厚腻"})["coating_greasy"] == 8
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "腐苔"})["coating_greasy"] == 7
+    # 否定守卫："不腻" 中 "腻" 被前置 "不" 拦截
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "不腻"})["coating_greasy"] == 0
+
+
+def test_coating_color_scoring():
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_color": "白"})["coating_color"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_color": "黄"})["coating_color"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_color": "灰"})["coating_color"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_color": "黑"})["coating_color"] == 7
+    # "灰黑" 最长匹配压过 "灰"(6)/"黑"(7)，不降级
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_color": "灰黑"})["coating_color"] == 8
+
+
+def test_prickles_scoring():
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "点刺"})["prickles"] == 5
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "芒刺"})["prickles"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "无点刺"})["prickles"] == 0
+
+
+def test_sublingual_scoring():
+    # 舌下络脉颜色
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_color": "淡紫"})["sublingual_color"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_color": "紫暗"})["sublingual_color"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_color": "青紫"})["sublingual_color"] == 8
+    # 舌下络脉粗细
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_thickness": "增粗"})["sublingual_thickness"] == 5
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_thickness": "怒张"})["sublingual_thickness"] == 7
+    # 舌下络脉瘀点（复用 PETECHIAE_MAP）
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_petechiae": "散在"})["sublingual_petechiae"] == 5
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_petechiae": "无"})["sublingual_petechiae"] == 0
+
+
+def test_body_color_hongrun_not_misjudged():
+    """轮次 3 词表缺口修补：正常描述「红润」不再靠单字「红」误报 7 分
+    （「红润」最长匹配压过「红」）；真正的偏红仍判 7。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "红润"})["body_color"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "舌质红润，苔薄白"})["body_color"] == 0
+    # 对照：裸「红」仍是 7
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "红"})["body_color"] == 7
 
 
 def test_sclera_color_scoring():
