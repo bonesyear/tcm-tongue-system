@@ -65,16 +65,16 @@ kimi version 2.0.0
 Now let me examine the actual data: records/daily/2026-08-09_analysis.json (the scene in question) and 08-14, 08-28, plus existing weekly reports to see actual distribution. Let me check the 08-09 file and look at what tongue observations exist, and check existing weekly reports for the int/float issue and the summary sentence.
 
   Also check tests that assert on detail types (test that asserts mean type). Let me check tests/test files referencing dimension_deviation_detail.=== 2026-08-09 shape keys: ['patient', 'gender_age', 'date', 'session', 'confidence', 'photo_coverage', 'vision_model', 'tongue']
-tongue node: {"body": "（示例舌象描述，合成数据）", "coating": "薄白(中根稍厚), 润偏滑, 稍腻, 无剥落", "sublingual": "正常(闪光灯下Qwen仍判正常)"}
+tongue node: {"body": "（示例舌象描述，合成数据）", "coating": "（示例苔质描述，合成数据）", "sublingual": "正常"}
 
 === 2026-08-14 shape keys: ['patient', 'gender_age', 'date', 'session', 'confidence', 'tongue', 'inquiry', 'pattern_update']
-tongue node: {"body": "（示例舌象，合成数据）", "coating": "白薄(中根稍厚), 湿润, 无明显腻(腻退, 湿继续改善), 点刺舌尖边散在", "peeling": "（示例剥落描述，合成数据）", "sublingual": "正常(Qwen闪光灯下仍判正常, 用户无变化报告; 湿退→络脉显影减轻)"}
+tongue node: {"body": "（示例舌象，合成数据）", "coating": "（示例苔质，合成数据）", "peeling": "（示例剥落，合成数据）", "sublingual": "正常"}
 
 === 2026-08-28 shape keys: ['date', 'session', 'patient', 'gender_age', 'confidence', 'photos', 'tongue', 'head_face']
-tongue node: {"body_color": "淡红", "body_size": "胖大", "tooth_marks": "边缘轻度齿痕", "fissure": "仅中央浅窄正中沟（生理性，非病理裂纹）", "prickles": "舌尖及舌边散在红色点刺，剥落区内亦见红点", "coating_color": "白", "coating_thickness": "中央及根部偏厚，边尖较薄", "coating_moisture": "湿润偏滑", "coating_greasy": "稍腻", "coating_peeling": "（示例剥落描述，合成数据）", "sublingual_color": "正常（浅蓝紫细条）", "sublingual_thickness": "正常（小于2mm）", "sublingual_varicosity": "正常（平直不迂曲）"}
+tongue node: {"body_color": "（示例舌色，合成数据）", "body_size": "（示例）", "tooth_marks": "（示例）", "fissure": "（示例）", "prickles": "（示例）", "coating_color": "白", "coating_thickness": "（示例）", "coating_moisture": "（示例）", "coating_greasy": "（示例）", "coating_peeling": "（示例剥落，合成数据）", "sublingual_color": "正常", "sublingual_thickness": "正常", "sublingual_varicosity": "正常"}
 
 === 2026-08-02 shape keys: ['patient', 'gender_age', 'date', 'session', 'confidence', 'photo_coverage', 'formula_with_dosage', 'face']
-tongue node: {"body_color": "（示例舌色，合成数据）", "body_shape": "偏胖", "teeth_marks": "（示例齿痕，合成数据）", "coating_color": "白带淡黄 (四模型一致)", "coating_thickness": "薄~中 (根部稍厚)", "coating_moisture": "润", "coating_greasy": "微腻", "coating_peeling": "无", "crack": "排除 — 生理性舌正中沟 (豆包2.0+K3+照片描述一致; 豆包2.1误判浅裂纹)", "sublingual_veins": "（示例舌下络脉，合成数据） (用户肉眼确认, 血瘀铁证; 自然光照豆包判正常但用户确认存在深紫; 闪光灯照豆包判深紫粗大蛇形与此吻合)"}
+tongue node: {"body_color": "（示例舌色，合成数据）", "body_shape": "偏胖", "teeth_marks": "（示例齿痕，合成数据）", "coating_color": "（示例苔色，合成数据）", "coating_thickness": "（示例厚薄，合成数据）", "coating_moisture": "润", "coating_greasy": "（示例）", "coating_peeling": "无", "crack": "（示例裂纹描述，合成数据）", "sublingual_veins": "（示例舌象值，合成数据）"}
 
 === 2026-07-15 shape keys: 
 ['date', 'confidence', 'photo_coverage', 'dimensions_covered', 'dimensions_unchanged', 'photo_analysis', 'inquiry', 'trend_vs_0712']
@@ -85,9 +85,9 @@ tongue node: MISSING
 
 Interesting. 2026-08-09 is a shape C record with a free-text "tongue" node using keys body/coating/sublingual (B-style nested strings, but at top level so detected as shape C). The get_observation for shape C uses identity mapping: "body_color" path = ["body_color"], so digging root["body_color"] returns "" — hence all indicators empty. It prints the mixed-shape warning. Then score_indicators scores all 0. So extract_tongue_metrics returns all 0.0 — indistinguishable from "observed normal".
 
-  Note: 08-09's tongue node has values as plain strings ("示例舌色欠红润, 胖大偏嫩...") under keys body/coating/sublingual. Shape C detection: top-level key "tongue" exists → shape C. Paths are identity, so nothing parses. Indeed the "混合形状" warning.
+  Note: 08-09's tongue node has values as plain strings （示例舌象描述…） under keys body/coating/sublingual. Shape C detection: top-level key "tongue" exists → shape C. Paths are identity, so nothing parses. Indeed the "混合形状" warning.
 
-  Also 08-02: shape C with keys body_color (exists! "淡紫..."), body_shape (drift), teeth_marks (drift), coating_color, coating_thickness, coating_moisture, coating_greasy, coating_peeling, crack (drift), sublingual_veins (drift). So partial parse: body_color, coating_color, coating_thickness, coating_moisture, coating_greasy, coating_peeling parse; body_size, tooth_marks, fissure, prickles, sublingual_* missing.
+  Also 08-02: shape C with keys body_color (exists! "示例值..."), body_shape (drift), teeth_marks (drift), coating_color, coating_thickness, coating_moisture, coating_greasy, coating_peeling, crack (drift), sublingual_veins (drift). So partial parse: body_color, coating_color, coating_thickness, coating_moisture, coating_greasy, coating_peeling parse; body_size, tooth_marks, fissure, prickles, sublingual_* missing.
 
   Key question ①: does score_indicators distinguish "no observation" from "observed normal 0"? Answer: NO. _match_score returns 0 for empty text and 0 for "淡红". score_indicators returns Dict[str, int] with all indicators always present, 0 for both cases. So cannot distinguish by score alone.
 
@@ -201,11 +201,11 @@ SUMMARY: 本周（2026-08-28 至 2026-08-28）共 1 条日分析记录。舌诊�
 舌苔变化: 舌苔厚度整体稳定（0.0 → 0.0）；舌苔润燥整体稳定（7.0 → 7.0）；舌苔剥落整体稳定（6.0 → 6.0）
 
 
-• Interesting — the W35 report shows "舌质颜色偏离度整体稳定（0.0 → 0.0）" even for 2026-08-28 which HAS body_color "淡红" → score... body_color map: "淡红" 0. Text contains "偏红"? "红" kw=7 — is it negated? "剥落区偏红" — "红" occurrence preceded by "偏" within window "淡红". Let me check: first "红" in "淡红" — "淡红" is exact? Text is not exact match (long string), so substring path: "淡红" (len 2) found at idx 2 — unnegated → best_kw "淡红"? But "红绛" no. "暗红" no. Longest unnegated keyword: "淡红" len2 vs "红" len1 → "淡红" wins → 0. So 舌质颜色 = 0.0, genuinely "observed normal" here. But for 08-09 scenario it's unobserved. Both print "整体稳定（0.0 → 0.0）".
+• Interesting — the W35 report shows "舌质颜色偏离度整体稳定（0.0 → 0.0）" even for 2026-08-28 which HAS body_color "示例舌色描述" → score... body_color map: "淡红" 0. Text contains "偏红"? "红" kw=7 — is it negated? "示例舌色描述" — "红" occurrence preceded by "偏" within window "示例舌色描述". Let me check: first "红" in "淡红" — "淡红" is exact? Text is not exact match (long string), so substring path: "淡红" (len 2) found at idx 2 — unnegated → best_kw "淡红"? But "红绛" no. "暗红" no. Longest unnegated keyword: "淡红" len2 vs "红" len1 → "淡红" wins → 0. So 舌质颜色 = 0.0, genuinely "observed normal" here. But for 08-09 scenario it's unobserved. Both print "整体稳定（0.0 → 0.0）".
 
   Also note 舌苔厚度 in W35: "整体稳定（0.0 → 0.0）" but 08-28 coating_thickness="中央及根部偏厚，边尖较薄" — map: "白厚"7/"黄厚"7/"厚腻"8 — "偏厚" contains "厚"? Keywords: 薄白/薄黄/无苔/白厚/黄厚/厚腻/焦黑. "厚" alone is not a keyword. So 0. Hmm, that's a scoring coverage gap but not in scope.
 
-  Wait, but the mean=5.3 with n=6 for 08-28 — from indicators: coating_moisture "湿润偏滑"→滑7, coating_greasy "稍腻"→3, coating_peeling→6 or 7 （地图舌7), prickles→5, body_size 胖大→7, tooth_marks 轻度→4. n=6 positives. OK.
+  Wait, but the mean=5.3 with n=6 for 08-28 — from indicators: coating_moisture "示例值"→滑7, coating_greasy "示例值"→3, coating_peeling→6 or 7 （地图舌7), prickles→5, body_size 胖大→7, tooth_marks 轻度→4. n=6 positives. OK.
 
   Now for 08-09: shape C mixed — all indicators "" → all scores 0, n=0 at dimension level (fixed in round 4), but per-metric tongue_metrics all 0.0 → trend says "舌质颜色偏离度整体稳定（0.0 → 0.0）". Confirmed.
 
@@ -227,7 +227,7 @@ C
 === 2026-08-28 shape C
 
   non-empty indicators: ['body_color', 'body_size', 'tooth_marks', 'fissure', 'prickles', 'coating_color', 'coating_thickness', 'coating_moisture', 'coating_greasy', 'coating_peeling', 'sublingual_color', 'sublingual_thickness', 'sublingual_varicosity']
-  radar metrics: {'舌苔润燥': 7.0, '齿痕': 4.0, '舌体胖瘦': 7.0, '舌苔剥落': 6.0}
+  radar metrics: （示例：4 个轴有非零值）
 
   tongue detail: {'mean': 5.3, 'max': 7.0, 'n': 6}
 === 2026-06-25 shape B
@@ -242,9 +242,9 @@ C
   tongue detail: {'mean': 0.0, 'max': 0.0, 'n': 0}
 Excellent — this confirms everything:
 
-  1. 08-09/08-14 (shape C mixed): all obs empty → radar metrics all 0.0 → 逐指标趋势 prints "整体稳定（0.0 → 0.0）" — misleading. Note: 08-09's actual tongue text describes 胖大/齿痕/点刺/稍腻 — real abnormalities invisible in weekly per-metric trends. (Though dimension-level now says 无有效观测.)
+  1. 08-09/08-14 (shape C mixed): all obs empty → radar metrics all 0.0 → 逐指标趋势 prints "整体稳定（0.0 → 0.0）" — misleading. Note: 08-09's actual tongue text describes 胖大/齿痕/点刺/示例值 — real abnormalities invisible in weekly per-metric trends. (Though dimension-level now says 无有效观测.)
 
-  2. Interesting: 08-02 partial — radar metrics all 0.0! Even though body_color="淡紫..." （紫暗 9? "淡紫" not in map; "紫暗" not substring... text "淡紫 （用户确认...)" — kw "紫暗" not in text; "淡白"? no. So 0), coating_thickness "薄~中 （根部稍厚）" — no kw hit → 0. So 08-02 radar shows all-zero despite real observations （明显齿痕 etc. unparsed due to key drift teeth_marks). Also a misleading case but caused by key drift + keyword gaps.
+  2. Interesting: 08-02 partial — radar metrics all 0.0! Even though body_color="示例值..." （紫暗 9? "示例值" not in map; "紫暗" not substring... text "示例值 （用户确认...)" — kw "紫暗" not in text; "淡白"? no. So 0), coating_thickness "薄~中 （根部稍厚）" — no kw hit → 0. So 08-02 radar shows all-zero despite real observations （明显齿痕 etc. unparsed due to key drift teeth_marks). Also a misleading case but caused by key drift + keyword gaps.
 
   3. 07-15 shape B but no tongue observations at all (photo_analysis shape, "tongue node MISSING") → n=0, radar all 0.0.
 
@@ -320,9 +320,9 @@ W32 confirms item 2 exactly: "舌诊本周无有效观测…；当前偏离度�
 
   真实场景（实测 `records/daily`）：
 
-  - `2026-08-09_analysis.json` 是混合形状档案：顶层有 `tongue` 键被判为形状 C，但内部是 B 式嵌套（`body`/`coating`/`sublingual` 整段文本），按恒等映射（src/record.py:50-67 的 C 路径）解析后 **18 个规范指标全部为空串**。`extract_tongue_metrics`（scripts/generate_weekly_report.py:197-219）因此输出 9 轴全 0.0。而原文实际记录了"胖大偏嫩、齿痕轻微、舌尖点刺、稍腻"等真实异常——周报逐指标趋势却写"整体稳定（0.0 → 0.0）"。
+  - `2026-08-09_analysis.json` 是混合形状档案：顶层有 `tongue` 键被判为形状 C，但内部是 B 式嵌套（`body`/`coating`/`sublingual` 整段文本），按恒等映射（src/record.py:50-67 的 C 路径）解析后 **18 个规范指标全部为空串**。`extract_tongue_metrics`（scripts/generate_weekly_report.py:197-219）因此输出 9 轴全 0.0。而原文实际记录了（示例异常描述，合成数据）等真实异常——周报逐指标趋势却写"整体稳定（0.0 → 0.0）"。
   - 这不是假想场景：`records/weekly/2026-W32_report.json` 的 summary 里已经躺着这句话——`舌质颜色偏离度整体稳定（0.0 → 0.0）`（同一摘要里维度级已正确写"舌诊本周无有效观测"，逐指标级却写"稳定"，自相矛盾）。
-  - 同类档案还有 `2026-08-14`（同混合形状，全空）、`2026-07-10`/`2026-07-15`（形状 B 但无 tongue 观测节点，全空）、`2026-08-02`（键名漂移 `teeth_marks`/`body_shape`/`crack`/`sublingual_veins`，18 项中只解析到 6 项，且 9 个雷达轴全 0.0——明明有"明显齿痕、中度血瘀"的确认记录）。records/daily 共 9 份 analysis，其中 5 份存在逐指标级全零或大幅欠解析，**该误导在真实数据分布中是常态而非边角**。
+  - 同类档案还有 `2026-08-14`（同混合形状，全空）、`2026-07-10`/`2026-07-15`（形状 B 但无 tongue 观测节点，全空）、`2026-08-02`（键名漂移 `teeth_marks`/`body_shape`/`crack`/`sublingual_veins`，18 项中只解析到 6 项，且 9 个雷达轴全 0.0——明明有"示例异常描述"的确认记录）。records/daily 共 9 份 analysis，其中 5 份存在逐指标级全零或大幅欠解析，**该误导在真实数据分布中是常态而非边角**。
 
   **第 2 项：不止文字冗余，是自相矛盾 + 错误建议，中等严重性。**
 
@@ -336,7 +336,7 @@ W32 confirms item 2 exactly: "舌诊本周无有效观测…；当前偏离度�
 
   ## ② 第 1 项技术方案（重点）
 
-  **判据可行：`get_observation(dim)` 的文本非空判定是可靠的"有无观测"信号。** 注意不是"键是否存在"——`get_observation`（src/record.py:295-309）对缺失指标**以空串占位**，返回 dict 的键集合恒定，所以判据必须是 `obs[ind_key].strip()` 非空。实测验证：08-09/08-14/07-15 全部指标为空串（无观测）；08-28 的 `body_color="淡红"` 非空但得 0 分（有观测、正常）——该判据把两类场景干净分开，而分值做不到。
+  **判据可行：`get_observation(dim)` 的文本非空判定是可靠的"有无观测"信号。** 注意不是"键是否存在"——`get_observation`（src/record.py:295-309）对缺失指标**以空串占位**，返回 dict 的键集合恒定，所以判据必须是 `obs[ind_key].strip()` 非空。实测验证：08-09/08-14/07-15 全部指标为空串（无观测）；08-28 的 `body_color="示例舌色描述"` 非空但得 0 分（有观测、正常）——该判据把两类场景干净分开，而分值做不到。
 
   **推荐方案（最小改动，不改 `extract_tongue_metrics` 语义）：**
 
@@ -361,7 +361,7 @@ W32 confirms item 2 exactly: "舌诊本周无有效观测…；当前偏离度�
 
   1. **雷达图全零多边形（最重要，未列入 3 项）**：`generate_radar_chart`（generate_weekly_report.py:371-380）`values = [metrics.get(cat, 0) ...]` 无任何 n 感知。08-09 周会画一个"完美居中"的全零多边形，视觉上是"一切正常"的最强误导。趋势图维度级已在 :440-453 用 NaN 断线 + "无有效观测"文字标注处理过，**雷达图没有对应处理**。
   2. **next_week_suggestion 的 max_score<3.0 分支**（:637-641）：全 n=0 时落入"偏离度总体较低"文案（W32 实测已发生），与第 2 项同源。
-  3. **round-4 修复自身的语义残留**：`compute_dimension_deviation_detail` 的 n 定义为"score>0 的指标数"（:264, :250-251 docstring 已自知"没拍到/解析不到**与真正常**同写 0.0"）。一份"完整观测但全部正常"（淡红/薄白/无齿痕）的记录同样 n=0，会触发"本周无有效观测"文案——把"正常"误述为"没观测"。现有示例数据未触发（每期都有阳性指标），但语义上埋着。彻底解法是把 n 改为"观测文本非空的指标数"（与②的判据同源），但那会改变 round-4 已签认的行为与测试，建议仅记录为已知口径，本轮不动。
+  3. **round-4 修复自身的语义残留**：`compute_dimension_deviation_detail` 的 n 定义为"score>0 的指标数"（:264, :250-251 docstring 已自知"没拍到/解析不到**与真正常**同写 0.0"）。一份"完整观测但全部正常"（淡红/薄白/无齿痕）的记录同样 n=0，会触发"本周无有效观测"文案——把"正常"误述为"没观测"。当前示例数据未触发（每期都有阳性指标），但语义上埋着。彻底解法是把 n 改为"观测文本非空的指标数"（与②的判据同源），但那会改变 round-4 已签认的行为与测试，建议仅记录为已知口径，本轮不动。
   4. **weekly_comparison**（:597-602）：是纯静态占位符（"缺少上周周报数据"），不参与任何数值判定，无静默零问题。
   5. **charts JSON 元数据**（:826-838）：只有 path/type/title，不带数值，无问题。
   6. **趋势图数据点**：已在轮次 4 处理（NaN 断线 + 图底标注），无遗留。

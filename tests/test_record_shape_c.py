@@ -1,7 +1,7 @@
 """形状 C（自由格式，顶层规范英文维度键）测试。
 
-fixture tests/fixtures/shape_c_sample.json 为脱敏样例（字段与值风格参考
-records/daily/2026-08-28_analysis.json，不含任何患者身份信息）。
+fixture tests/fixtures/shape_c_sample.json 为纯合成示例（字段与值风格仿形状 C
+记录，全部内容为构造数据，不对应任何真实个人）。
 """
 import json
 import os
@@ -89,13 +89,13 @@ def test_long_peeling_text_does_not_leak_into_other_indicators(shape_c_record):
 # ---- 问诊扁平字典 / pattern_update ----
 
 def test_inquiry_flat_dict_counts_nonempty_strings(shape_c_record):
-    # 4 个问题中 "剥落区不适" 为空串 → 3/4
+    # 4 个问题中 "小便" 为空串 → 3/4
     assert shape_c_record.get_inquiry_coverage() == (3, 4)
 
 
 def test_pattern_update_read(shape_c_record):
     pd = shape_c_record.get_pattern_differentiation()
-    assert "太阴脾虚" in pd["pattern"]
+    assert "示例辨证" in pd["pattern"]
 
 
 # ---- 缺失容错 ----
