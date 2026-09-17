@@ -219,6 +219,27 @@ def extract_tongue_metrics(record: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
+def extract_tongue_observation_flags(record: Dict[str, Any]) -> Dict[str, bool]:
+    """雷达轴名 → 该轴规范指标是否有观测文本。
+
+    score_indicators 对"无观测"与"正常 0"返回相同分值，无法靠分值区分；
+    get_observation 对缺失指标以空串占位（键数恒定），故判据为观测文本
+    非空。供逐指标趋势与雷达图区分"正常 0 分"与"无数据"。
+
+    参数:
+        record: 单日诊断 JSON 记录（dict 或 DailyRecord）
+
+    返回:
+        dict: 雷达轴名 → 是否有观测（True=有观测文本）
+    """
+    rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
+    obs = rec.get_observation(VisionDimension.TONGUE)
+    return {
+        metric_name: bool(obs.get(ind_key, "").strip())
+        for metric_name, ind_key in TONGUE_RADAR_METRIC_KEYS.items()
+    }
+
+
 def compute_dimension_deviation(record: Dict[str, Any]) -> Dict[str, float]:
     """
     计算单条记录各望诊维度的综合偏离度分数（0-10）。
@@ -329,13 +350,19 @@ def describe_trend(name: str, first_val: float, last_val: float,
 
 
 def generate_radar_chart(metrics_list: List[Dict[str, float]],
-                         dates: List[str]) -> Optional[str]:
+                         dates: List[str],
+                         obs_flags_list: Optional[List[Dict[str, bool]]] = None
+                         ) -> Optional[str]:
     """
     生成舌象指标雷达图。
 
     参数:
         metrics_list: 多日的舌象指标列表
         dates: 对应的日期标签
+        obs_flags_list: 可选，逐日各雷达轴"是否有观测"（见
+            extract_tongue_observation_flags）。某日全部轴无观测时不绘制
+            该日多边形（全零多边形视觉上等同"一切正常"，是最强误导），
+            并在图下加注。不传则保持旧行为（全部绘制）。
 
     返回:
         str: 图表文件路径，失败返回 None
@@ -368,24 +395,42 @@ def generate_radar_chart(metrics_list: List[Dict[str, float]],
     colors = ["#C41E3A", "#D4770A", "#2D5016", "#1A6B8A",
               "#6B2D8A", "#8B1A1A", "#B8860B"]
 
+    skipped_dates: List[str] = []
     for idx, metrics in enumerate(metrics_list):
+        label = dates[idx] if idx < len(dates) else f"Day {idx + 1}"
+
+        # 全部轴无观测的日期不绘制多边形（全零多边形 = 圆心一点，
+        # 视觉上会被误读为"一切正常"）
+        if (obs_flags_list is not None and idx < len(obs_flags_list)
+                and not any(obs_flags_list[idx].values())):
+            skipped_dates.append(label)
+            print(f"ℹ️ 雷达图: {label} 全部轴无有效观测，未绘制该日多边形",
+                  file=sys.stderr)
+            continue
+
         values = [metrics.get(cat, 0) for cat in categories]
         values += values[:1]  # 闭合
 
-        label = dates[idx] if idx < len(dates) else f"Day {idx + 1}"
         color = colors[idx % len(colors)]
 
         ax.fill(angles, values, alpha=0.08, color=color)
         ax.plot(angles, values, "o-", linewidth=2, color=color,
                 label=label, markersize=5)
 
+    if skipped_dates:
+        fig.text(0.5, 0.02,
+                 f"注：以下日期无有效观测，未绘制多边形：{'、'.join(skipped_dates)}",
+                 ha="center", fontsize=10, color="#8B1A1A")
+
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(category_labels, fontsize=10, color="#2C1810")
     ax.set_ylim(0, 10)
     ax.set_yticks([2, 4, 6, 8, 10])
     ax.set_yticklabels(["2", "4", "6", "8", "10"], fontsize=8, color="#666666")
-    ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.1),
-              fontsize=9, framealpha=0.9)
+    # 全部日期均无观测时没有可图例化的多边形，空图例只剩一个空框
+    if len(skipped_dates) < len(metrics_list):
+        ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.1),
+                  fontsize=9, framealpha=0.9)
 
     # 保存
     date_tag = dates[-1] if dates else datetime.now().strftime("%Y-%m-%d")
@@ -547,6 +592,10 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
     first_detail = details[0]
     last_detail = details[-1]
 
+    # 逐指标"有无观测"判据：观测文本非空（score 无法区分"正常 0"与"无数据"）
+    first_flags = extract_tongue_observation_flags(recs[0])
+    last_flags = extract_tongue_observation_flags(recs[-1])
+
     def _dim_trend(name: str, dim_cn: str) -> str:
         """维度级趋势描述：携带 max/n 启用双门槛与无有效观测判定。"""
         return describe_trend(
@@ -557,31 +606,40 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
             last_n=last_detail[dim_cn]["n"],
         )
 
+    def _metric_trend(name: str, axis: str) -> str:
+        """逐指标趋势：观测 flag 作为 n（0/1）传入 describe_trend，
+        无观测走其既有 n=0 分支，不再把"未解析到"写成"整体稳定（0.0 → 0.0）"；
+        两端都有观测时退化为与旧标量调用逐字一致的输出。"""
+        return describe_trend(
+            name, first_tm[axis], last_tm[axis],
+            first_max=first_tm[axis], last_max=last_tm[axis],
+            first_n=int(first_flags[axis]), last_n=int(last_flags[axis]),
+        )
+
+    def _metric_group_trend(axes: List[Any]) -> str:
+        """分组短路：组内全部轴两端均无观测时只输出一句，避免整组刷长文案。"""
+        if all(not first_flags[axis] and not last_flags[axis]
+               for _, axis in axes):
+            names = "/".join(axis for _, axis in axes)
+            suffix = "均未解析到" if len(axes) > 1 else "未解析到"
+            return f"本周无有效观测（{names}{suffix}）"
+        return "；".join(_metric_trend(name, axis) for name, axis in axes)
+
     trend_analysis = {
-        "舌质变化": describe_trend(
-            "舌质颜色偏离度", first_tm["舌质颜色"], last_tm["舌质颜色"]
-        ),
-        "舌苔变化": (
-            describe_trend("舌苔厚度", first_tm["舌苔厚度"], last_tm["舌苔厚度"])
-            + "；"
-            + describe_trend("舌苔润燥", first_tm["舌苔润燥"], last_tm["舌苔润燥"])
-            + "；"
-            # 轮次 3 起剥落进入雷达图与评分；文字趋势同步纳入，
-            # 否则核心观察点（花剥苔/地图舌）在摘要里看不到
-            + describe_trend("舌苔剥落", first_tm["舌苔剥落"], last_tm["舌苔剥落"])
-        ),
-        "舌形变化": (
-            describe_trend("齿痕程度", first_tm["齿痕"], last_tm["齿痕"])
-            + "；"
-            + describe_trend(
-                "舌体胖瘦偏离度", first_tm["舌体胖瘦"], last_tm["舌体胖瘦"]
-            )
-            + "；"
-            + describe_trend("裂纹程度", first_tm["裂纹"], last_tm["裂纹"])
-        ),
-        "舌下络脉变化": describe_trend(
-            "舌下络脉迂曲度", first_tm["舌下络脉"], last_tm["舌下络脉"]
-        ),
+        "舌质变化": _metric_group_trend([("舌质颜色偏离度", "舌质颜色")]),
+        # 轮次 3 起剥落进入雷达图与评分；文字趋势同步纳入，
+        # 否则核心观察点（花剥苔/地图舌）在摘要里看不到
+        "舌苔变化": _metric_group_trend([
+            ("舌苔厚度", "舌苔厚度"),
+            ("舌苔润燥", "舌苔润燥"),
+            ("舌苔剥落", "舌苔剥落"),
+        ]),
+        "舌形变化": _metric_group_trend([
+            ("齿痕程度", "齿痕"),
+            ("舌体胖瘦偏离度", "舌体胖瘦"),
+            ("裂纹程度", "裂纹"),
+        ]),
+        "舌下络脉变化": _metric_group_trend([("舌下络脉迂曲度", "舌下络脉")]),
         "head_face_trend": _dim_trend("头面诊偏离度", "头面诊"),
         "eye_trend": _dim_trend("目诊偏离度", "目诊"),
         "ear_trend": _dim_trend("耳诊偏离度", "耳诊"),
@@ -603,6 +661,10 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
 
     # 找出本周偏离度最高的维度
     max_dim, max_score = max(last_dev.items(), key=lambda item: item[1])
+
+    # 全维度周末 n=0 = 本周未解析到任何有效观测：不作偏离度排名，
+    # 也不得落入"偏离度总体较低"建议分支（会把"无数据"误述为"状况良好"）
+    all_dims_unobserved = all(d["n"] == 0 for d in last_detail.values())
 
     # 舌诊偏离度多维呈现：均值 + 最重单项 + 异常项数；n=0 时显式标注
     # "无有效观测"，不再把"没拍到/解析不到"写成 0.0 假"正常"
@@ -626,15 +688,23 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
 
+    if all_dims_unobserved:
+        ranking_phrase = "本周各维度均无有效观测，不作偏离度排名。"
+    else:
+        ranking_phrase = f"当前偏离度最高的维度为「{max_dim}」（{max_score:.1f} 分）。"
     summary = (
         f"本周（{first_date} 至 {last_date}）共 {len(records)} 条日分析记录。"
         f"{tongue_phrase}；"
-        f"当前偏离度最高的维度为「{max_dim}」（{max_score:.1f} 分）。"
+        f"{ranking_phrase}"
         f"{trend_analysis['舌质变化']} "
         f"{trend_analysis['head_face_trend']}。"
     )
 
-    if max_score < 3.0:
+    if all_dims_unobserved:
+        next_week_suggestion = (
+            "本周未解析到有效观测，请按规范形状（形状 C）核对档案或重传照片。"
+        )
+    elif max_score < 3.0:
         next_week_suggestion = (
             "本周各维度偏离度总体较低，建议维持现有六维拍照套餐"
             "（舌+头面+目+耳+手+皮肤），保持规律记录即可。"
@@ -788,12 +858,15 @@ def main():
     print("\n--- 生成舌象雷达图 ---")
     metrics_list = []
     dates_labels = []
+    obs_flags_list = []
     for record in records:
         m = extract_tongue_metrics(record)
         metrics_list.append(m)
         dates_labels.append(record.get("date", "?"))
+        obs_flags_list.append(extract_tongue_observation_flags(record))
 
-    radar_path = generate_radar_chart(metrics_list, dates_labels)
+    radar_path = generate_radar_chart(metrics_list, dates_labels,
+                                      obs_flags_list=obs_flags_list)
     if radar_path:
         print(f"   雷达图: {radar_path}")
 

@@ -358,3 +358,81 @@ def test_weekly_summary_marks_no_valid_observation():
     assert "无有效观测" in data["summary"]
     assert "舌诊综合偏离度均值由 0.0" not in data["summary"]
     assert data["dimension_deviation_detail"]["舌诊"]["last"]["n"] == 0
+
+
+# ---- 轮次 5：逐指标观测标注 / 全 n=0 时 summary 与建议联动 / 雷达图无观测 ----
+
+
+def test_extract_tongue_observation_flags(real_raw):
+    """观测 flag 判据 = 观测文本非空（score 无法区分"正常 0"与"无数据"）。"""
+    flags = g.extract_tongue_observation_flags(real_raw)
+    assert set(flags.keys()) == set(g.TONGUE_RADAR_METRIC_KEYS.keys())
+    # fixture 2026-06-25（形状 B）舌诊 18 项指标齐全 → 9 个雷达轴全有观测
+    assert all(flags.values())
+    empty = g.extract_tongue_observation_flags(
+        {"date": "2026-01-01", "observations": {"tongue": {}}})
+    assert not any(empty.values())
+
+
+def test_metric_trend_group_short_circuit_when_unobserved():
+    """组内全部轴两端均无观测 → 整组只输出一句，不刷多条长文案；
+    且不得再出现"整体稳定（0.0 → 0.0）"式的假正常。"""
+    raw = {"date": "2026-01-01", "observations": {"tongue": {}}}
+    data = g.generate_weekly_report_data([raw])
+    ta = data["trend_analysis"]
+    assert ta["舌质变化"] == "本周无有效观测（舌质颜色未解析到）"
+    assert ta["舌苔变化"] == "本周无有效观测（舌苔厚度/舌苔润燥/舌苔剥落均未解析到）"
+    assert ta["舌形变化"] == "本周无有效观测（齿痕/舌体胖瘦/裂纹均未解析到）"
+    assert ta["舌下络脉变化"] == "本周无有效观测（舌下络脉未解析到）"
+    for key in ("舌质变化", "舌苔变化", "舌形变化", "舌下络脉变化"):
+        assert "整体稳定" not in ta[key]
+
+
+def test_metric_trend_observed_normal_zero_verbatim_compatible():
+    """有观测但正常 0 分（淡红）时必须与旧标量调用逐字一致——
+    "整体稳定（0.0 → 0.0）"只在确有观测时出现。"""
+    raw = {"date": "2026-01-01",
+           "observations": {"tongue": {"body": {"color": "淡红"}}}}
+    data = g.generate_weekly_report_data([raw])
+    assert data["trend_analysis"]["舌质变化"] == "舌质颜色偏离度整体稳定（0.0 → 0.0）"
+    # 同档案未观测的分组仍走分组短路
+    assert data["trend_analysis"]["舌苔变化"] == \
+        "本周无有效观测（舌苔厚度/舌苔润燥/舌苔剥落均未解析到）"
+
+
+def test_metric_trend_one_end_observed():
+    """仅一端有观测 → 走 describe_trend 既有"仅一端有有效观测"分支。"""
+    first = {"date": "2026-01-01", "observations": {"tongue": {}}}
+    last = {"date": "2026-01-02",
+            "observations": {"tongue": {"body": {"color": "淡红"}}}}
+    data = g.generate_weekly_report_data([first, last])
+    assert "仅一端有有效观测" in data["trend_analysis"]["舌质变化"]
+
+
+def test_summary_no_ranking_when_all_dims_unobserved():
+    """全维度周末 n=0：不作偏离度排名，且建议不得把"无数据"叙述为
+    "偏离度总体较低"（实测 W32 曾输出自相矛盾的 summary 与错误建议）。"""
+    raw = {"date": "2026-01-01", "observations": {"tongue": {}}}
+    data = g.generate_weekly_report_data([raw])
+    assert "本周各维度均无有效观测，不作偏离度排名" in data["summary"]
+    assert "当前偏离度最高的维度" not in data["summary"]
+    assert "本周未解析到有效观测" in data["next_week_suggestion"]
+    assert "偏离度总体较低" not in data["next_week_suggestion"]
+
+
+def test_radar_chart_skips_unobserved_day(monkeypatch, tmp_path, capsys):
+    """全部轴无观测的日期不绘制多边形（全零多边形视觉上=一切正常），
+    并有显式提示；不传 flags 时保持旧行为（向后兼容）。"""
+    pytest.importorskip("matplotlib")
+    monkeypatch.setattr(g, "CHARTS_DIR", str(tmp_path))
+    dates = ["2026-01-01", "2026-01-02"]
+    metrics = [{"舌质颜色": 7.0}, {}]
+    flags = [
+        {k: True for k in g.TONGUE_RADAR_METRIC_KEYS},
+        {k: False for k in g.TONGUE_RADAR_METRIC_KEYS},
+    ]
+    path = g.generate_radar_chart(metrics, dates, obs_flags_list=flags)
+    assert path is not None and os.path.exists(path)
+    assert "2026-01-02 全部轴无有效观测" in capsys.readouterr().err
+    # 不传 flags：全部绘制，不抛异常
+    assert g.generate_radar_chart(metrics, dates) is not None
