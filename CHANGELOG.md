@@ -1,5 +1,71 @@
 # 更新日志
 
+## v1.4.0（形状 C 档案规范 + 评分与周报修复，2026-09-17）
+
+> 本轮共 20 次提交（含文档入档），测试 159 → **232 项**。两项核心变化：① 新增**档案形状 C**（顶层规范维度键），使解析层对真实产出重新生效；② 评分覆盖扩展 + 周报「无观测」语义修正。
+
+### 新功能
+
+- **档案形状 C（`src/record.py`）**：顶层使用规范英文维度键（`tongue` / `head_face` / `eye` / `ear` / `hand` / `skin`）+ 维度内使用规范指标名（`body_color` / `coating_peeling` / `sublingual_thickness` …）的档案，现可被完整解析（实测维度覆盖 **0/6 → 6/6**）。形状检测优先级 B > A > C > 默认 B；兼容维度别名 `face`→`head_face`、`palm`→`hand`（规范键优先）；`get_inquiry_coverage` 支持扁平 `{问题: 回答}` 计数；新增骨架模板 `templates/daily_record_shape_c_template.json` 与脱敏样例 `tests/fixtures/shape_c_sample.json`。
+- **评分覆盖扩展（`src/scoring.py`）**：新增 7 个指标的评分规则（0 = 正常基线，越高越异常）——
+  - `coating_peeling`：剥落 6 / 剥脱 6 / 花剥 6 / 地图舌 7 / 镜面 9
+  - `coating_greasy`：稍腻 3 / 腻 5 / 厚腻 8 / 腐苔 7
+  - `coating_color`：白 0 / 黄 3 / 灰 6 / 黑 7 / 灰黑 8
+  - `prickles`：点刺 5 / 芒刺 6
+  - `sublingual_color`：淡紫 0 / 紫暗 6 / 青紫 8
+  - `sublingual_thickness`：增粗 5 / 怒张 7
+  - `sublingual_petechiae`：复用瘀斑表
+  并补 `body_color` 词条 `"红润": 0`（原靠单字「红」命中误报 7 分）。纳入原则：**评分层只收静态照片可客观判读的指标**（需动态观察者如 `body_dynamics` 排除）。
+- **雷达图 9 轴**：新增「舌苔剥落」轴；轴集合改为从 `TONGUE_RADAR_METRIC_KEYS` 单一来源取（消除硬编码 8 轴假设）。
+- **周报评分多维输出**：新增 `dimension_deviation_detail`（每维度 first/last 各含 `mean` / `max` / `n`）；摘要呈现「均值 X（最重单项 Y 分，共 N 项异常）」。
+
+### 修复
+
+**辨证与评分层**
+
+- 否定词表移除「非」——「非典型黄染」不再被误否定漏报；同时补入真否定「并非 / 绝非」以避免反向敞口。
+- `_match_score` 平局规则改为**同长度取分值最高者**（fail-loud）——「湿润偏滑」原被「润 = 0」掩盖得 0 分，现正确命中「滑 = 7」。
+- `has_formula_content` 增加兜底扫描（剂量模式 `\d+[g克]` + 27 个经方名白名单），键名漂移不再漏检。
+- `get_pattern_differentiation` 形状 A 缺键时返回 `{}`（原返回整个 diag，污染辨证结果）。
+- `confidence.parse_level` 英文词边界严格化（`HIGH1` / `HIGH_2` 不再误判为 HIGH）。
+- `danger_flags` 宽松真值判定（字符串 `"true"` / `"yes"` / 数值 `1` 均可触发），修复 fail-open。
+- `score()` 非舌诊维度返回值类型统一为 float（原 int，JSON 中出现 `0` 与 `0.0` 并列）。
+
+**方案 A：舌质「润燥」降级**
+
+- `body_luster` 移出评分层（照片光线干扰、静态照片不可判舌神/荣枯），辨证层保留；形状 A 路径键 `舌质荣枯` → `舌质润燥`；删除死代码 `TONGUE_BODY_LUSTER_MAP`。
+
+**周报「无观测」语义**
+
+- 维度级与逐指标级 `n = 0` 不再显示 0.0 → 「本周无有效观测（未拍到或未解析到有分指标）」；雷达图对全无观测的日期**跳过绘制**并提示（原会画出「完美居中的多边形」，视觉上等同于「一切正常」）。
+- 摘要与下周建议在全维度无观测时不再输出偏离度排名，也不再误报「偏离度总体较低，建议维持现状」；逐指标判据采用 `get_observation` 文本非空（区分「正常 0」与「无数据」）。
+- `describe_trend` 增加**双门槛**：仅当最重单项下降 ≥ 0.5 且异常项数不增时，才判定「异常程度减轻」（防止新增轻度异常稀释均值被读成好转）。
+
+**周报档案选择**
+
+- 新增 `_select_daily_file` 三级规则：精确 `{date}_analysis.json` 优先 → 排除 `.bak` / `copy` / `tmp` / `_旧格式` 候选后取 mtime 最新 → 多份候选打印警告。修正原「取字典序最新」静默选中副本的问题（实测 2026-07-15 曾读错 `_b` 副本而丢弃正档）。
+
+**vision_client.py**
+
+- 文件句柄改用 `with`；HTTP 错误带状态码与响应摘要；JSON 解码失败 / 超时 / 缺 `choices` 统一转 `RuntimeError`；运行时校验由 `assert` 改为显式错误（`python -O` 下不再失效）；参数不足或未知模式退出码 2；MIME 类型映射（png/jpg/jpeg/webp，回退 jpeg）；`classify` 未知类别回退「其他」并告警；`observe` 无效部位告警（原静默回退）。
+
+**图表**
+
+- CJK 字体候选补入 `Noto Sans CJK JP`（Linux 的 Noto `.ttc` 常只注册 JP 名，原候选 `Noto Sans CJK SC` 匹配不到，会落到缺 ASCII 字形的 `Droid Sans Fallback`）+ 字体回退链 → 图上字母 / 数字 / 破折号不再显示为方块（实测渲染警告 25 → 0）。
+
+### 测试
+
+- 159 → **232 项**：新增 `tests/test_vision_client.py`（20 项，全 mock 免网络）、`tests/test_record_shape_c.py`（12 项）；周报 / 评分 / 记录层补充约 40 项，含「正常路径逐字不变」的兼容性钉子与「代价侧」反例（如「有观测且 0 分」的逐字兼容、`并非 / 绝非` 真否定）。
+
+### 文档
+
+- 新增 5 份模型复核 / 分析报告：`docs/K3_REVIEW_2026-09-17.md`、`docs/K3_POST_R2_AUDIT_2026-09-17.md`、`docs/K3_SCORING_ADVICE_2026-09-17.md`、`docs/K3_SCORING_METRIC_ADVICE_2026-09-17.md`、`docs/K3_NO_OBSERVATION_ANALYSIS_2026-09-17.md`。
+- `docs/REPAIR_PLAN_2026-08-25.md` 更新执行进度（形状 C 与轮次 1–5 全部完成，含逐轮实测数据与遗留清单）。
+
+### ⚠️ 口径变更提示
+
+- 评分覆盖扩展（新增 7 个指标进入分母）使维度偏离度均值与历史数值**不可直接纵向比较**（如 2026-08-28 舌诊 6.0 → 5.3）。周报现同时给出 `max`（最重单项）与 `n`（异常项数）以补足负荷信息；均值口径本身含义为「已发现异常的平均烈度」，非异常负荷。
+
 ## v1.3.5（隐私声明与代码整理，2026-08-28）
 
 ### 文档

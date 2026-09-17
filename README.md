@@ -4,7 +4,7 @@
 
 **纯 Python 数据模型库**——不绑定任何 LLM Agent 框架（Hermes / Codex / 其他均可接入）。
 
-当前版本：**v1.3.5**。详见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本：**v1.4.0**。详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 
