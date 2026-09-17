@@ -17,7 +17,7 @@ def test_tongue_score_on_clean_keywords():
 
 
 def test_longest_match_avoids_ambiguity():
-    # "淡红为底" 应命中「淡红」(正常基线 0)，而非裸「红」(7)——
+    # "淡红为底" 应命中「淡红」（示例文本）(正常基线 0)，而非裸「红」(7)——
     # 若最长匹配失效，裸「红」会把正常舌色误判为 7 分
     inds = score_indicators(VisionDimension.TONGUE, "淡红为底，局部偏红")
     assert inds["body_color"] == 0
