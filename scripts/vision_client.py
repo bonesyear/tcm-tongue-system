@@ -119,6 +119,11 @@ def main(argv=None):
             print(USAGE, file=sys.stderr)
             sys.exit(2)
         part = argv[2]
+        if part not in PROMPTS:
+            # 与 classify 分支对齐：无效 part 不得静默回退——调用方拼错
+            # 部位名会拿到通用 prompt 却不自知（解析层键名约定随之失效）
+            print(f"[warn] observe 收到未知部位 {part!r}，回退为 '其他'"
+                  f"（可用类别：{'/'.join(PROMPTS)}）", file=sys.stderr)
         prompt = PROMPTS.get(part, PROMPTS["其他"])
         dt, out = call(img, prompt)
         print(f"[{dt}s] {out}")

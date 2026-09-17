@@ -81,6 +81,20 @@ def test_fei_is_not_negation_for_abnormal_prefix():
                             {"jaundice": "非典型黄染"})["jaundice"] == 4
 
 
+def test_bingfei_juefei_are_true_negations():
+    """"并非/绝非" 是双字真否定短语——移除裸"非"时曾把它们连带弄丢，
+    导致"苔并非黄厚"被判 7 分（轮次 2 自引入的 fail-open）。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "苔并非黄厚"})["coating_thickness"] == 0
+    assert score_indicators(VisionDimension.EYE,
+                            {"jaundice": "巩膜绝非黄染"})["jaundice"] == 0
+    assert score_indicators(VisionDimension.EYE,
+                            {"jaundice": "巩膜并非黄染"})["jaundice"] == 0
+    # 对照：无否定的真阳性仍计分
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "苔黄厚"})["coating_thickness"] == 7
+
+
 def test_negation_guard_clause_boundary():
     # 否定词只在同一小句内生效："无瘀点，散在瘀斑" 的"无"不应跨逗号抹掉"散在"
     inds = score_indicators(VisionDimension.TONGUE, {"petechiae": "无瘀点，散在瘀斑"})

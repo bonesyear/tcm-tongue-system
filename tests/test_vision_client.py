@@ -1,6 +1,7 @@
 """vision_client 单元测试 — 全部 mock，无真实网络请求。"""
 import io
 import json
+import socket
 import urllib.error
 
 import pytest
@@ -183,3 +184,55 @@ def test_classify_known_output(monkeypatch, img, capsys):
     captured = capsys.readouterr()
     assert captured.out.strip() == "舌面"
     assert captured.err == ""
+
+
+# ⑧ observe 未知部位打 warning 并回退 '其他' prompt（与 classify 对齐，
+#    不得静默回退——调用方拼错部位名会拿到通用 prompt 却不自知）
+def test_observe_unknown_part_warns_and_falls_back(monkeypatch, img, capsys):
+    seen = {}
+
+    def fake_call(img_path, prompt, timeout=150):
+        seen["prompt"] = prompt
+        return (1, "{}")
+
+    monkeypatch.setattr(vision_client, "call", fake_call)
+    vision_client.main(["observe", img, "鼻子"])
+    captured = capsys.readouterr()
+    assert "鼻子" in captured.err  # warning 含实际收到值
+    assert "舌面" in captured.err  # warning 含可用类别列表
+    assert seen["prompt"] == vision_client.PROMPTS["其他"]  # 行为仍回退
+
+
+# ⑨ respond 非 JSON 文本 → RuntimeError（不得裸 JSONDecodeError 崩溃）
+def test_call_invalid_json_response(monkeypatch, img, key):
+    class Resp:
+        def read(self):
+            return b"<html>gateway error</html>"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: Resp())
+    with pytest.raises(RuntimeError) as e:
+        vision_client.call(img, "p")
+    assert "invalid JSON" in str(e.value)
+
+
+# ⑩ 超时类异常 → RuntimeError（socket.timeout 与 TimeoutError 同路径）
+def test_call_socket_timeout(monkeypatch, img, key):
+    def boom(req, timeout=None):
+        raise socket.timeout("timed out")
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom)
+    with pytest.raises(RuntimeError) as e:
+        vision_client.call(img, "p")
+    assert "timed out" in str(e.value)
+
+
+# ⑪ 舌面 prompt 的"舌质润燥"键名指令钉住——record.py A 路径依赖该键名
+#    约定，被误改会静默断链（prompt 键名与解析键名漂移无任何报错）
+def test_tongue_prompt_declares_rzao_key_name():
+    assert '键名固定为"舌质润燥"' in vision_client.PROMPTS["舌面"]
