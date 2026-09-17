@@ -10,7 +10,7 @@
 消费方（validator / weekly_report / prompt 文档）一律引用本模块，
 不再各自硬编码中英文维度名，从而消除"head_face vs 头面诊"式的拼写漂移。
 
-设计语汇（/codebase-design）：本模块是一个深 module——interface 很小
+设计语汇：本模块是一个深 module——interface 很小
 （六个枚举 + 两个 adapter），implementation 持有全部维度元数据。
 两个 adapter（中/英）同时存在 → 这是个真 seam，不是假想。
 """

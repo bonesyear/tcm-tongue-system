@@ -159,6 +159,80 @@ def test_has_formula_content():
     assert has_formula_content("   ") is False
 
 
+def test_has_formula_content_fallback_scan():
+    """白名单键未命中时的兜底扫描：值中出现剂量模式或经方名即算有内容
+    （键名漂移不能成为安全检查的放行理由）。"""
+    from src.record import has_formula_content
+    assert has_formula_content({"description": "含桂枝10g"}) is True
+    assert has_formula_content({"note": "桂枝汤加减"}) is True
+    assert has_formula_content({"note": "小柴胡汤"}) is True
+    # 无剂量、无方名的描述不算方剂内容
+    assert has_formula_content({"note": "无"}) is False
+    assert has_formula_content({"description": "暂不需要"}) is False
+
+
+def test_shape_a_body_luster_moisture_path():
+    """方案 A：body_luster 的形状 A 路径为"舌质润燥"（与 vision prompt
+    键名一致）；旧键"舌质荣枯"不再解析（历史记录实测全为形状 B，无影响）。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质润燥": "润泽"}},
+    })
+    tongue = rec.get_observation(VisionDimension.TONGUE)
+    assert tongue["body_luster"] == "润泽"
+    old_key = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质荣枯": "荣润"}},
+    })
+    assert old_key.get_observation(VisionDimension.TONGUE)["body_luster"] == ""
+
+
+def test_shape_a_pattern_differentiation_missing_key_returns_empty():
+    """形状 A 缺"许家栋经方辨证"键时必须返回 {}，不得回落为整个
+    deepseek_diagnosis dict（否则无关字段污染辨证结果）。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "deepseek_diagnosis": {"综合辨证结论": "脾虚", "方剂建议": {}},
+    })
+    assert rec.get_pattern_differentiation() == {}
+    # 键存在时正常取值
+    rec2 = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "deepseek_diagnosis": {"许家栋经方辨证": {"核心病机": "脾虚"}},
+    })
+    assert rec2.get_pattern_differentiation() == {"核心病机": "脾虚"}
+
+
+def test_shape_a_danger_flags_triggered():
+    """形状 A 的 danger_flags：triggered 按宽松真值判定——布尔 True 与
+    LLM 可能输出的字符串 "true"/"yes"、数值 1 均算触发（严格 is True
+    会让字符串 "true" 静默不触发，fail-open）。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "danger_flags": {
+            "daiyang": {"triggered": True, "finding": "面红如妆"},
+            "skin_cold": {"triggered": False, "finding": ""},
+        },
+    })
+    assert rec.get_triggered_danger_flags() == ["daiyang"]
+    # 字符串/数值真值同样触发
+    rec2 = DailyRecord({
+        "date": "2026-01-01",
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "danger_flags": {
+            "daiyang": {"triggered": "true", "finding": "面红如妆"},
+            "skin_cold": {"triggered": "yes", "finding": "肢冷"},
+            "flesh_wasted": {"triggered": 1, "finding": "肉脱"},
+            "mirror_tongue": {"triggered": "false", "finding": ""},
+        },
+    })
+    assert rec2.get_triggered_danger_flags() == ["daiyang", "skin_cold",
+                                                 "flesh_wasted"]
+
+
 def test_no_information_loss_against_raw(real_record):
     """新架构取出的观测文本应是原始记录的子集，不丢失关键信息。"""
     raw = real_record.raw

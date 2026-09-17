@@ -18,13 +18,14 @@ observation 可为 Record.get_observation() 返回的 {指标: 文本}（推荐�
     2. 子串匹配降级 —— 取命中最长的关键词（"红如妆" 优先于 "红"，
        "淡红" 优先于 "红"），消除歧义
     3. 否定守卫（双向） —— 前置：关键词前 6 字内、同一小句（以标点/空白
-       为界）出现否定词（无/不/未/没/非，"非常" 是程度副词不算）；
+       为界）出现否定词（无/不/未/没；"非" 不作否定词——"非正常/非典型"
+       类表述中"非"修饰的是"正常/典型"，误判为否定会漏报异常）；
        后置：关键词后紧跟否定短语（不明显/不显著/未见/阴性 等）。
        覆盖 "无明显浮肿"、"未见浮肿"、"没有黄染"、"浮肿不明显" 等真实
        LLM 产出中的常见否定表达；且按关键词的**全部出现位置**判定——
        "舌质不红，但舌边红" 中第二个 "红" 是真阳性，正常计分。
 
-评分基线约定：**正常表现一律 0 分**（淡红舌、薄白苔、润苔、荣润、适中
+评分基线约定：**正常表现一律 0 分**（淡红舌、薄白苔、润苔、适中
 均为 0）。0 = 正常，10 = 极重度异常，全表统一，杜绝"正常人踩关注线"。
 
 与 Record module 组合：Record 按维度取观测 → Scoring 打分。
@@ -108,13 +109,6 @@ TONGUE_BODY_SIZE_MAP = {
     "肿胀": 9,
 }
 
-# 舌质荣枯（有神/无神）
-TONGUE_BODY_LUSTER_MAP = {
-    "荣润": 0,   # 有神
-    "少泽": 5,   # 少神
-    "枯槁": 8,   # 无神
-}
-
 # 面部光泽
 FACE_LUSTER_MAP = {
     "荣润": 0,   # 有神
@@ -146,7 +140,6 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "sublingual_varicosity": SUBLINGUAL_VARICOSITY_MAP,
         "fissure": FISSURE_MAP,
         "body_size": TONGUE_BODY_SIZE_MAP,
-        "body_luster": TONGUE_BODY_LUSTER_MAP,
     },
     VisionDimension.HEAD_FACE: {
         "face_color":    {"萎黄": 5, "晦暗": 5, "黧黑": 5, "青灰": 5, "红如妆": 9},
@@ -185,6 +178,9 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
 
 
 # 舌诊的雷达图指标名 → 规范指标 key（供周报 extract_tongue_metrics 复用）
+# body_luster（舌质润燥，原"舌质荣枯"）不进雷达图也不参与评分：光泽受
+# 照片光线干扰（顺光/闪光灯观感完全不同），且神气/荣枯需动态观察，
+# 静态照片不可判——不给不可靠数据建展示位（方案 A，评分层降级到辨证层）。
 TONGUE_RADAR_METRIC_KEYS = {
     "舌质颜色": "body_color",
     "舌苔厚度": "coating_thickness",
@@ -201,8 +197,9 @@ TONGUE_RADAR_METRIC_KEYS = {
 # 匹配策略
 # ============================================================
 
-# 否定词：无/不/未/没/非（"非常" 是程度副词，用负向前瞻排除）
-_NEGATION_RE = re.compile(r"无|不|未|没|非(?!常)")
+# 否定词：无/不/未/没。"非" 已移除——"非正常红润""非典型黄染" 中"非"
+# 修饰的是"正常/典型"，当作否定词会把真异常误杀为正常（漏报）。
+_NEGATION_RE = re.compile(r"无|不|未|没")
 # 后置否定短语（"浮肿不明显""黄染未见" 等"关键词+否定"句式），
 # 必须锚定在关键词之后的小句开头，避免"充血无改善"这类误杀
 _POST_NEGATION_RE = re.compile(r"不明显|不显著|不突出|不著|未见|阴性")
@@ -242,7 +239,8 @@ def _has_unnegated_occurrence(text: str, kw: str) -> bool:
 
 
 def _match_score(rules: Dict[str, int], text: str) -> int:
-    """单指标打分：精确匹配优先 → 最长子串匹配（带双向否定守卫）。
+    """单指标打分：精确匹配优先 → 最长子串匹配（带双向否定守卫，
+    同长度关键词取分值最高者）。
 
     返回命中的分值；无命中返回 0。
     已知局限：无标点连写（如"手足不温伴厥冷"）中，否定词可能误伤
@@ -256,14 +254,17 @@ def _match_score(rules: Dict[str, int], text: str) -> int:
     if text in rules:
         return rules[text]
 
-    # 2. 子串匹配降级：取存在未否定出现的最长关键词
+    # 2. 子串匹配降级：取存在未否定出现的最长关键词；
+    #    同长度时取分值最高者（fail-loud：宁可高估不漏估——"湿润偏滑"
+    #    应命中"滑"=7，不能因"润"=0 排在前面而漏掉湿盛信号）
     best_kw = None
     for kw in rules:
         if kw not in text:
             continue
         if not _has_unnegated_occurrence(text, kw):
             continue
-        if best_kw is None or len(kw) > len(best_kw):
+        if (best_kw is None or len(kw) > len(best_kw)
+                or (len(kw) == len(best_kw) and rules[kw] > rules[best_kw])):
             best_kw = kw
 
     return rules[best_kw] if best_kw is not None else 0
