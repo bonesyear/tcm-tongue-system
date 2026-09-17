@@ -78,3 +78,14 @@
 - 实测仅使用仓库内的**非患者示例图**（`docs/images/tongue_surface.jpg`）。
 - API key 仅在进程内存中使用，未写入报告、未打印。
 - 未修改任何 Hermes 配置（`image_input_mode` 保持 `auto`）。
+
+## 七、后续计划：下次实际望诊时做 A/B（用户决定：2026-09-17）
+
+**前提**：仍在**不改任何 Hermes 配置**的条件下跑对比脚本；真实舌照会发送给 DeepSeek（当前仅发送给百炼 Qwen）——**需用户当场确认**。
+
+1. 取当天同一张**真实舌面照**（若同时有舌底照，可各跑一轮）。
+2. **路径 A（现有链路）**：`/usr/bin/python3 scripts/vision_client.py observe <img> 舌面`
+3. **路径 B（主模型 native）**：本地脚本直调 `https://api.deepseek.com/v1/chat/completions`，`model=deepseek-flash`，使用与 `scripts/vision_client.py` 中 `PROMPTS["舌面"]` **完全相同的 prompt**，`max_tokens ≥ 3000`（思考模式会占用大量 token，给少了 `content` 为空）。
+4. **对比维度**：耗时｜JSON 合规性（键名是否严格符合 prompt 约定）｜与**用户肉眼判读**的一致性——重点看舌色深浅（淡红/偏红/红）、苔的厚薄/腻腐/剥落、点刺、以及「中央沟属生理性还是深宽病理裂纹」的区分。
+5. **判定规则**：以**用户肉眼**为最终权威（既有铁律）。若 native 在肉眼对照下**不逊于** Qwen，则考虑切换识图链路——收益是少一次调用、每次随访约快 30 秒；切换方式为显式设 `image_input_mode: native`（注意：`auto` 模式下显式 `auxiliary.vision` 会把主模型压回 `text`）。
+6. **若判定不切**：把结论追加到本文件第八节，避免日后重复评估。
