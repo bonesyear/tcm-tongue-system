@@ -259,3 +259,102 @@ def test_empty_records_report_structure():
     data = g.generate_weekly_report_data([])
     assert data["daily_records_count"] == 0
     assert data["confidence_checks"] == []
+    assert data["dimension_deviation_detail"] == {}
+
+
+# ---- 多维输出（mean/max/n）与趋势双门槛 ----
+
+
+def test_compute_dimension_deviation_detail(real_raw):
+    """多维输出：每维度携带 mean/max/n，mean 与旧口径 compute_dimension_deviation 一致。"""
+    detail = g.compute_dimension_deviation_detail(real_raw)
+    dev = g.compute_dimension_deviation(real_raw)
+    assert set(detail.keys()) == set(dev.keys())
+    for dim_cn, d in detail.items():
+        assert set(d.keys()) == {"mean", "max", "n"}
+        assert d["mean"] == dev[dim_cn]
+    # fixture 舌诊：齿痕 4 + 胖大 7 + 剥落 6 + 点刺 5 → 均值 5.5、最重单项 7、共 4 项异常
+    assert detail["舌诊"] == {"mean": 5.5, "max": 7.0, "n": 4}
+
+
+def test_describe_trend_dual_gate_allows_real_improvement():
+    """max 降 ≥0.5 且 n 不增 → 允许报"异常程度减轻"。"""
+    text = g.describe_trend("舌诊偏离度", 6.0, 5.0,
+                            first_max=7.0, last_max=5.0, first_n=3, last_n=3)
+    assert "异常程度减轻" in text
+    # n 减少（负荷下降）同样允许
+    text2 = g.describe_trend("舌诊偏离度", 6.0, 5.0,
+                             first_max=7.0, last_max=5.0, first_n=3, last_n=2)
+    assert "异常程度减轻" in text2
+
+
+def test_describe_trend_dual_gate_blocks_denominator_dilution():
+    """均值下降纯属分母变大（max 未降、n 增加）→ 不得报"减轻"（08-28 实测场景）。"""
+    text = g.describe_trend("舌诊偏离度", 6.0, 5.3,
+                            first_max=7.0, last_max=7.0, first_n=3, last_n=6)
+    assert "异常程度减轻" not in text
+    assert "暂不判为好转" in text
+    assert "最重单项未同步减轻" in text
+
+
+def test_describe_trend_max_down_but_n_up_is_neutral():
+    """max 下降但 n 增加 → 中性描述"最重单项减轻但异常项增多"。"""
+    text = g.describe_trend("舌诊偏离度", 6.0, 4.0,
+                            first_max=7.0, last_max=6.0, first_n=3, last_n=5)
+    assert "异常程度减轻" not in text
+    assert "异常项增多（3→5 项）" in text
+    assert "暂不判为好转" in text
+
+
+def test_describe_trend_worsening_ungated():
+    """加重方向不设门槛：均值升高即报加重（从严叙述）。"""
+    text = g.describe_trend("舌诊偏离度", 5.0, 6.0,
+                            first_max=5.0, last_max=4.0, first_n=3, last_n=6)
+    assert "异常程度加重" in text
+
+
+def test_describe_trend_no_valid_observation():
+    """n=0 为"无有效观测"，不作趋势判定、不写 0.0 正常。"""
+    text = g.describe_trend("舌诊偏离度", 0.0, 0.0,
+                            first_max=0.0, last_max=0.0, first_n=0, last_n=0)
+    assert "无有效观测" in text
+    assert "整体稳定" not in text
+    text2 = g.describe_trend("舌诊偏离度", 0.0, 5.3,
+                             first_max=0.0, last_max=7.0, first_n=0, last_n=6)
+    assert "不作趋势判定" in text2
+
+
+def test_describe_trend_scalar_call_backward_compatible():
+    """不传 max/n 的旧调用方式（逐指标标量）保持原口径。"""
+    text = g.describe_trend("齿痕程度", 4.0, 2.0)
+    assert "异常程度减轻" in text
+    assert g.describe_trend("齿痕程度", 4.0, 4.2) == "齿痕程度整体稳定（4.0 → 4.2）"
+
+
+def test_weekly_report_detail_keys_additive(real_raw):
+    """周报 JSON 纯增量加键：dimension_deviation_detail 含首末 mean/max/n，旧键不动。"""
+    data = g.generate_weekly_report_data([real_raw])
+    detail = data["dimension_deviation_detail"]
+    assert detail["舌诊"]["first"] == {"mean": 5.5, "max": 7.0, "n": 4}
+    assert detail["舌诊"]["last"] == {"mean": 5.5, "max": 7.0, "n": 4}
+    # 旧键一个不少
+    for key in ("week_id", "start_date", "end_date", "daily_records_count",
+                "trend_analysis", "weekly_comparison", "summary",
+                "next_week_suggestion", "confidence_checks"):
+        assert key in data
+
+
+def test_weekly_summary_shows_mean_max_n(real_raw):
+    """摘要舌诊偏离度同时呈现均值/最重单项/异常项数三个数（中文可读）。"""
+    data = g.generate_weekly_report_data([real_raw])
+    assert "舌诊综合偏离度均值由 5.5 变化至 5.5（最重单项 7 分，共 4 项异常）" \
+        in data["summary"]
+
+
+def test_weekly_summary_marks_no_valid_observation():
+    """舌诊 n=0（解析不到观测）的档案：摘要标注"无有效观测"，不写 0.0 假正常。"""
+    raw = {"date": "2026-01-01", "observations": {"tongue": {}}}
+    data = g.generate_weekly_report_data([raw])
+    assert "无有效观测" in data["summary"]
+    assert "舌诊综合偏离度均值由 0.0" not in data["summary"]
+    assert data["dimension_deviation_detail"]["舌诊"]["last"]["n"] == 0
