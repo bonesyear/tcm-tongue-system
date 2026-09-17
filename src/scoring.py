@@ -398,5 +398,6 @@ def score(dimension: VisionDimension, observation) -> float:
             return 0.0
         return round(total / covered, 1)
 
-    # 其余维度：累加并封顶
-    return round(min(sum(indicators.values()), 10), 1)
+    # 其余维度：累加并封顶；float() 统一返回类型——round(int, 1) 在
+    # Python 3 返回 int，会让 mean 出现 0（int）与 max 0.0（float）并列
+    return round(float(min(sum(indicators.values()), 10)), 1)
