@@ -5,7 +5,10 @@
   python3 vision_client.py classify <img>              # 2a 部位分类
   python3 vision_client.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
 """
-import base64, json, os, sys, time, urllib.request
+import base64, json, os, socket, sys, time, urllib.error, urllib.request
+
+USAGE = ("用法: vision_client.py classify <img> | "
+         "vision_client.py observe <img> <part-key>")
 
 def load_key():
     # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 环境变量 DASHSCOPE_API_KEY > .env DASHSCOPE_API_KEY
@@ -37,7 +40,7 @@ URL = os.environ.get("VISION_BASE_URL",
                      "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
 
 PROMPTS = {
-    "舌面": "这是一张舌面照片，请精确观察并只输出JSON：舌质颜色、舌苔(颜色/厚薄/润燥/腻腐/剥落)、舌体(胖瘦/齿痕/裂纹/点刺)。注意区分舌面中央的浅沟是生理性正中沟还是深宽病理裂纹。",
+    "舌面": "这是一张舌面照片，请精确观察并只输出JSON：舌质颜色、舌苔(颜色/厚薄/润燥/腻腐/剥落)、舌体(胖瘦/齿痕/裂纹/点刺)，舌质润燥粗判(输出'舌质润泽/干燥（粗判：润泽/偏干/干燥/干裂）')。注意区分舌面中央的浅沟是生理性正中沟还是深宽病理裂纹。不判舌神/荣枯（照片光线干扰、静态不可判）。",
     "舌底": "观察舌下络脉。正常基线：浅蓝紫细条<2mm平直。仅深紫+粗大>2mm+蛇形弯曲才标异常。只输出JSON：颜色/粗细/走行判断(正常/边缘/异常)。",
     "头面部": "观察并只输出JSON：面色(淡白/萎黄/红赤/晦暗/黧黑/青灰)、唇色唇润燥、面部浮肿。",
     "眼部": "观察并只输出JSON：白睛颜色、目赤(无/轻/重)、巩膜黄染(无/轻/重)、眼睑浮肿。",
@@ -47,14 +50,29 @@ PROMPTS = {
     "其他": "描述这张照片的望诊相关特征，输出JSON。",
 }
 
+MIME_MAP = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+def mime_type(img_path):
+    """按扩展名映射 MIME，未知回退 image/jpeg。"""
+    return MIME_MAP.get(os.path.splitext(img_path)[1].lower(), "image/jpeg")
+
 def call(img_path, prompt, timeout=150):
     key = load_key()
-    assert key, "VISION_API_KEY or DASHSCOPE_API_KEY not found"
-    b64 = base64.b64encode(open(img_path, "rb").read()).decode()
+    if not key:
+        raise RuntimeError("VISION_API_KEY or DASHSCOPE_API_KEY not found "
+                           "(环境变量与 .env 均未配置)")
+    with open(img_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
     payload = {
         "model": MODEL,
         "messages": [{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            {"type": "image_url",
+             "image_url": {"url": f"data:{mime_type(img_path)};base64,{b64}"}},
             {"type": "text", "text": prompt},
         ]}],
         "max_tokens": 600,
@@ -62,19 +80,51 @@ def call(img_path, prompt, timeout=150):
     req = urllib.request.Request(URL, data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        data = json.loads(r.read().decode())
-    msg = data["choices"][0]["message"]
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode(errors="replace")[:200]
+        except Exception:
+            pass
+        raise RuntimeError(f"vision API HTTP {e.code}: {body}") from e
+    except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
+        raise RuntimeError(f"vision API request failed: {e}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"vision API returned invalid JSON: {e}") from e
+    choices = data.get("choices")
+    if not choices:
+        raise RuntimeError(f"vision API response missing choices: {str(data)[:200]}")
+    msg = choices[0].get("message", {})
     return round(time.time() - t0), msg.get("content", "")
 
-if __name__ == "__main__":
-    mode = sys.argv[1]
-    img = sys.argv[2]
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) < 2:
+        print(USAGE, file=sys.stderr)
+        sys.exit(2)
+    mode, img = argv[0], argv[1]
     if mode == "classify":
-        dt, out = call(img, "这张照片属于哪个类别？选项：舌面/舌底/头面部/眼部/耳部/手掌/皮肤/其他。只输出一个词。", timeout=60)
-        print(out.strip())
+        _, out = call(img, "这张照片属于哪个类别？选项：舌面/舌底/头面部/眼部/耳部/手掌/皮肤/其他。只输出一个词。", timeout=60)
+        lines = out.strip().splitlines()
+        first = lines[0].strip() if lines else ""
+        if first not in PROMPTS:
+            print(f"[warn] classify 输出 {first!r} 不在已知类别中，回退为 '其他'", file=sys.stderr)
+            first = "其他"
+        print(first)
     elif mode == "observe":
-        part = sys.argv[3]
+        if len(argv) < 3:
+            print(USAGE, file=sys.stderr)
+            sys.exit(2)
+        part = argv[2]
         prompt = PROMPTS.get(part, PROMPTS["其他"])
         dt, out = call(img, prompt)
         print(f"[{dt}s] {out}")
+    else:
+        print(f"未知 mode: {mode!r}\n{USAGE}", file=sys.stderr)
+        sys.exit(2)
+
+if __name__ == "__main__":
+    sys.exit(main())
