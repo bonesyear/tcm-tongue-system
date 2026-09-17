@@ -45,7 +45,7 @@ def test_get_observation_tongue_has_content(real_record):
 
 def test_get_observation_text_non_empty(real_record):
     text = real_record.get_observation_text(VisionDimension.HEAD_FACE)
-    assert "萎黄" in text  # 真实记录面色萎黄
+    assert "晦暗" in text  # 示例记录面色晦暗
 
 
 def test_get_formula_non_empty(real_record):
