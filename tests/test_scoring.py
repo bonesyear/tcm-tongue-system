@@ -348,3 +348,15 @@ def test_structured_input_avoids_cross_field_false_match():
     }
     inds = score_indicators(VisionDimension.TONGUE, obs)
     assert inds["petechiae"] == 0
+
+
+def test_non_tongue_score_mean_is_always_float():
+    """轮次 5：非舌诊维度 score()（即周报 mean）恒为 float——
+    round(int, 1) 在 Python 3 返回 int，曾让周报 JSON 出现
+    "mean": 0 与 "max": 0.0 并列。只改类型，数值语义不变（0 == 0.0）。"""
+    zero = score(VisionDimension.HEAD_FACE, "面色正常 红润有光泽")
+    assert isinstance(zero, float)
+    assert zero == 0
+    positive = score(VisionDimension.HEAD_FACE, "面色红如妆")
+    assert isinstance(positive, float)
+    assert positive == 9
