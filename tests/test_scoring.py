@@ -278,6 +278,24 @@ def test_prickles_scoring():
                             {"prickles": "无点刺"})["prickles"] == 0
 
 
+def test_prickles_shaoliang_conservative():
+    # 轮次 11（KNOWN_ISSUES #6）：真实档案「少量」漏判 → 词表收 少量:2（保守档）
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "少量"})["prickles"] == 2
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "散在少量"})["prickles"] == 2
+    # 同长平局取高，锁死方向：「少量点刺」/「点刺少量」→ 5，不被 少量:2 拉低
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "少量点刺"})["prickles"] == 5
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "点刺少量"})["prickles"] == 5
+    # 否定守卫不受新词条影响
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "无点刺"})["prickles"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"prickles": "点刺不明显"})["prickles"] == 0
+
+
 def test_sublingual_scoring():
     # 舌下络脉颜色
     assert score_indicators(VisionDimension.TONGUE,
