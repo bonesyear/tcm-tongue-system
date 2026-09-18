@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Hermes 隐私守卫（pre-push hook）
 #
-# 目的：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」。
-# 三层检查：
+# 目的：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」，并强制版本一致性。
+# 四层检查：
 #   ① 敏感词表（本地 .privacy-words，gitignored —— 因为词表里含真实姓名，不能进仓库）
 #   ② 凭证模式（sk-/ghp_/github_pat_/LTAI/AKLT/私钥头）
 #   ③ 真实凭证指纹（读 ~/.hermes/ 的 .env，取每个 KEY 值的前 14 字符在待推送内容中比对）
+#   ④ 版本一致性（VERSION 文件 ↔ CHANGELOG.md 最新条目；防「只改一处」的版本漂移）
 #
 # 误报豁免：git push --no-verify（仅在已人工复核确认无害时使用）
 set -uo pipefail
@@ -85,6 +86,27 @@ check_key_fingerprints() {
   done
 }
 
+# ④ 版本一致性（VERSION ↔ CHANGELOG 最新条目）
+# 背景：曾把所有版本统一后，「只改 CHANGELOG 未同步 VERSION」又连续发生两次漂移。
+# 靠人记得改两处必然再犯 → 机械强制。检查对象同样是待推送的树。
+check_version_consistency() {
+  local commit="$1"
+  local ver cl
+  ver="$(git show "$commit:VERSION" 2>/dev/null | tr -d '[:space:]')"
+  cl="$(git show "$commit:CHANGELOG.md" 2>/dev/null | grep -m1 -oE '^## v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^## v//')"
+  if [ -z "$ver" ] || [ -z "$cl" ]; then
+    echo "  (VERSION 或 CHANGELOG 缺失 / 无版本条目 —— 跳过版本一致性检查)"
+    return
+  fi
+  if [ "$ver" != "$cl" ]; then
+    echo "  ❌ 版本不一致：VERSION=$ver，但 CHANGELOG 最新条目=v$cl"
+    echo "     修复：把 VERSION 改成 v$cl（或将 CHANGELOG 最新条目改成 v$ver），二者必须相同。"
+    FAIL=1
+  else
+    echo "  ✓ 版本一致：v$ver"
+  fi
+}
+
 echo "════════ Hermes 隐私守卫（pre-push）════════"
 while read -r local_ref local_sha remote_ref remote_sha; do
   # stdin 已被 read 消费，后续子命令统一 </dev/null
@@ -94,6 +116,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   check_words "$local_sha" </dev/null
   check_patterns "$local_sha" </dev/null
   check_key_fingerprints "$local_sha" </dev/null
+  check_version_consistency "$local_sha" </dev/null
 done
 echo "═══════════════════════════════════════════"
 
@@ -114,5 +137,5 @@ EOF
   exit 1
 fi
 
-echo "✅ 隐私守卫通过 —— 未发现使用者信息 / 凭证 / 真实凭证指纹"
+echo "✅ 守卫通过 —— 未发现使用者信息 / 凭证 / 真实凭证指纹；版本一致"
 exit 0
