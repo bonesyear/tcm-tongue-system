@@ -29,3 +29,6 @@ charts/*
 # 版权物：《经方探源》全文仅限本地个人研究使用，不入版本库
 # （见 knowledge_base/README.md 版权说明）
 knowledge_base/jingfang_tanyuan_full.md
+
+# 档案备份目录（含真实病案/姓名，禁止入公开仓库）
+records/_backup/
