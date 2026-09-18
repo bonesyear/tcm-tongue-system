@@ -4,7 +4,7 @@
 
 **纯 Python 数据模型库**——不绑定任何 LLM Agent 框架（Hermes / Codex / 其他均可接入）。
 
-当前版本：**v1.4.0**。详见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本见根目录 [VERSION](VERSION) 文件；变更历史详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 
@@ -109,6 +109,31 @@ print(allows_formula(level))  # True/False
 
 ---
 
+## 配置自己的视觉模型
+
+`scripts/vision_client.py` 是识图统一入口，支持任意 **OpenAI 兼容多模态模型**，全部通过环境变量配置（模板见根目录 [.env.example](.env.example)，复制为 `.env` 或直接导出环境变量）：
+
+| 变量 | 必填 | 默认 | 含义 |
+|:---|:---|:---|:---|
+| `VISION_MODEL` | ✅ | — | 模型名（以厂商文档为准） |
+| `VISION_BASE_URL` | ✅ | — | OpenAI 兼容的 chat/completions 端点 |
+| `VISION_API_KEY` | ✅ | — | 该端点的 API key |
+| `VISION_TEMPERATURE` | 否 | 不发送该键 | ⚠️ 设 0 ≠ 确定性输出：部分模型有官方下限（更低值被服务端静默改写），查官方文档 default/range/clamp 三栏 |
+| `VISION_MAX_TOKENS` | 否 | 600 | 思考型（reasoning）模型的思考过程占用该额度，建议 ≥8000 |
+| `VISION_TIMEOUT` | 否 | 150 | observe 单次请求超时秒数（classify 固定 60） |
+
+**换模型 checklist（五步）**：
+
+1. 复制 `.env.example`，填好 `VISION_MODEL` / `VISION_BASE_URL` / `VISION_API_KEY` 三件套
+2. 跑 `python3 scripts/vision_client.py classify <照片>`，确认连通且能正确识别照片类型（舌面/舌下/头面/目/耳/手/皮肤）
+3. 跑 `python3 scripts/vision_client.py observe <照片> 舌面`，确认输出为 JSON 且含「舌质润燥」等规范键
+4. 输出为空或被截断 → 设 `VISION_MAX_TOKENS=8000`；输出措辞太随意 → 查官方文档后设 `VISION_TEMPERATURE`
+5. 同一张照片连跑 5 次，对照肉眼签认；抖动大的字段以肉眼为准，并记录为该模型的已知弱项
+
+> ⚠️ **换模型必须重新标定**：`vision_client.py` 的 prompt 采用封闭词表（如腻腐只填 无/微腻/稍腻/偏腻/腻/厚腻/腐苔），与 `src/scoring.py` 的评分词表**逐键对齐**——词表之外的措辞会被评分层**静默读作 0 分 = 正常**，不产生任何报错。因此换模型后第 3、5 步不是可选项：必须用真实照片验证新模型的措辞落在封闭词表内，否则异常体征会被静默归零。
+
+---
+
 ## 校验与周报
 
 ```bash
@@ -157,7 +182,7 @@ docs/                      # 用户指南、架构分析、审查报告
 - **纯 Python，零框架依赖**：四个核心 module 仅用标准库；matplotlib/numpy 仅周报画图可选
 - **深 module / 浅 interface**：每个 module 用小 interface 背后藏大量行为
 - **安全边界可断言**：`allows_formula(LOW) == False` 把"宁缺毋滥"变成可执行测试
-- **LLM 无关**：不 import 任何 LLM SDK，不硬编码 provider 或 endpoint
+- **框架层 LLM 无关**：`src/` 不 import 任何 LLM SDK、不绑定 provider；`scripts/vision_client.py` 是可插拔的识图脚本，按你在 `.env` 中配置的端点发起调用（默认配置仅作示例，可整体替换）
 
 ---
 
@@ -167,7 +192,7 @@ docs/                      # 用户指南、架构分析、审查报告
 
 **本库不收集、不存储、不上传任何用户数据**——无遥测、无统计上报、无数据回传。
 
-- **数据只在本机**：照片、望诊记录（`records/`）、图表（`charts/`）全部保存在你的机器上。本库不发起任何网络请求，不含任何分析/追踪 SDK，也不硬编码任何 provider 或 endpoint。
+- **数据只在本机**：照片、望诊记录（`records/`）、图表（`charts/`）全部保存在你的机器上。`src/` 框架代码不发起任何网络请求、不含任何分析/追踪 SDK，也不硬编码任何 provider 或 endpoint；`scripts/vision_client.py` 仅向你**自行配置**的端点（`VISION_BASE_URL`）发送照片与 prompt，是否使用云端视觉服务由你决定。
 - **网络调用由外层 Agent 发起**：本库只处理数据，不调 LLM、不传图片。若你配置的 Agent 使用**云端模型**（视觉/语言），则相关照片与文本会上传至该服务商——是否采用云端服务、如何保护数据，由使用者自行决定与配置（API key 亦由使用者自备）。
 - **备份默认不碰健康数据**：OSS 备份脚本已排除全部 `records/`、`charts/` 与版权全文，需主动配置才会启用。
 - **使用者的责任**：健康数据属敏感个人信息，请妥善保管本地目录与备份权限；若面向他人提供服务，请遵守当地个人信息保护法规。
