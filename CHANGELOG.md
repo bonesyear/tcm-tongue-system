@@ -1,5 +1,22 @@
 # 更新日志
 
+## v1.4.5（形状 A 键名中性化 + 读时兼容层，2026-09-18）
+
+> 形状 A 的两个品牌键改名（`doubao_vision_analysis`→`vision_analysis`、`deepseek_diagnosis`→`diagnosis`），代码层新旧双名双收、**新名优先**。消除「用户自行改名导致形状探测静默塌缩」的 footgun；历史档案**零迁移**、可继续校验——旧名永久兼容（读时双收即满足「历史不追溯」原则），新记录一律用新名。纯解析层改动，`score()` / `compute_dimension_deviation()` 公开语义与双门槛逻辑未动。
+
+### 改动
+
+- **`src/record.py` 读时兼容层**：新增模块级常量 `_A_VISION_KEYS = ("vision_analysis", "doubao_vision_analysis")` / `_A_DIAGNOSIS_KEYS = ("diagnosis", "deepseek_diagnosis")` 与助手 `_first_present()`（按序取第一个存在的顶层键）；形状 A 探测、`_dimension_root`、`get_pattern_differentiation`、`get_formula` 四处改走兼容层；相关注释与 docstring 同步注明「旧名永久兼容，新记录一律用新名」。
+- **`scripts/input_validator.py`**：`_DICT_FIELDS` 追加 `vision_analysis` / `diagnosis`（旧名保留——历史档案仍需类型校验）。
+- **模板与 prompt**：`templates/multi_dim_record_template.json` 两键改新名；`templates/adaptive_analysis_prompt.md` 三处 `doubao_analysis` → `vision_analysis`（prompt 的 User Message 键与记录文件键统一为同一个名，消除批 1 留下的文件内自相矛盾）。
+- **知识库**：`smartphone-visual-diagnostics.md` 开头「Doubao Vision」→「视觉模型」（活文档与模板同级处置，不按历史存档冻结）。
+- **README**：① 修「接入你的 Agent」第 1 步的事实性错误——原让新用户把 `adaptive_analysis_prompt.md` 当作 Vision 模型的 system prompt，但该文件实为第 4 步辨证 LLM 的 prompt（输出 Markdown 报告，非结构化 JSON）；第 1 步改指 `scripts/vision_client.py`（内置封闭词表 prompt 的推荐入口）。② 五步后新增「记录形状说明」小段：三种形状（A 模板中文键 / B `observations` 英文键 / C 顶层维度键）；`multi_dim_record_template.json` 定位为形状 A 的完整 schema 存档参考，**新用户日常记录推荐形状 B**。既有隐私声明段未触碰。
+
+### 测试
+
+- 252 → **253 项**：新增 `test_shape_a_new_key_wins_when_both_present`（同一记录同时含新旧两键时取新名，钉死「新名优先」规则）；`test_shape_a_template_compatibility` 重命名为 `test_shape_a_legacy_key_compat`（旧名固件保留）；6 处 `doubao_vision_analysis` 与 3 处 `deepseek_diagnosis` 测试固件改新名；`tests/test_weekly_report.py` 的旧名固件保留（一个固件同时覆盖两条兼容路径 + 周报链路）。
+- 旧名固件与新名固件各跑一次 `input_validator.py`，均识别为形状 A 且无新增 error；`records/daily/` 现存 12 份档案逐一回归，与批 0 基线零差异。
+
 ## v1.4.4（视觉模型可移植性·文档与配置模板，2026-09-18）
 
 > 纯文档批次，零代码改动。目标：让非作者用户仅靠仓库文档即可完成视觉模型配置，并修掉全部已确认的文档漂移。

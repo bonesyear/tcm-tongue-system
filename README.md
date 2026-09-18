@@ -99,11 +99,13 @@ print(allows_formula(level))  # True/False
 
 源码不绑定任何框架。你需要补的唯一一件事是 **orchestration 层**：
 
-1. **拍照 → Vision API**：调你用的 Vision 模型（如 OpenAI、Anthropic、通义千问、豆包等），用 `templates/adaptive_analysis_prompt.md` 作为 system prompt，让它产出结构化 JSON
+1. **拍照 → Vision API**：调你用的 Vision 模型（OpenAI 兼容多模态端点均可），让它产出结构化 JSON——推荐入口是 `scripts/vision_client.py observe`（内置与评分词表逐键对齐的封闭词表 prompt，配置见下文「配置自己的视觉模型」）
 2. **JSON → 数据层**：交给 `DailyRecord.parse()` 解析归一
 3. **评分 + 置信度**：调 `scoring` / `confidence` 模块
-4. **辨证 → LLM**：把评分结果 + 知识库检索结果并入 prompt，调 LLM 输出辨证结论
+4. **辨证 → LLM**：把评分结果 + 知识库检索结果并入 prompt，调 LLM 输出辨证结论（`templates/adaptive_analysis_prompt.md` 是**本步**的 system prompt，输出 Markdown 报告，非结构化 JSON）
 5. **（可选）图表**：`scripts/generate_weekly_report.py` 生成周报趋势图
+
+> **记录形状说明**：本库支持三种记录形状——**A**（模板中文键，顶层 `vision_analysis` / `diagnosis`；旧名 `doubao_vision_analysis` / `deepseek_diagnosis` 永久兼容）、**B**（`observations` 英文键）、**C**（顶层规范英文维度键）。`templates/multi_dim_record_template.json` 是形状 A 的完整 schema 存档参考；**新用户日常记录推荐形状 B**——把 `vision_client.py observe` 的输出并入 `observations` 即可，无需照模板逐键填写。三种形状由 `DailyRecord` 自动识别，下游代码无需感知差异。
 
 任何能运行 Python 的 Agent 都能直接 `import src.dimensions`——标准库即够用，无需任何适配层。
 
