@@ -258,9 +258,23 @@ class DailyRecord:
         elif _C_DIMENSION_KEYS & self.raw.keys():
             self._shape = "C"
         else:
-            # 三种判据都不满足：默认按 B 处理，
+            # 三种判据都不满足：默认按 B 处理（行为不变），
             # 各维度观测将返回空，由 validator/调用方判定。
+            # 但静默落入本分支极难排查（典型场景：使用者把容器键改成
+            # 第三个名字，如 my_model_analysis → 覆盖 0/6 → 推断 LOW），
+            # 故打一条 stderr 提示并列出实际顶层键——不改解析行为、
+            # 不改退出码、不改 stdout 契约（与 [vision_client][warn] 同定位）。
             self._shape = "B"
+            top_keys = ", ".join(self.raw.keys()) or "(无)"
+            print(
+                "⚠️ 警告: 未识别的记录形状（三判据均未命中：无 observations、"
+                "无 vision_analysis、顶层无维度键 tongue/head_face/eye/ear/"
+                "hand/skin），按形状 B 处理，六维观测将为空。"
+                f"本记录实际顶层键: {top_keys}。"
+                "若你改过视觉分析的容器键名，请改用 vision_analysis"
+                "（旧名 doubao_vision_analysis 仍兼容）。",
+                file=sys.stderr,
+            )
         # 形状 C 混合形状警告的去重记录（每维度至多打一次）
         self._warned_mixed_shape: set = set()
 

@@ -139,6 +139,34 @@ def test_shape_a_new_key_wins_when_both_present():
     assert rec.get_formula() == {"主方": "新名方"}
 
 
+def test_unknown_shape_warns_and_stays_b(capsys):
+    """三判据全不中（典型：使用者把容器键改成第三个名字）→ 打 stderr
+    提示且形状仍为 B（else 分支行为不变，仅增加可观测性）。
+    提示必须列出实际顶层键——使用者自定义的键名因此可直接被认出。"""
+    rec = DailyRecord({
+        "date": "2026-09-18",
+        "my_model_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+    })
+    err = capsys.readouterr().err
+    assert rec.shape == "B"                      # 行为不变：仍按 B 处理
+    assert "未识别的记录形状" in err
+    assert "vision_analysis" in err              # 指明该用的键名
+    assert "my_model_analysis" in err            # 列出实际顶层键便于自助定位
+    assert not any(rec.get_observation(VisionDimension.TONGUE).values())
+
+
+def test_known_shapes_produce_no_stderr(capsys):
+    """正常形状 A（新旧名）/B/C 判定不产生任何 stderr 噪音——
+    可观测性告警只在失败路径出现。"""
+    DailyRecord({"date": "2026-01-01",
+                 "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}}})
+    DailyRecord({"date": "2026-01-01",
+                 "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}}})
+    DailyRecord({"date": "2026-01-01", "observations": {}})
+    DailyRecord({"date": "2026-01-01", "tongue": {"body_color": "淡红"}})
+    assert capsys.readouterr().err == ""
+
+
 def test_unknown_dimension_raises():
     """未知维度名必须报错，不得静默回落到舌诊（历史 Bug 9）。"""
     rec = DailyRecord({"date": "2026-01-01", "observations": {}})
