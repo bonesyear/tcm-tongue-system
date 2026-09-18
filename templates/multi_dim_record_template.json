@@ -11,7 +11,7 @@
     "hands": "path/to/hands.jpg",
     "skin": "path/to/skin.jpg"
   },
-  "doubao_vision_analysis": {
+  "vision_analysis": {
     "舌诊": {
       "舌质颜色": "",
       "舌质润燥": "",
@@ -136,7 +136,7 @@
       "answer": ""
     }
   },
-  "deepseek_diagnosis": {
+  "diagnosis": {
     "许家栋经方辨证": {
       "三观": {
         "表里观": "",
