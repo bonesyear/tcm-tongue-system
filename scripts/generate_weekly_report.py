@@ -262,10 +262,11 @@ def compute_dimension_deviation(record: Dict[str, Any]) -> Dict[str, float]:
 
 def compute_dimension_deviation_detail(record: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """
-    计算单条记录各望诊维度的偏离度多维信息：mean / max / n。
+    计算单条记录各望诊维度的偏离度多维信息：score / max / n。
 
-    - mean：与 compute_dimension_deviation 完全同口径（score() 公开语义不变：
-      舌诊为有分指标 sparse 均值，其余维度为累加封顶 10）；
+    - score：与 compute_dimension_deviation 完全同口径（score() 公开语义不变：
+      舌诊为有分指标 sparse 均值，其余维度为累加封顶 10——非舌维度该值是
+      累加和而非均值，故键名为 score 而非 mean）；
     - max：该维度内最高单项分（无异常指标时为 0.0）——均值会被新增轻度异常
       稀释，max 不会，趋势判定需要它做第二道门槛；
     - n：有分（>0）指标数，即异常负荷；n=0 表示"无有效观测"
@@ -275,7 +276,7 @@ def compute_dimension_deviation_detail(record: Dict[str, Any]) -> Dict[str, Dict
         record: 单日诊断 JSON 记录（dict 或 DailyRecord）
 
     返回:
-        dict: 维度中文名 → {"mean": float, "max": float, "n": int}
+        dict: 维度中文名 → {"score": float, "max": float, "n": int}
     """
     rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
     detail: Dict[str, Dict[str, Any]] = {}
@@ -284,7 +285,7 @@ def compute_dimension_deviation_detail(record: Dict[str, Any]) -> Dict[str, Dict
         indicators = score_indicators(dim, obs)
         positives = [float(v) for v in indicators.values() if v > 0]
         detail[dim.chinese_name] = {
-            "mean": score_dimension(dim, obs),
+            "score": score_dimension(dim, obs),
             "max": max(positives) if positives else 0.0,
             "n": len(positives),
         }
@@ -296,11 +297,16 @@ def describe_trend(name: str, first_val: float, last_val: float,
                    first_max: Optional[float] = None,
                    last_max: Optional[float] = None,
                    first_n: Optional[int] = None,
-                   last_n: Optional[int] = None) -> str:
+                   last_n: Optional[int] = None,
+                   metric_name: str = "均值") -> str:
     """
     根据首末两次数值生成中文趋势描述。
 
     口径说明：只比较周初与周末两天，不反映周中波动。
+
+    metric_name：降幅中性文案中对该数值的量纲称呼（默认"均值"，保持旧调用
+    逐字不变）。舌诊 score 是有分指标均值，用默认值即可；非舌维度 score 是
+    各指标之和（封顶 10），调用方应传"累计分"等词，避免把 sum 说成均值。
 
     双门槛（仅在调用方提供 first/last 的 max 与 n 时启用）：
     均值的分母是有分指标数 n，新增轻度异常会稀释均值造成"假好转"
@@ -337,10 +343,10 @@ def describe_trend(name: str, first_val: float, last_val: float,
             return (f"{name}较周初{direction}{abs(delta):.1f}分，异常程度减轻"
                     f"（{first_val:.1f} → {last_val:.1f}）")
         if max_drop >= 0.5:
-            return (f"{name}均值较周初降低{abs(delta):.1f}分，最重单项减轻但"
+            return (f"{name}{metric_name}较周初降低{abs(delta):.1f}分，最重单项减轻但"
                     f"异常项增多（{first_n}→{last_n} 项），暂不判为好转"
                     f"（{first_val:.1f} → {last_val:.1f}）")
-        return (f"{name}均值较周初降低{abs(delta):.1f}分，但最重单项未同步减轻"
+        return (f"{name}{metric_name}较周初降低{abs(delta):.1f}分，但最重单项未同步减轻"
                 f"（{first_max:g} → {last_max:g} 分），暂不判为好转"
                 f"（{first_val:.1f} → {last_val:.1f}）")
 
@@ -473,7 +479,7 @@ def generate_trend_chart(records: List[Dict[str, Any]]) -> Optional[str]:
     x = np.arange(len(records))
 
     # 计算各维度偏离度（按 Dimension 规范六维遍历，不再硬编码中文名）；
-    # 多维信息（mean/max/n）用于区分"正常 0 分"与"无有效观测"（n=0）
+    # 多维信息（score/max/n）用于区分"正常 0 分"与"无有效观测"（n=0）
     details = [compute_dimension_deviation_detail(r) for r in records]
 
     # ---- 绘制多维度趋势线 ----
@@ -484,7 +490,7 @@ def generate_trend_chart(records: List[Dict[str, Any]]) -> Optional[str]:
     for dim in DIMENSIONS:
         # n=0（无有效观测）的点置 NaN 断线，不再画成 0.0 假"正常"
         series = [
-            d[dim.chinese_name]["mean"] if d[dim.chinese_name]["n"] > 0 else float("nan")
+            d[dim.chinese_name]["score"] if d[dim.chinese_name]["n"] > 0 else float("nan")
             for d in details
         ]
         marker, color, label = _DIMENSION_STYLE[dim]
@@ -580,7 +586,7 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         week_id = "YYYY-W00"
 
     # 提取舌象与维度偏离度序列（deviations 保留旧结构供 max_dim 分支等使用；
-    # details 为多维输出 mean/max/n，供趋势双门槛与"无有效观测"判定）
+    # details 为多维输出 score/max/n，供趋势双门槛与"无有效观测"判定）
     tongue_metrics = [extract_tongue_metrics(r) for r in recs]
     deviations = [compute_dimension_deviation(r) for r in recs]
     details = [compute_dimension_deviation_detail(r) for r in recs]
@@ -597,13 +603,16 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
     last_flags = extract_tongue_observation_flags(recs[-1])
 
     def _dim_trend(name: str, dim_cn: str) -> str:
-        """维度级趋势描述：携带 max/n 启用双门槛与无有效观测判定。"""
+        """维度级趋势描述：携带 max/n 启用双门槛与无有效观测判定。
+        仅服务五个非舌维度（score 为各指标之和封顶 10），metric_name 传
+        "累计分"——name 已含"偏离度"，不得再叠"偏离度"字样，也不能称"均值"。"""
         return describe_trend(
             name, first_dev[dim_cn], last_dev[dim_cn],
             first_max=first_detail[dim_cn]["max"],
             last_max=last_detail[dim_cn]["max"],
             first_n=first_detail[dim_cn]["n"],
             last_n=last_detail[dim_cn]["n"],
+            metric_name="累计分",
         )
 
     def _metric_trend(name: str, axis: str) -> str:
@@ -674,17 +683,17 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         tongue_phrase = "舌诊本周无有效观测（未拍到或未解析到有分指标），偏离度不予计值"
     elif last_td["n"] == 0:
         tongue_phrase = (
-            f"舌诊综合偏离度均值周初为 {first_td['mean']:.1f}"
+            f"舌诊综合偏离度均值周初为 {first_td['score']:.1f}"
             f"（共 {first_td['n']} 项异常），周末无有效观测"
         )
     elif first_td["n"] == 0:
         tongue_phrase = (
-            f"舌诊综合偏离度均值周初无有效观测，周末为 {last_td['mean']:.1f}"
+            f"舌诊综合偏离度均值周初无有效观测，周末为 {last_td['score']:.1f}"
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
     else:
         tongue_phrase = (
-            f"舌诊综合偏离度均值由 {first_td['mean']:.1f} 变化至 {last_td['mean']:.1f}"
+            f"舌诊综合偏离度均值由 {first_td['score']:.1f} 变化至 {last_td['score']:.1f}"
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
 
@@ -773,7 +782,7 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         "summary": summary,
         "next_week_suggestion": next_week_suggestion,
         "confidence_checks": confidence_checks,
-        # 纯增量键（向后兼容）：各维度周初/周末的 mean/max/n 多维信息，
+        # 纯增量键（向后兼容）：各维度周初/周末的 score/max/n 多维信息，
         # 供趋势双门槛复核与"无有效观测"（n=0）识别；旧键一律不动
         "dimension_deviation_detail": {
             dim_cn: {"first": first_detail[dim_cn], "last": last_detail[dim_cn]}
