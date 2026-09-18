@@ -67,6 +67,22 @@ def test_call_uses_mime_of_extension(monkeypatch, tmp_path, key):
     assert url.startswith("data:image/png;base64,")
 
 
+def test_call_payload_temperature_zero(monkeypatch, img, key):
+    """payload 固定 temperature=0（降低采样噪声；2026-09-18 实测收益幅度
+    未定量、temp=0 不等于消除抖动）。只改这一个变量：不加 seed/top_p。"""
+    seen = {}
+
+    def capture(req, timeout=None):
+        seen["body"] = json.loads(req.data.decode())
+        return _fake_response({"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    vision_client.call(img, "prompt")
+    assert seen["body"]["temperature"] == 0
+    assert "seed" not in seen["body"]
+    assert "top_p" not in seen["body"]
+
+
 # ② HTTP 4xx/5xx 与缺 choices 不抛 KeyError，而是带状态码的 RuntimeError
 def test_call_http_500(monkeypatch, img, key):
     def boom(req, timeout=None):

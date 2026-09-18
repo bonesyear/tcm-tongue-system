@@ -3,6 +3,7 @@ from src.dimensions import VisionDimension
 from src.scoring import (
     DIMENSION_RULES,
     TONGUE_COATING_GREASY_MAP,
+    TONGUE_PRICKLES_MAP,
     _match_score,
     score,
     score_indicators,
@@ -269,31 +270,29 @@ def test_coating_color_scoring():
                             {"coating_color": "灰黑"})["coating_color"] == 8
 
 
-def test_prickles_scoring():
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "点刺"})["prickles"] == 5
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "芒刺"})["prickles"] == 6
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "无点刺"})["prickles"] == 0
+def test_prickles_removed_from_scoring():
+    """2026-09-18：prickles 从评分表降级——凸起度需触诊/动态观察，静态
+    照片判不准（实测同一真实舌照 9/9 判「有」而用户肉眼为「无」），违反
+    统一原则「评分层只收静态照片可客观判读的指标」（scoring.py:139-143），
+    同 palm_temp（轮次 9）先例降级到辨证层。观测层（record.py 指标路径与
+    档案 prickles 字段）保留，仅退出评分；词表留存备查。"""
+    inds = score_indicators(VisionDimension.TONGUE, {"prickles": "点刺"})
+    assert "prickles" not in inds
+    assert "prickles" not in DIMENSION_RULES[VisionDimension.TONGUE]
 
 
-def test_prickles_shaoliang_conservative():
-    # 轮次 11（KNOWN_ISSUES #6）：真实档案「少量」漏判 → 词表收 少量:2（保守档）
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "少量"})["prickles"] == 2
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "散在少量"})["prickles"] == 2
-    # 同长平局取高，锁死方向：「少量点刺」/「点刺少量」→ 5，不被 少量:2 拉低
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "少量点刺"})["prickles"] == 5
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "点刺少量"})["prickles"] == 5
-    # 否定守卫不受新词条影响
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "无点刺"})["prickles"] == 0
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"prickles": "点刺不明显"})["prickles"] == 0
+def test_prickles_map_preserved_for_reference():
+    """TONGUE_PRICKLES_MAP 变量保留（含轮次 11 的 少量:2 兜底语义记录），
+    直接用 _match_score 复验其匹配行为不变。"""
+    assert _match_score(TONGUE_PRICKLES_MAP, "点刺") == 5
+    assert _match_score(TONGUE_PRICKLES_MAP, "芒刺") == 6
+    assert _match_score(TONGUE_PRICKLES_MAP, "无点刺") == 0
+    assert _match_score(TONGUE_PRICKLES_MAP, "少量") == 2
+    assert _match_score(TONGUE_PRICKLES_MAP, "散在少量") == 2
+    # 同长平局取高：「少量点刺」/「点刺少量」→ 5，不被 少量:2 拉低
+    assert _match_score(TONGUE_PRICKLES_MAP, "少量点刺") == 5
+    assert _match_score(TONGUE_PRICKLES_MAP, "点刺少量") == 5
+    assert _match_score(TONGUE_PRICKLES_MAP, "点刺不明显") == 0
 
 
 def test_sublingual_scoring():
