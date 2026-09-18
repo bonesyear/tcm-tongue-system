@@ -11,6 +11,9 @@ import base64, json, os, socket, sys, time, urllib.error, urllib.request
 USAGE = ("用法: vision_client.py classify <img> | "
          "vision_client.py observe <img> <part-key>")
 
+# 可观测性告警统一前缀（便于 grep 与日志分流）；仅失败/异常路径输出，正常路径零告警
+WARN_PREFIX = "[vision_client][warn]"
+
 def load_key():
     # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 环境变量 DASHSCOPE_API_KEY > .env DASHSCOPE_API_KEY
     env_key = os.environ.get("VISION_API_KEY", "") or os.environ.get("DASHSCOPE_API_KEY", "")
@@ -100,7 +103,13 @@ def call(img_path, prompt, timeout=None):
             body = e.read().decode(errors="replace")[:200]
         except Exception:
             pass
-        raise RuntimeError(f"vision API HTTP {e.code}: {body}") from e
+        msg = f"vision API HTTP {e.code}: {body}"
+        if 400 <= e.code < 500:
+            # 4xx 通用排查提示（厂商中立，不断言任何一家的具体行为）
+            msg += ("；排查提示：请检查凭证（VISION_API_KEY）是否有效、端点地址"
+                    "（VISION_BASE_URL）是否正确、模型名（VISION_MODEL）是否存在，"
+                    "以及请求参数取值（如 temperature / max_tokens）是否被服务端拒绝")
+        raise RuntimeError(msg) from e
     except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
         raise RuntimeError(f"vision API request failed: {e}") from e
     except json.JSONDecodeError as e:
@@ -109,7 +118,20 @@ def call(img_path, prompt, timeout=None):
     if not choices:
         raise RuntimeError(f"vision API response missing choices: {str(data)[:200]}")
     msg = choices[0].get("message", {})
-    return round(time.time() - t0), msg.get("content", "")
+    content = msg.get("content") or ""
+    # ② 截断告警：finish_reason=length 表示输出达到上限，JSON 可能不完整
+    if choices[0].get("finish_reason") == "length":
+        print(f"{WARN_PREFIX} 响应 finish_reason='length'：输出已达 max_tokens 上限、"
+              f"可能被截断（JSON 可能不完整）；如需完整输出请提高 VISION_MAX_TOKENS"
+              f"（默认 600）", file=sys.stderr)
+    # ① 空 content 告警：思考型模型的思考过程可能吃满额度导致正文为空
+    if not content.strip():
+        print(f"{WARN_PREFIX} 响应 content 为空/纯空白：若使用思考型（reasoning）模型，"
+              f"其思考过程可能吃满 max_tokens 额度导致正文未输出——建议提高 "
+              f"VISION_MAX_TOKENS（默认 600 对思考型模型偏小）；并检查响应是否含 "
+              f"reasoning_content 字段（本响应 message 键：{sorted(msg.keys())}）",
+              file=sys.stderr)
+    return round(time.time() - t0), content
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
@@ -137,6 +159,15 @@ def main(argv=None):
                   f"（可用类别：{'/'.join(PROMPTS)}）", file=sys.stderr)
         prompt = PROMPTS.get(part, PROMPTS["其他"])
         dt, out = call(img, prompt)
+        # ③ 非 JSON 告警：去掉首尾空白与可能的 ```json 围栏后，输出应以 '{' 开头
+        candidate = out.strip()
+        if candidate.startswith("```"):
+            candidate = candidate.split("\n", 1)[1] if "\n" in candidate else ""
+            candidate = candidate.rsplit("```", 1)[0].strip()
+        if not candidate.startswith("{"):
+            print(f"{WARN_PREFIX} observe 输出未以 '{{' 开头（已去空白与 ``` 围栏），"
+                  f"该模型可能未遵守「只输出 JSON」约定，下游解析可能失败；"
+                  f"输出前 60 字符：{out.strip()[:60]!r}", file=sys.stderr)
         print(f"[{dt}s] {out}")
     else:
         print(f"未知 mode: {mode!r}\n{USAGE}", file=sys.stderr)
