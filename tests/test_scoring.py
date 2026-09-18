@@ -369,9 +369,9 @@ def test_structured_input_avoids_cross_field_false_match():
 
 
 def test_non_tongue_score_mean_is_always_float():
-    """轮次 5：非舌诊维度 score()（即周报 mean）恒为 float——
+    """轮次 5：非舌诊维度 score()（即周报 detail 的 score 键）恒为 float——
     round(int, 1) 在 Python 3 返回 int，曾让周报 JSON 出现
-    "mean": 0 与 "max": 0.0 并列。只改类型，数值语义不变（0 == 0.0）。
+    "score"（旧名 "mean"）: 0 与 "max": 0.0 并列。只改类型，数值语义不变（0 == 0.0）。
     轮次 8 起用结构化 dict 入参（lip_color 新增裸「红:3」后纯文本会
     跨字段 double-score，纯文本路径的已知局限）；断言期望值不变。"""
     zero = score(VisionDimension.HEAD_FACE,
