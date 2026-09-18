@@ -126,6 +126,8 @@ print(allows_formula(level))  # True/False
 
 > ⚠️ 代码默认值（`qwen3.8-max` + DashScope 端点）**仅为示例**，目的是 clone 后不配置也能看到结构；**请务必替换为你自己的模型与端点**。
 
+> 兼容说明：旧变量 `DASHSCOPE_API_KEY` 仍作为历史兼容回退被识别（作者早期环境遗留），**新配置一律用 `VISION_API_KEY`**；实际用到旧变量时脚本会打一条 stderr 弃用提示。
+
 **换模型 checklist（五步）**：
 
 1. 复制 `.env.example`，填好 `VISION_MODEL` / `VISION_BASE_URL` / `VISION_API_KEY` 三件套

@@ -2,9 +2,13 @@
 from src.dimensions import VisionDimension
 from src.scoring import (
     DIMENSION_RULES,
+    TONGUE_BODY_COLOR_MAP,
+    TONGUE_BODY_SIZE_MAP,
     TONGUE_COATING_GREASY_MAP,
     TONGUE_PRICKLES_MAP,
+    TOOTH_MARK_MAP,
     _match_score,
+    match_keyword,
     score,
     score_indicators,
 )
@@ -586,3 +590,32 @@ def test_ear_helix_new_terms():
                             {"helix": "尚润，略枯"})["helix"] == 2
     assert score_indicators(VisionDimension.EAR,
                             {"helix": "干枯"})["helix"] == 4
+
+
+# ---- match_keyword：校验器判断「值是否落在词表内」的单一事实来源 ----
+def test_match_keyword_exact_and_longest():
+    # 精确匹配
+    assert match_keyword(TONGUE_BODY_COLOR_MAP, "淡红") == "淡红"
+    # 最长匹配压过短词（"红润" 压过 "红"）
+    assert match_keyword(TONGUE_BODY_COLOR_MAP, "舌质红润有光泽") == "红润"
+
+
+def test_match_keyword_no_hit_returns_none():
+    # 词表外措辞 → None（这正是校验器告警的情形）
+    assert match_keyword(TOOTH_MARK_MAP, "舌缘可见") is None
+    assert match_keyword(TONGUE_BODY_SIZE_MAP, "较丰满") is None
+    # 空值
+    assert match_keyword(TOOTH_MARK_MAP, "") is None
+
+
+def test_match_keyword_negated_occurrence_not_a_hit():
+    # 「无明显浮肿」中「浮肿」被否定 → 不算命中（评分 0 是正确结果）
+    assert match_keyword({"浮肿": 4}, "无明显浮肿") is None
+    # 「舌质不红，但舌边红」中第二个「红」是真阳性 → 命中
+    assert match_keyword(TONGUE_BODY_COLOR_MAP, "舌质不红，但舌边红") == "红"
+
+
+def test_match_score_delegates_to_match_keyword():
+    # 公开语义不变：命中得分值，无命中 0
+    assert _match_score(TONGUE_BODY_SIZE_MAP, "偏胖") == 4
+    assert _match_score(TONGUE_BODY_SIZE_MAP, "较丰满") == 0
