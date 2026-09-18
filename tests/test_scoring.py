@@ -360,3 +360,35 @@ def test_non_tongue_score_mean_is_always_float():
     positive = score(VisionDimension.HEAD_FACE, "面色红如妆")
     assert isinstance(positive, float)
     assert positive == 9
+
+
+# ============================================================
+# 轮次 7：舌体胖瘦词表补漏（2026-09-18 实测 "偏胖" 漏判为 0，
+# 新增 4 词条，分值经用户签认）
+# ============================================================
+
+def test_body_size_new_intermediate_terms():
+    """4 个新词各自命中签认分值：偏胖/偏瘦=4（中间态），稍胖/略瘦=3。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "偏胖"})["body_size"] == 4
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "偏瘦"})["body_size"] == 4
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "稍胖"})["body_size"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "略瘦"})["body_size"] == 3
+
+
+def test_body_size_pianpangda_not_downgraded():
+    """平局不降级："偏胖大" 中 "胖大"(7) 与 "偏胖"(4) 同长度平局取高者，
+    仍为 7——硬约束偏胖 ≤ 7，≥8 会翻转取偏胖（独立复验实测红线）。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "偏胖大"})["body_size"] == 7
+
+
+def test_body_size_negation_guard():
+    """否定守卫：前置 "无明显" 与后置 "不明显" 均归零。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "无明显偏胖"})["body_size"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_size": "偏胖不明显"})["body_size"] == 0
