@@ -44,8 +44,11 @@ from src.scoring import DIMENSION_RULES  # noqa: E402
 
 # 顶层容器字段:键存在但类型不是 dict → 严重错误(不能静默按空处理,
 # 否则红线/方剂等安全数据会被类型错误"清零"后放行)
-_DICT_FIELDS = ("observations", "doubao_vision_analysis", "inquiry",
-                "inquiry_coverage", "deepseek_diagnosis",
+# vision_analysis/diagnosis 为形状 A 新名；旧名 doubao_vision_analysis/
+# deepseek_diagnosis 永久保留——历史档案（不迁移）仍需类型校验。
+_DICT_FIELDS = ("observations", "vision_analysis", "doubao_vision_analysis",
+                "inquiry", "inquiry_coverage", "diagnosis",
+                "deepseek_diagnosis",
                 "pattern_differentiation", "danger_flags", "formula",
                 # 形状 C 顶层维度键与辨证键
                 "tongue", "head_face", "eye", "ear", "hand", "skin",
