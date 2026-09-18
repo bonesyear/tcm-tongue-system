@@ -82,6 +82,11 @@ def test_out_of_vocab_wording_triggers_warning():
     assert "tooth_marks" in hits[0] and "舌缘可见" in hits[0]
     assert "无/轻度/中度/重度" in hits[0]  # 给出可行动的规范词清单
     assert "模型措辞问题而非数据错误" in hits[0]
+    # 两分支处置指引（v1.4.12）：静默 0 分事实原样保留，正常描述分支
+    # 明确告知可忽略、异常分支明确告知漏判后果——不按情形分级措辞
+    assert "静默按 0 分" in hits[0]
+    assert "可忽略本告警" in hits[0]
+    assert "静默漏判" in hits[0]
 
 
 def test_out_of_vocab_synonym_example_warns():
