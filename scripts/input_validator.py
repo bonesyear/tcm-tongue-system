@@ -14,6 +14,8 @@
   4. 安全红线（danger_flags）完整性
   5. 置信度一致性：记录声称的 confidence 与实际覆盖维度数是否一致
      （LOW 不允许给方剂 —— 安全边界强制，违反计为**严重错误**，退出码 1）
+  6. 评分值卫生与词表覆盖（纯告警）：判读注记 / 语义矛盾写法 /
+     封闭词表之外的措辞（会被评分层静默读作 0 分）
 
 严重度约定：
   - error：结构缺失/安全边界违反 → 退出码 1，记录不予通过
@@ -40,7 +42,7 @@ if _ROOT not in sys.path:
 from src.record import DailyRecord, SCHEMA, has_formula_content  # noqa: E402
 from src.dimensions import DIMENSIONS, VisionDimension  # noqa: E402
 from src import confidence as confidence_mod  # noqa: E402
-from src.scoring import DIMENSION_RULES  # noqa: E402
+from src.scoring import DIMENSION_RULES, match_keyword  # noqa: E402
 
 # 顶层容器字段:键存在但类型不是 dict → 严重错误(不能静默按空处理,
 # 否则红线/方剂等安全数据会被类型错误"清零"后放行)
@@ -116,6 +118,10 @@ def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
 
         # ---- 6. 评分值卫生（轮次 8，纯告警，不影响通过/失败判定） ----
         warnings.extend(_validate_scoring_value_hygiene(record))
+
+        # ---- 7. 封闭词表覆盖（纯告警，同上）：词表外措辞会被评分层
+        #         静默读作 0 分（正常），此处把它暴露出来 ----
+        warnings.extend(_validate_scoring_vocab_coverage(record))
     except Exception as e:  # 防御兜底：任何未预期异常都转为 error，不落 traceback
         errors.append(f"❌ 校验过程异常（记录结构可能损坏）: {e!r}")
 
@@ -286,6 +292,64 @@ def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
                     f"{indicator} 的值同时声明「未拍摄」与「正常」，语义矛盾: "
                     f"{value!r} —— 建议写为「未拍摄（用户声明正常）」"
                 )
+    return warnings
+
+
+# 词表覆盖检查的豁免：值本身在声明「无/未见/正常/未拍摄/生理性」等
+# 正常或否定语义。评分词表只收异常词与显式基线词，这类正常/否定描述
+# 本就不入词表（评分 0 = 正常，结果正确），不是模型措辞问题。
+# 判据保守：宁可漏报，不可刷屏——词表外措辞只在「既未命中词表、
+# 又无任何正常/否定语义标记」时才告警。
+_NORMAL_STATEMENT_RE = re.compile(r"无|未|没|不|正常|阴性|生理性|非病理")
+
+
+def _validate_scoring_vocab_coverage(record: DailyRecord) -> List[str]:
+    """封闭词表覆盖校验（纯告警 —— 与既有 warning 通道同哲学，不改变
+    通过/失败判定）。把「词表外措辞 → 静默读作 0 分」暴露出来：
+
+    危险链条：换用非默认模型 → 模型用词表外的措辞（如把「偏胖」写成
+    「较丰满」）→ scoring 词表匹配不到 → 该指标静默按 0 分（正常）
+    计入评分与红线推断 → 使用者永远无法察觉该维度没被正确评估。
+
+    豁免情形（全部满足保守优先原则）：
+      - 值为空：缺失由覆盖度检查负责，不归本检查；
+      - 命中词表任一词条：判据与 scoring.match_keyword 完全一致（含
+        双向否定守卫），单一事实来源，不与评分层漂移；
+      - 值含正常/否定语义标记（无/未/没/不/正常/阴性/生理性/非病理）
+        ——正常/否定描述本就不入词表，0 分是正确结果；
+      - 值已被「判读注记」检查告警（_validate_scoring_value_hygiene
+        第 2 类）：同一值不重复告警。
+    只查 DIMENSION_RULES 收录的封闭词表指标；自由文本指标
+    （body_luster / body_dynamics / coating_distribution / prickles /
+    palm_temp / lip_around / nose_color / nose_bleeding 等无词表指标）
+    不适用本检查。
+    """
+    warnings: List[str] = []
+
+    for dim in DIMENSIONS:
+        scored = DIMENSION_RULES.get(dim, {})
+        if not scored:
+            continue
+        obs = record.get_observation(dim)
+        for indicator, rules in scored.items():
+            value = obs.get(indicator, "")
+            if not value:
+                continue
+            if match_keyword(rules, value) is not None:
+                continue
+            if _NORMAL_STATEMENT_RE.search(value):
+                continue
+            # 判读注记检查已告警的值不重复告警（同一值两条 warning 是噪声）
+            if any(_ANNOTATION_WORD_RE.search(b)
+                   for b in _ANNOTATION_BRACKET_RE.findall(value)):
+                continue
+            warnings.append(
+                f"⚠️ 词表外措辞: {dim.chinese_name}（{dim.english_name}）指标 "
+                f"{indicator} 的值 {value!r} 未命中评分词表任何词条——"
+                f"该指标将被静默按 0 分（正常）计入评分与红线推断。"
+                f"这通常是模型措辞问题而非数据错误：请改用该指标的规范词"
+                f"（{'/'.join(rules)}）；若该值确为正常描述，可忽略本告警"
+            )
     return warnings
 
 
