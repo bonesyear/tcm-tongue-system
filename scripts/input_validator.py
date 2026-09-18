@@ -232,7 +232,8 @@ def _validate_confidence(record: DailyRecord,
 # 判读注记特征：值含括号，且括号内出现模型名或判读词
 # （保守判据，避免把正常括号描述误报）
 _ANNOTATION_BRACKET_RE = re.compile(r"[（(]([^（）()]*)[)）]")
-_ANNOTATION_WORD_RE = re.compile(r"豆包|Qwen|K3|用户确认|误判")
+_ANNOTATION_WORD_RE = re.compile(
+    r"豆包|DeepSeek|Qwen|K3|Kimi|GPT|Claude|Gemini|用户确认|误判")
 
 
 def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
