@@ -30,6 +30,16 @@ def _clean_vision_param_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _reset_legacy_warn_state():
+    """每个用例前后清空弃用提示去重状态——模块级 once 去重是进程级状态，
+    不清理会让「先触发旧变量路径的用例」吞掉后续用例的 stderr 提示，
+    造成隐藏的顺序依赖。"""
+    vision_client._reset_legacy_warn_state()
+    yield
+    vision_client._reset_legacy_warn_state()
+
+
 @pytest.fixture
 def img(tmp_path):
     p = tmp_path / "t.jpg"
@@ -390,6 +400,31 @@ def test_load_key_legacy_from_env_file(monkeypatch, tmp_path, capsys):
     _block_env_files(monkeypatch, tmp_path)  # chdir(tmp_path) 使相对 .env 指向它
     assert vision_client.load_key() == "sk-legacy"
     assert vision_client.WARN_PREFIX in capsys.readouterr().err
+
+
+def test_legacy_warn_once_per_process(monkeypatch, tmp_path, capsys):
+    """模块级 once 去重：同一进程内重复走旧变量路径，每名只提示一次。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "legacy-key")
+    _block_env_files(monkeypatch, tmp_path)
+    for _ in range(3):
+        assert vision_client.load_key() == "legacy-key"
+    err = capsys.readouterr().err
+    assert err.count(vision_client.WARN_PREFIX) == 1
+    assert err.count("DASHSCOPE_API_KEY") == 1
+
+
+def test_legacy_warn_reset_hook_restores_warning(monkeypatch, tmp_path, capsys):
+    """重置钩子清空去重状态后，再次使用旧变量会重新提示
+    （钩子本身可用性的回归防护）。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "legacy-key")
+    _block_env_files(monkeypatch, tmp_path)
+    vision_client.load_key()
+    vision_client._reset_legacy_warn_state()
+    vision_client.load_key()
+    err = capsys.readouterr().err
+    assert err.count(vision_client.WARN_PREFIX) == 2
 
 
 def test_missing_key_error_message_vendor_neutral(monkeypatch, img, tmp_path):
