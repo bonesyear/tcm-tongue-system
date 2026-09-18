@@ -305,31 +305,37 @@ class DailyRecord:
         for indicator, paths in _DIMENSION_INDICATORS[dim].items():
             path = paths.get(shape_key) or paths.get("B") or paths.get("A") or []
             result[indicator] = _dig(root, path)
-        self._warn_if_mixed_shape(dim, root, result)
+        self._warn_if_mixed_shape(dim, root)
         return result
 
     def _warn_if_mixed_shape(self, dim: VisionDimension,
-                             root: Dict[str, Any], result: Dict[str, str]) -> None:
-        """形状 C 下维度节点非空却解析不到任何规范指标时打 warning。
+                             root: Dict[str, Any]) -> None:
+        """形状 C 下维度节点含未识别键时打 warning，并列出被丢弃的键名。
 
-        混合形状档案（顶层有 tongue 被判为 C，内层却是 B 式嵌套
-        body/coating/sublingual 或漂移键名 body_shape/teeth_marks）会被
-        恒等映射静默取空 → 覆盖 0/6 全程无提示（实测 08-09/08-14）。
-        仅打警告：不抛异常、不改变返回语义；每记录每维度至多打一次。
-        正常 C 档案（观测能解析出值，或维度键根本没写）不触发。
+        旧口径只在维度节点全部解析不到时才告警；部分解析成功时漂移键被
+        静默丢弃——实测 08-02 的 tongue 10 键中 body_shape/teeth_marks/
+        crack/sublingual_veins 4 键无声丢失，其中 sublingual_veins 的值
+        是「异常—中度血瘀」铁证级数据。现升级为「存在未识别键即告警」。
+        仅打警告：不抛异常、不改变返回语义、不影响覆盖度与评分；
+        每记录每维度至多打一次（_warned_mixed_shape 去重）。
+        未识别键全为空值占位时不触发（没有实质内容被丢弃）；
+        维度键根本没写（缺失 ≠ 漂移）也不触发。
         """
         if (self._shape != "C" or dim in self._warned_mixed_shape
-                or not isinstance(root, dict) or not root
-                or any(result.values())):
+                or not isinstance(root, dict) or not root):
             return
-        if not _flatten_to_text(root):
-            return  # 节点只有空值占位，不算"有内容却解析不到"
+        known = set(_DIMENSION_INDICATORS[dim])
+        dropped = [k for k in root if k not in known]
+        if not dropped:
+            return
+        if not _flatten_to_text({k: root[k] for k in dropped}):
+            return  # 未识别键只有空值占位，不算"有内容被丢弃"
         self._warned_mixed_shape.add(dim)
         print(
-            f"⚠️ 警告: 形状 C 记录的维度节点 {dim.english_name!r} 非空，"
-            f"但按规范指标名解析不到任何观测——可能是混合形状"
-            f"（B 式嵌套 body/coating/sublingual）或键名漂移"
-            f"（如 body_shape/teeth_marks），请核对形状 C 规范",
+            f"⚠️ 警告: 形状 C 记录的维度节点 {dim.english_name!r} 含未识别键: "
+            f"{', '.join(dropped)} —— 这些键的值不会进入评分，"
+            f"请核对是否为键名漂移（规范键名见形状 C 规范）或混合形状"
+            f"（B 式嵌套 body/coating/sublingual）",
             file=sys.stderr,
         )
 

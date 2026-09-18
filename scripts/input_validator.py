@@ -241,6 +241,11 @@ def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
     2. 任一评分类指标的值含判读注记特征（括号内出现模型名/判读词）→
        值应只写当前状态纯描述，判读注记请移入 notes/lessons —— 注记会被
        关键词评分误命中（已有 08-02 palm_color 实测假阳性 4 分）。
+    3. 值以「正常」开头且同时含「未拍」（轮次 9 新增）→ 「正常（用户声明，
+       未拍摄）」式占位文本语义矛盾（声明未拍摄却写"正常"，与 prompt 约定
+       「绝不编造观察」有张力），建议写为「未拍摄（用户声明正常）」。
+       判据保守：只抓「正常」打头 + 含「未拍」的组合，不误报推荐写法
+       （「未拍摄（用户声明正常）」以「未拍摄」开头，不触发）。
     """
     warnings: List[str] = []
 
@@ -271,6 +276,12 @@ def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
                         "实测假阳性 4 分）"
                     )
                     break  # 同一指标只告警一次
+            if value.startswith("正常") and "未拍" in value:
+                warnings.append(
+                    f"⚠️ {dim.chinese_name}（{dim.english_name}）指标 "
+                    f"{indicator} 的值同时声明「未拍摄」与「正常」，语义矛盾: "
+                    f"{value!r} —— 建议写为「未拍摄（用户声明正常）」"
+                )
     return warnings
 
 

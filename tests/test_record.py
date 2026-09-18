@@ -269,6 +269,39 @@ def test_mixed_shape_c_warns_when_unparseable(capsys):
     assert capsys.readouterr().err == ""
 
 
+def test_shape_c_partial_drift_keys_warn_and_list(capsys):
+    """轮次 9 告警升级：部分解析成功时漂移键不再静默丢弃——存在未识别键
+    即告警并列出键名（实测 08-02：tongue 10 键中 body_shape/teeth_marks/
+    crack/sublingual_veins 4 键被静默丢弃，sublingual_veins 是血瘀铁证）。
+    返回语义不变：规范键照常解析，漂移键不进入结果。"""
+    rec = DailyRecord({
+        "date": "2026-08-02",
+        "tongue": {
+            "body_color": "淡红",
+            "body_shape": "胖大",           # 漂移键（规范名 body_size）
+            "teeth_marks": "轻度",          # 漂移键（规范名 tooth_marks）
+            "sublingual_veins": "异常—中度血瘀：主干粗大深紫",
+        },
+    })
+    obs = rec.get_observation(VisionDimension.TONGUE)
+    assert obs["body_color"] == "淡红"      # 规范键照常解析（返回语义不变）
+    err = capsys.readouterr().err
+    assert "tongue" in err and "未识别键" in err
+    for key in ("body_shape", "teeth_marks", "sublingual_veins"):
+        assert key in err                  # 告警列出全部漂移键名
+    assert "body_color" not in err         # 已识别键不列入
+    # 去重：同维度不重复刷屏
+    rec.get_observation(VisionDimension.TONGUE)
+    assert capsys.readouterr().err == ""
+    # 未识别键全为空值占位时不触发（没有实质内容被丢弃）
+    empty_drift = DailyRecord({
+        "date": "2026-09-02",
+        "tongue": {"body_color": "淡红", "body_shape": ""},
+    })
+    empty_drift.get_observation(VisionDimension.TONGUE)
+    assert capsys.readouterr().err == ""
+
+
 def test_no_information_loss_against_raw(real_record):
     """新架构取出的观测文本应是原始记录的子集，不丢失关键信息。"""
     raw = real_record.raw
