@@ -290,3 +290,71 @@ def test_call_socket_timeout(monkeypatch, img, key):
 #    约定，被误改会静默断链（prompt 键名与解析键名漂移无任何报错）
 def test_tongue_prompt_declares_rzao_key_name():
     assert '键名固定为"舌质润燥"' in vision_client.PROMPTS["舌面"]
+
+
+# ⑫ 可观测性告警：四类失败从静默变为 stderr 可见（统一前缀 [vision_client][warn]）
+def test_call_warns_on_empty_content(monkeypatch, img, key, capsys):
+    """① 空 content：告警指向 reasoning_content 与 VISION_MAX_TOKENS。"""
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: _fake_response(
+                            {"choices": [{"message": {"content": "  \n"},
+                                          "finish_reason": "stop"}]}))
+    dt, out = vision_client.call(img, "prompt")
+    assert out.strip() == ""
+    err = capsys.readouterr().err
+    assert vision_client.WARN_PREFIX in err
+    assert "VISION_MAX_TOKENS" in err
+    assert "reasoning_content" in err
+
+
+def test_call_warns_on_length_finish_reason(monkeypatch, img, key, capsys):
+    """② finish_reason=length → 截断告警；正常 finish_reason=stop 无任何告警。"""
+    # 正常路径基线：stderr 必须为空
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: _fake_response(
+                            {"choices": [{"message": {"content": "ok"},
+                                          "finish_reason": "stop"}]}))
+    vision_client.call(img, "prompt")
+    assert capsys.readouterr().err == ""
+
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: _fake_response(
+                            {"choices": [{"message": {"content": '{"舌质颜色":"淡红'},
+                                          "finish_reason": "length"}]}))
+    vision_client.call(img, "prompt")
+    err = capsys.readouterr().err
+    assert vision_client.WARN_PREFIX in err
+    assert "length" in err
+    assert "截断" in err
+
+
+def test_observe_warns_on_non_json_output(monkeypatch, img, capsys):
+    """③ observe 输出非 JSON（去围栏后不以 '{' 开头）→ 告警；stdout 契约不变。"""
+    monkeypatch.setattr(vision_client, "call",
+                        lambda *a, **k: (1, "舌质淡红，舌苔薄白"))
+    vision_client.main(["observe", img, "舌面"])
+    captured = capsys.readouterr()
+    assert vision_client.WARN_PREFIX in captured.err
+    assert "JSON" in captured.err
+    assert captured.out == "[1s] 舌质淡红，舌苔薄白\n"  # stdout 不受影响
+
+
+def test_call_http_4xx_includes_troubleshooting_hint(monkeypatch, img, key):
+    """④ HTTP 4xx → RuntimeError 追加通用排查提示；5xx 不追加。"""
+    def boom400(req, timeout=None):
+        raise urllib.error.HTTPError("http://x", 400, "Bad Request", {},
+                                     io.BytesIO(b"invalid parameter"))
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom400)
+    with pytest.raises(RuntimeError) as e:
+        vision_client.call(img, "p")
+    assert "400" in str(e.value)
+    assert "排查提示" in str(e.value)
+    assert "VISION_API_KEY" in str(e.value)
+
+    def boom500(req, timeout=None):
+        raise urllib.error.HTTPError("http://x", 500, "Server Error", {},
+                                     io.BytesIO(b"boom"))
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom500)
+    with pytest.raises(RuntimeError) as e:
+        vision_client.call(img, "p")
+    assert "排查提示" not in str(e.value)

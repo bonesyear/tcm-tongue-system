@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.4.7（视觉客户端可观测性：四类失败从静默变为 stderr 可见可行动，2026-09-18）
+
+> 空 content / 输出截断 / 非 JSON 输出 / HTTP 4xx 四类失败此前静默或仅有裸状态码；本批统一以 `[vision_client][warn]` 前缀输出 stderr 告警（4xx 为异常消息内追加排查提示）。**不改退出码、不改 stdout 契约**（下游脚本按行读 stdout），正常路径零告警。
+
+### 改动
+
+- **`scripts/vision_client.py` 新增统一告警前缀常量 `WARN_PREFIX = "[vision_client][warn]"`**，所有新告警共用，便于 grep 与日志分流。
+- **告警① 空 content**（响应解析段）：`choices[0].message.content` 为空/纯空白时告警——提示思考型（reasoning）模型的思考过程可能吃满 `VISION_MAX_TOKENS` 额度导致正文未输出（默认 600 对思考型模型偏小，建议提高），并提示检查响应是否含 `reasoning_content` 字段（附本响应 message 键清单）。`content` 为 `null` 时归一为空串返回（原样返回 `None` 会让调用方在 `.strip()` 处崩出 `AttributeError`）。
+- **告警② 输出截断**（响应解析段）：`choices[0].finish_reason == "length"` 时告警——输出已达 max_tokens 上限、可能被截断（JSON 可能不完整），建议提高 `VISION_MAX_TOKENS`。
+- **告警③ 非 JSON 输出**（observe 分支）：模型输出去掉首尾空白与可能的 ` ```json ` 围栏后不以 `{` 开头时告警——该模型可能未遵守「只输出 JSON」约定，下游解析可能失败（附输出前 60 字符）；stdout 照常打印原文，契约不变。
+- **告警④ HTTP 4xx 排查提示**（HTTP 错误段）：4xx 时 `RuntimeError` 消息追加通用排查提示——检查凭证（`VISION_API_KEY`）、端点地址（`VISION_BASE_URL`）、模型名（`VISION_MODEL`）与请求参数取值（temperature / max_tokens）是否被服务端拒绝；**厂商中立，不断言任何一家的具体行为**。5xx 不追加。
+
+### 测试
+
+- 255 → **259 项**：新增 4 个 mock 测试（每类告警一个）——① 空 content 告警含 `VISION_MAX_TOKENS` 与 `reasoning_content` 提示；② `finish_reason=length` 告警（同测试内先断言正常 `stop` 路径 `err == ""`）；③ observe 非 JSON 输出告警且 stdout 逐字节不变；④ HTTP 400 消息含排查提示、500 不含。
+
 ## v1.4.6（视觉模型请求参数环境变量化 + 本地 .env 候选路径泛化，2026-09-18）
 
 > 请求参数从写死改为环境变量驱动，作者环境行为保持等价（不传 `temperature` ≡ 服务端默认值生效，官方文档已证实、本批实测复核）。
