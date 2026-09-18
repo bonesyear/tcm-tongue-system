@@ -5,7 +5,7 @@
 # 四层检查：
 #   ① 敏感词表（本地 .privacy-words，gitignored —— 因为词表里含真实姓名，不能进仓库）
 #   ② 凭证模式（sk-/ghp_/github_pat_/LTAI/AKLT/私钥头）
-#   ③ 真实凭证指纹（读 ~/.hermes/ 的 .env，取每个 KEY 值的前 14 字符在待推送内容中比对）
+#   ③ 真实凭证指纹（读作者环境的多个 .env 路径，见下方 _ENV_FILES；取每个 KEY 值的前 14 字符在待推送内容中比对）
 #   ④ 版本一致性（VERSION 文件 ↔ CHANGELOG.md 最新条目；防「只改一处」的版本漂移）
 #
 # 误报豁免：git push --no-verify（仅在已人工复核确认无害时使用）
@@ -59,7 +59,9 @@ check_patterns() {
 check_key_fingerprints() {
   local commit="$1"
   local envf
-  for envf in "$HOME/.hermes/.env" "$HOME/.hermes/profiles/tcm-tongue/.env"; do
+  # 作者环境的凭据文件清单（此处为作者本地路径；使用者 fork 后请改为自己的路径，
+  # 或以环境变量 _PRIVACY_ENV_FILES 覆盖。改动本清单不影响前三层检查之外的任何行为。）
+  for envf in ${_PRIVACY_ENV_FILES:-"$HOME/.hermes/.env" "$HOME/.hermes/profiles/tcm-tongue/.env"}; do
     [ -f "$envf" ] || continue
     while IFS= read -r line; do
       line="${line%$'\r'}"
