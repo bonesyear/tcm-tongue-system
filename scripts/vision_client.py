@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """望诊识图统一入口 — 开放接口（OpenAI 兼容视觉模型，默认 Qwen3.8-Max）
 模型/端点/Key 通过环境变量 VISION_MODEL / VISION_BASE_URL / VISION_API_KEY 配置，可插拔任意 OpenAI 兼容服务。
+可选请求参数（运行时读取）：VISION_TEMPERATURE（默认不发送该键）/ VISION_MAX_TOKENS（默认 600）/ VISION_TIMEOUT（默认 150，classify 固定 60）。
 用法:
   python3 vision_client.py classify <img>              # 2a 部位分类
   python3 vision_client.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
@@ -16,7 +17,12 @@ def load_key():
     if env_key:
         return env_key
     keys = {}
-    for p in [os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
+    # 本地 .env 候选清单：前两条为通用部署路径（当前工作目录 / XDG 配置目录）；
+    # 后两条为作者环境便利（存在则加载，不存在则跳过，对使用者无影响）。
+    # 通用部署建议用环境变量或项目根 .env。
+    for p in [".env",
+              os.path.expanduser("~/.config/tcm-tongue/.env"),
+              os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
               os.path.expanduser("~/.hermes/.env")]:
         try:
             with open(p) as f:
@@ -61,7 +67,8 @@ def mime_type(img_path):
     """按扩展名映射 MIME，未知回退 image/jpeg。"""
     return MIME_MAP.get(os.path.splitext(img_path)[1].lower(), "image/jpeg")
 
-def call(img_path, prompt, timeout=150):
+def call(img_path, prompt, timeout=None):
+    timeout = timeout or int(os.environ.get("VISION_TIMEOUT", "150"))
     key = load_key()
     if not key:
         raise RuntimeError("VISION_API_KEY or DASHSCOPE_API_KEY not found "
@@ -75,20 +82,12 @@ def call(img_path, prompt, timeout=150):
              "image_url": {"url": f"data:{mime_type(img_path)};base64,{b64}"}},
             {"type": "text", "text": prompt},
         ]}],
-        "max_tokens": 600,
-        # temperature 显式取 0.6 —— 这是 qwen3.8-max「思考模式」**视觉理解的下限**。
-        # 官方文档（DashScope「qwen-api-via-dashscope」）：该模型「视觉理解 0.6，
-        # 0.6 以下的 temperature 值会默认改为 0.6」。即传 0 会被服务端静默改写成 0.6，
-        # 与不传参完全等价 —— 曾误以为 temp=0 可降低抖动；2026-09-18 实验 1（同图
-        # temp=0 vs temp=1.0 各 10 次、交叉交替）实测两组无可辨差异
-        # （双侧 Fisher p≈0.21/0.47，均不显著），正与此规则吻合。
-        # 故此处显式写 0.6，如实反映实际生效值（写 0 会造成"已降噪"的误导）。
-        # ⚠️ 不得表述为「降低抖动/解决抖动」：本模型视觉理解随机性下限即 0.6，
-        # temperature 无法再降；抖动主源为服务端不确定性（连续批处理 + 非确定性
-        # 内核）与判读边界模糊，缓解手段是「用户肉眼为最终权威」（见 user-guide §八）。
-        # 不擅自加 seed/top_p —— DashScope 对 VL 模型是否支持未经核实，一次只改一个变量。
-        "temperature": 0.6,
+        "max_tokens": int(os.environ.get("VISION_MAX_TOKENS", "600")),
     }
+    # temperature 仅在显式配置 VISION_TEMPERATURE 时发送；否则由服务端模型默认值生效。
+    temperature = os.environ.get("VISION_TEMPERATURE", "").strip()
+    if temperature:
+        payload["temperature"] = float(temperature)
     req = urllib.request.Request(URL, data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
     t0 = time.time()

@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.4.6（视觉模型请求参数环境变量化 + 本地 .env 候选路径泛化，2026-09-18）
+
+> 请求参数从写死改为环境变量驱动，作者环境行为保持等价（不传 `temperature` ≡ 服务端默认值生效，官方文档已证实、本批实测复核）。
+
+### 改动
+
+- **`scripts/vision_client.py` 请求参数环境变量化**（三个变量均在 `call()` 内运行时读取，不做模块级常量）：`max_tokens` 改从 `VISION_MAX_TOKENS` 读（默认 600）；`temperature` 仅当 `VISION_TEMPERATURE` 非空时发送（未设置或空串 → payload 完全不含该键，由服务端模型默认值生效）；`call(..., timeout=None)` 生效值 = `timeout or int(os.environ.get("VISION_TIMEOUT", "150"))`（classify 显式传 60 不变）。原 Qwen 专属 temperature 论证注释整段删除，替换为一行中性说明（论据已迁入 `.env.example` / README / CHANGELOG v1.4.3）。key 回退链、MIME 回退、错误处理结构未动。
+- **本地 `.env` 候选路径泛化**（`load_key()`）：候选序列改为 当前工作目录 `.env` → `~/.config/tcm-tongue/.env` → 原有两条作者便利路径（`~/.hermes/profiles/tcm-tongue/.env`、`~/.hermes/.env`，保留不移除）；注释注明后两条为作者环境便利、通用部署建议用环境变量或项目根 `.env`。
+- **默认值标注**：`.env.example` 与 README「配置自己的视觉模型」明确标注——代码默认值（`qwen3.8-max` + DashScope 端点）仅为示例（clone 后不配置也能看到结构），请务必替换为自己的模型与端点；代码默认值本身未改。
+- **`scripts/hooks/README.md`**：凭证指纹层的 `.env` 路径描述泛化为「作者环境的多个 `.env` 路径（实际清单见 `pre-push` 顶部常量）」；`pre-push` 脚本实际路径未动（hook 必须真能读到凭证才能比对指纹）。
+
+### 测试
+
+- 253 → **255 项**：删除 `test_call_payload_temperature`（原断言 `temperature == 0.6`），新增 3 个——① 默认 payload 不含 `temperature` 键 + `max_tokens == 600` + 无 `seed`/`top_p`；② 设 `VISION_TEMPERATURE` 后出现该键；③ `VISION_MAX_TOKENS` 生效覆盖默认值。新增 autouse fixture 清除运行环境残留的 `VISION_TEMPERATURE` / `VISION_MAX_TOKENS` / `VISION_TIMEOUT`；`load_key` 相关测试补 `chdir` 隔离相对路径 `.env` 候选。
+- 作者环境实测：`unset` 三个变量后 classify/observe 与批 0 基线模式类别一致、JSON 结构一致、无新 stderr；`VISION_MAX_TOKENS=8000` 与 `VISION_TEMPERATURE=0.6` 各跑一次 observe 均正常返回。
+
 ## v1.4.5（形状 A 键名中性化 + 读时兼容层，2026-09-18）
 
 > 形状 A 的两个品牌键改名（`doubao_vision_analysis`→`vision_analysis`、`deepseek_diagnosis`→`diagnosis`），代码层新旧双名双收、**新名优先**。消除「用户自行改名导致形状探测静默塌缩」的 footgun；历史档案**零迁移**、可继续校验——旧名永久兼容（读时双收即满足「历史不追溯」原则），新记录一律用新名。纯解析层改动，`score()` / `compute_dimension_deviation()` 公开语义与双门槛逻辑未动。

@@ -23,6 +23,13 @@ def _fake_response(payload):
     return Resp()
 
 
+@pytest.fixture(autouse=True)
+def _clean_vision_param_env(monkeypatch):
+    """清除运行环境残留的 VISION_* 参数变量，避免影响 payload/超时断言。"""
+    for name in ("VISION_TEMPERATURE", "VISION_MAX_TOKENS", "VISION_TIMEOUT"):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def img(tmp_path):
     p = tmp_path / "t.jpg"
@@ -40,6 +47,7 @@ def _block_env_files(monkeypatch, tmp_path):
     monkeypatch.setattr(vision_client.os.path, "expanduser",
                         lambda p: str(tmp_path / "nonexistent" / p[2:])
                         if p.startswith("~/") else p)
+    monkeypatch.chdir(tmp_path)  # 同时隔离候选清单里的相对路径 ".env"
 
 
 # ① 正常调用
@@ -67,10 +75,26 @@ def test_call_uses_mime_of_extension(monkeypatch, tmp_path, key):
     assert url.startswith("data:image/png;base64,")
 
 
-def test_call_payload_temperature(monkeypatch, img, key):
-    """payload 显式 temperature=0.6（qwen3.8-max 视觉理解的官方下限：0.6 以下
-    被服务端静默改为 0.6，故写 0 与不传参等价；显式 0.6 如实反映生效值，
-    不得表述为降噪）。只改这一个变量：不加 seed/top_p。"""
+def test_call_payload_defaults(monkeypatch, img, key):
+    """默认（未设 VISION_* 参数）：payload 完全不含 temperature 键（由服务端
+    模型默认值生效），max_tokens=600，不擅自加 seed/top_p。"""
+    seen = {}
+
+    def capture(req, timeout=None):
+        seen["body"] = json.loads(req.data.decode())
+        return _fake_response({"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    vision_client.call(img, "prompt")
+    assert "temperature" not in seen["body"]
+    assert seen["body"]["max_tokens"] == 600
+    assert "seed" not in seen["body"]
+    assert "top_p" not in seen["body"]
+
+
+def test_call_payload_temperature_from_env(monkeypatch, img, key):
+    """设置 VISION_TEMPERATURE 后 payload 出现 temperature 键。"""
+    monkeypatch.setenv("VISION_TEMPERATURE", "0.6")
     seen = {}
 
     def capture(req, timeout=None):
@@ -80,8 +104,20 @@ def test_call_payload_temperature(monkeypatch, img, key):
     monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
     vision_client.call(img, "prompt")
     assert seen["body"]["temperature"] == 0.6
-    assert "seed" not in seen["body"]
-    assert "top_p" not in seen["body"]
+
+
+def test_call_payload_max_tokens_from_env(monkeypatch, img, key):
+    """VISION_MAX_TOKENS 生效并覆盖默认 600。"""
+    monkeypatch.setenv("VISION_MAX_TOKENS", "8000")
+    seen = {}
+
+    def capture(req, timeout=None):
+        seen["body"] = json.loads(req.data.decode())
+        return _fake_response({"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    vision_client.call(img, "prompt")
+    assert seen["body"]["max_tokens"] == 8000
 
 
 # ② HTTP 4xx/5xx 与缺 choices 不抛 KeyError，而是带状态码的 RuntimeError
@@ -168,6 +204,7 @@ def test_load_key_env_file_comments(monkeypatch, tmp_path):
         encoding="utf-8")
     monkeypatch.setattr(vision_client.os.path, "expanduser",
                         lambda p: str(tmp_path / p[2:]) if p.startswith("~/") else p)
+    monkeypatch.chdir(tmp_path)  # 隔离候选清单里的相对路径 ".env"
     assert vision_client.load_key() == "sk-abc"
 
 

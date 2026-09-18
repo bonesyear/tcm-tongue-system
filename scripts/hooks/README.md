@@ -8,7 +8,7 @@
 |---|---|
 | ① 敏感词表 | 读仓库根的 `.privacy-words`（该文件**被 .gitignore 排除** —— 因为里面含真实姓名，绝不进仓库） |
 | ② 凭证模式 | `sk-` / `sk-ant-` / `ghp_` / `github_pat_` / `LTAI` / `AKLT` / `AIza` / `BEGIN … PRIVATE KEY` |
-| ③ 真实凭证指纹 | 读 `~/.hermes/.env` 与 `~/.hermes/profiles/tcm-tongue/.env`，取每个 KEY/TOKEN/SECRET/ID 变量值的前 14 字符，在**待推送的树**中比对（只比对前缀，不打印完整凭证） |
+| ③ 真实凭证指纹 | 读作者环境的多个 `.env` 路径（实际清单见 `scripts/hooks/pre-push` 顶部常量），取每个 KEY/TOKEN/SECRET/ID 变量值的前 14 字符，在**待推送的树**中比对（只比对前缀，不打印完整凭证） |
 
 检查范围是**待推送的提交**（用 `local_sha` 的树，不看工作区），所以工作区里的临时文件不会误报。
 
