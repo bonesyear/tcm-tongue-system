@@ -1,12 +1,13 @@
 # 更新日志
 
-## v1.4.3（识图采样稳定性处置：temperature=0 + 点刺退出评分层 + prompt 安全阀 + 腻腐封闭词表，2026-09-18）
+## v1.4.3（识图采样稳定性处置：温度真相查明（视觉理解下限 0.6）+ 点刺退出评分层 + prompt 安全阀 + 腻腐封闭词表，2026-09-18）
 
 > 依据：同日 Qwen3.8-Max 采样稳定性实验（同一张真实舌照，三组各 3 次，共 9 次调用）——点刺 **9/9 判「有」** 而用户肉眼为「无」；temperature=0 下腻腐仍抖（3 次出 2 种结果）。
+> ⚠️ **温度框架更正（同日查明）**：DashScope 官方文档（`qwen-api-via-dashscope`）明确 qwen3.8-max（思考模式）**视觉理解 temperature 默认 0.6、0.6 以下被服务端静默改为 0.6**——本版本涉及的所有「temp=0」条件实际生效值均为 0.6，与不传参等价；上述「temp=0 下仍抖」是**默认温度下的基线抖动观测**（仍真实），不构成「温度干预失败」的证据。实验 1（同图 temp=0 vs temp=1.0 各 10 次交叉交替）实测两组无可辨差异（双侧 Fisher p≈0.21/0.47 不显著）。
 
 ### 改动
 
-- **请求 payload 固定 `temperature: 0`**（`scripts/vision_client.py`）：降低采样噪声。⚠️ 收益幅度**未定量**（n=3 不足以定量），且 temp=0 下仍出过 2 种结果——**不等于消除抖动**。只改这一个变量，未加 `seed`/`top_p`（DashScope 对 VL 模型是否支持未经核实）。
+- **请求 payload 温度显式化：`temperature: 0` → `0.6`**（`scripts/vision_client.py`）：官方文档（DashScope「qwen-api-via-dashscope」）明确 qwen3.8-max（思考模式）**视觉理解 temperature 默认 0.6、0.6 以下被服务端静默改为 0.6**——最初落地的 `0` 与不传参等价，从未生效；该模型视觉理解的随机性下限即 0.6，**温度无法用于降噪**。显式写 `0.6` 只为如实反映生效值、避免「已降噪」误导，**不得表述为降低/解决抖动**（实验 1：temp=0 vs temp=1.0 各 10 次交叉交替无可辨差异，Fisher p≈0.21/0.47）。未加 `seed`/`top_p`（DashScope 对 VL 模型是否支持未经核实），一次只改一个变量。
 - **点刺退出评分层、降级到辨证层**（`src/scoring.py`）：凸起度需触诊/动态观察，静态照片判不准（9/9 实证），违反收录原则「评分层只收静态照片可客观判读的指标」（`scoring.py:139-143`），同 #18 `palm_temp` 先例。`prickles` 从 `DIMENSION_RULES[TONGUE]` 移除；词表 `TONGUE_PRICKLES_MAP` 保留备查（含轮次 11 `少量: 2` 兜底语义）。**档案 `prickles` 字段（用户肉眼值）继续保留供辨证层使用，只是不参与数值评分**；观测层（`record.py` 指标路径）不动。`score()` / `compute_dimension_deviation()` 公开语义与双门槛判定逻辑未动。
 - **舌面 prompt 点刺恢复安全阀**（`scripts/vision_client.py`）：v1.4.2 的规范化句「不填『不明显』等」拆掉了模型存疑时的对冲出口，使系统性偏向直接落成 5 分假阳性。现改为：输出 `点刺` 与 `点刺依据` 两个键——先判断是否有明显凸起的红色颗粒并给出凸起度/分布依据；确信有填「点刺」/「芒刺」，无填「无」，**存疑填「不明显」**（评分层自然归零，恢复出口安全；与 #6 的 `少量: 2` 兜底不冲突）。
 - **舌面 prompt 腻腐封闭词表**（`scripts/vision_client.py`）：腻腐只填 无/微腻/稍腻/偏腻/腻/厚腻/腐苔，异常档与 `TONGUE_COATING_GREASY_MAP` 键完全对齐——只保证「评分映射确定」，**不承诺消除判断层面抖动**（本次腻腐抖动是 无/腻 级别的判断摇摆，非措辞问题）。
@@ -20,11 +21,11 @@
 
 - `docs/HERMES_021_CAPABILITY_CHECK_2026-09-17.md` §8.2/8.3 + 新增 §8.6：9-17 A/B「Qwen 点刺判对」标注为**少数采样命中**（同图 9/9 实测证伪）；「Qwen 判读质量更优」论据**撤回（证据不足）**（四分歧项 native 有 2 项更接近签认值）；「维持 Qwen 为识图主力」结论方向保留，立足点改为运营性理由（prompt 已按 Qwen 调校 / 不扩大隐私面 / 切换收益约 30s 每次）。
 - `records/daily/2026-09-18_analysis.json` `ab_test_note`：同步修正（档案 `prickles: "无"` 用户肉眼签认值不动；validator 0 错误 0 警告）。
-- `docs/KNOWN_ISSUES.md` #5：由「点刺判读不稳定」扩展为「抖动 + 系统性偏向」，补入 9/9 实测、temp=0 不解决、规范化句拆安全阀的核心洞察、d+b 处置与腻腐连带处置；§0 总览表与 §5 坑表同步更新。
+- `docs/KNOWN_ISSUES.md` #5：由「点刺判读不稳定」扩展为「抖动 + 系统性偏向」，补入 9/9 实测、规范化句拆安全阀的核心洞察、d+b 处置与腻腐连带处置；§0 总览表与 §5 坑表同步更新。后续（同日）再补**温度真相**：temp=0 被服务端钳制到 0.6、从未生效，点刺 10/10 判有与采样温度无关。
 
 ### 测试
 
-- 251 → **252 项**：`test_prickles_scoring` / `test_prickles_shaoliang_conservative` 重写为「已退出评分注册表」+「词表保留 `_match_score` 行为不变」两组断言；新增 `test_call_payload_temperature_zero`（payload 固定 temperature=0、无 seed/top_p）；周报 fixture 舌诊期望值同步为 5.7/7.0/3。
+- 251 → **252 项**：`test_prickles_scoring` / `test_prickles_shaoliang_conservative` 重写为「已退出评分注册表」+「词表保留 `_match_score` 行为不变」两组断言；新增 `test_call_payload_temperature`（payload 显式 temperature=0.6、无 seed/top_p）；周报 fixture 舌诊期望值同步为 5.7/7.0/3。
 
 ## v1.4.2（点刺「少量」漏判修复：词表兜底 + prompt 规范化，2026-09-18）
 
