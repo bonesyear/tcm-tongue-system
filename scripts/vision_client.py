@@ -11,14 +11,31 @@ import base64, json, os, socket, sys, time, urllib.error, urllib.request
 USAGE = ("用法: vision_client.py classify <img> | "
          "vision_client.py observe <img> <part-key>")
 
-# 可观测性告警统一前缀（便于 grep 与日志分流）；仅失败/异常路径输出，正常路径零告警
+# 可观测性告警统一前缀（便于 grep 与日志分流）；仅失败/异常/弃用配置路径输出，正常路径零告警
 WARN_PREFIX = "[vision_client][warn]"
 
+# 历史兼容 key 变量：作者早期环境用 DashScope，该变量名永久保留为回退
+# （与 src/record.py 的 _A_VISION_KEYS 同风格：新名优先、旧名读时兼容、不迁移）。
+# 新配置一律用 VISION_API_KEY；使用其他厂商/本地模型的读者无需关心本常量。
+_LEGACY_KEY_NAMES = ("DASHSCOPE_API_KEY",)
+
+
+def _warn_legacy_key(name):
+    """历史兼容 key 变量被实际使用时打一条 stderr 弃用提示（不影响功能）。"""
+    print(f"{WARN_PREFIX} 正在使用历史兼容变量 {name} 提供 API Key——功能正常，"
+          f"但该变量仅为兼容保留，建议迁移到 VISION_API_KEY", file=sys.stderr)
+
+
 def load_key():
-    # 优先级: 环境变量 VISION_API_KEY > .env VISION_API_KEY > 环境变量 DASHSCOPE_API_KEY > .env DASHSCOPE_API_KEY
-    env_key = os.environ.get("VISION_API_KEY", "") or os.environ.get("DASHSCOPE_API_KEY", "")
+    # 优先级: 环境变量 VISION_API_KEY > 环境变量历史兼容名 > .env VISION_API_KEY > .env 历史兼容名
+    env_key = os.environ.get("VISION_API_KEY", "")
     if env_key:
         return env_key
+    for name in _LEGACY_KEY_NAMES:
+        env_key = os.environ.get(name, "")
+        if env_key:
+            _warn_legacy_key(name)
+            return env_key
     keys = {}
     # 本地 .env 候选清单：前两条为通用部署路径（当前工作目录 / XDG 配置目录）；
     # 后两条为作者环境便利（存在则加载，不存在则跳过，对使用者无影响）。
@@ -42,8 +59,19 @@ def load_key():
                         keys[k] = v
         except FileNotFoundError:
             pass
-    return keys.get("VISION_API_KEY") or keys.get("DASHSCOPE_API_KEY", "")
+    key = keys.get("VISION_API_KEY")
+    if key:
+        return key
+    for name in _LEGACY_KEY_NAMES:
+        key = keys.get(name, "")
+        if key:
+            _warn_legacy_key(name)
+            return key
+    return ""
 
+# 默认模型/端点仅为示例（clone 后不配置也能看到完整结构；README 与
+# .env.example 已标注「请务必替换」）——实际使用请通过 VISION_MODEL /
+# VISION_BASE_URL 换成你自己的模型与端点。
 MODEL = os.environ.get("VISION_MODEL", "qwen3.8-max")
 URL = os.environ.get("VISION_BASE_URL",
                      "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
@@ -74,8 +102,9 @@ def call(img_path, prompt, timeout=None):
     timeout = timeout or int(os.environ.get("VISION_TIMEOUT", "150"))
     key = load_key()
     if not key:
-        raise RuntimeError("VISION_API_KEY or DASHSCOPE_API_KEY not found "
-                           "(环境变量与 .env 均未配置)")
+        raise RuntimeError("未找到视觉模型 API Key：请配置 VISION_API_KEY"
+                           "（环境变量或 .env 均可；历史变量 DASHSCOPE_API_KEY"
+                           " 仍兼容，但新配置一律用 VISION_API_KEY）")
     with open(img_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     payload = {

@@ -358,3 +358,47 @@ def test_call_http_4xx_includes_troubleshooting_hint(monkeypatch, img, key):
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "排查提示" not in str(e.value)
+
+
+# ⑬ 历史兼容 key 变量（DASHSCOPE_API_KEY）：可用但打弃用提示；新名优先
+def test_load_key_legacy_env_var_still_works(monkeypatch, tmp_path, capsys):
+    """旧变量仍可用（作者环境回归防护），但打一条 stderr 弃用提示。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "legacy-key")
+    _block_env_files(monkeypatch, tmp_path)
+    assert vision_client.load_key() == "legacy-key"
+    err = capsys.readouterr().err
+    assert vision_client.WARN_PREFIX in err
+    assert "DASHSCOPE_API_KEY" in err and "VISION_API_KEY" in err
+
+
+def test_load_key_new_var_preferred_over_legacy(monkeypatch, tmp_path, capsys):
+    """新名优先：两者都设时取 VISION_API_KEY，且无任何告警。"""
+    monkeypatch.setenv("VISION_API_KEY", "new-key")
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "legacy-key")
+    _block_env_files(monkeypatch, tmp_path)
+    assert vision_client.load_key() == "new-key"
+    assert capsys.readouterr().err == ""
+
+
+def test_load_key_legacy_from_env_file(monkeypatch, tmp_path, capsys):
+    """.env 里的旧变量同样兼容（.env 回退路径回归防护）。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("DASHSCOPE_API_KEY=sk-legacy\n",
+                                   encoding="utf-8")
+    _block_env_files(monkeypatch, tmp_path)  # chdir(tmp_path) 使相对 .env 指向它
+    assert vision_client.load_key() == "sk-legacy"
+    assert vision_client.WARN_PREFIX in capsys.readouterr().err
+
+
+def test_missing_key_error_message_vendor_neutral(monkeypatch, img, tmp_path):
+    """缺 key 报错厂商中立：主变量是 VISION_API_KEY，旧变量只作兼容说明出现。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    _block_env_files(monkeypatch, tmp_path)
+    with pytest.raises(RuntimeError) as e:
+        vision_client.call(img, "p")
+    msg = str(e.value)
+    assert "VISION_API_KEY" in msg
+    assert "历史变量" in msg  # 旧变量仅以兼容说明的身份出现

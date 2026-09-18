@@ -32,7 +32,7 @@ observation 可为 Record.get_observation() 返回的 {指标: 文本}（推荐�
 """
 
 import re
-from typing import Dict
+from typing import Dict, Optional
 
 from .dimensions import VisionDimension
 
@@ -385,21 +385,20 @@ def _has_unnegated_occurrence(text: str, kw: str) -> bool:
     return False
 
 
-def _match_score(rules: Dict[str, int], text: str) -> int:
-    """单指标打分：精确匹配优先 → 最长子串匹配（带双向否定守卫，
-    同长度关键词取分值最高者）。
+def match_keyword(rules: Dict[str, int], text: str) -> Optional[str]:
+    """返回 text 命中的词表键；无命中返回 None。
 
-    返回命中的分值；无命中返回 0。
-    已知局限：无标点连写（如"手足不温伴厥冷"）中，否定词可能误伤
-    窗口内的下一个关键词；规范指标文本通常简短，实际影响有限。
+    判据与评分完全一致（精确匹配优先 → 存在未否定出现的最长子串，
+    同长度取分值最高者），供校验器判断「值是否落在词表内」——
+    单一事实来源，避免校验器与评分层的匹配逻辑各自漂移。
     """
     if not text:
-        return 0
+        return None
     text = text.strip()
 
     # 1. 精确匹配优先（"不温" 等含否定字的枚举值经此路径直接命中）
     if text in rules:
-        return rules[text]
+        return text
 
     # 2. 子串匹配降级：取存在未否定出现的最长关键词；
     #    同长度时取分值最高者（fail-loud：宁可高估不漏估——"湿润偏滑"
@@ -413,8 +412,18 @@ def _match_score(rules: Dict[str, int], text: str) -> int:
         if (best_kw is None or len(kw) > len(best_kw)
                 or (len(kw) == len(best_kw) and rules[kw] > rules[best_kw])):
             best_kw = kw
+    return best_kw
 
-    return rules[best_kw] if best_kw is not None else 0
+
+def _match_score(rules: Dict[str, int], text: str) -> int:
+    """单指标打分：命中的词表键对应分值；无命中返回 0。
+
+    匹配判据见 match_keyword。已知局限：无标点连写（如"手足不温伴厥冷"）
+    中，否定词可能误伤窗口内的下一个关键词；规范指标文本通常简短，
+    实际影响有限。
+    """
+    kw = match_keyword(rules, text)
+    return rules[kw] if kw is not None else 0
 
 
 def _normalize_observation(observation) -> Dict[str, str]:
