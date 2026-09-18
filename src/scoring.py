@@ -176,6 +176,11 @@ TONGUE_COATING_COLOR_MAP = {
 }
 
 # 点刺（凸起红点，分辨率敏感 → 分值保守）
+# ⚠️ 2026-09-18 起**已退出评分层**（见下方 DIMENSION_RULES 注释）：实测同一真实
+# 舌照 9/9 判「有」而用户肉眼为「无」——凸起度需触诊/动态观察，不满足
+# scoring.py:139-143 的收录原则（「评分层只收静态照片可客观判读的指标」），
+# 同 #18 palm_temp 先例降级到辨证层。本表保留备查（含轮次 11 的「少量: 2」
+# 兜底语义记录）；档案的 prickles 字段（用户肉眼值）继续保留供辨证层使用。
 TONGUE_PRICKLES_MAP = {
     "点刺": 5,
     "芒刺": 6,
@@ -235,7 +240,12 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "coating_peeling": TONGUE_COATING_PEELING_MAP,
         "coating_greasy": TONGUE_COATING_GREASY_MAP,
         "coating_color": TONGUE_COATING_COLOR_MAP,
-        "prickles": TONGUE_PRICKLES_MAP,
+        # 2026-09-18：prickles 从评分表降级——凸起度需触诊/动态观察，静态照片
+        # 判不准（实测同一真实舌照 9/9 判「有」而用户肉眼为「无」），违反统一
+        # 原则「评分层只收静态照片可客观判读的指标」（:139-143）；同轮次 9
+        # palm_temp 先例降级到辨证层。观测层（record.py 指标路径与档案
+        # prickles 字段）保留——用户肉眼值仍可进档案供辨证，只是不参与数值
+        # 评分。词表 TONGUE_PRICKLES_MAP 留存备查（移除理由与日期如上）。
         "sublingual_color": SUBLINGUAL_COLOR_MAP,
         "sublingual_thickness": SUBLINGUAL_THICKNESS_MAP,
         "sublingual_petechiae": PETECHIAE_MAP,  # 直接复用既有瘀斑表
