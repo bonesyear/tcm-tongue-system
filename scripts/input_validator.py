@@ -28,6 +28,7 @@
 
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List, Tuple
 
@@ -37,8 +38,9 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from src.record import DailyRecord, SCHEMA, has_formula_content  # noqa: E402
-from src.dimensions import DIMENSIONS  # noqa: E402
+from src.dimensions import DIMENSIONS, VisionDimension  # noqa: E402
 from src import confidence as confidence_mod  # noqa: E402
+from src.scoring import DIMENSION_RULES  # noqa: E402
 
 # 顶层容器字段:键存在但类型不是 dict → 严重错误(不能静默按空处理,
 # 否则红线/方剂等安全数据会被类型错误"清零"后放行)
@@ -108,6 +110,9 @@ def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
         conf_errors, conf_warnings = _validate_confidence(record, covered_count)
         errors.extend(conf_errors)
         warnings.extend(conf_warnings)
+
+        # ---- 6. 评分值卫生（轮次 8，纯告警，不影响通过/失败判定） ----
+        warnings.extend(_validate_scoring_value_hygiene(record))
     except Exception as e:  # 防御兜底：任何未预期异常都转为 error，不落 traceback
         errors.append(f"❌ 校验过程异常（记录结构可能损坏）: {e!r}")
 
@@ -219,6 +224,54 @@ def _validate_confidence(record: DailyRecord,
             )
 
     return errors, warnings
+
+
+# 判读注记特征：值含括号，且括号内出现模型名或判读词
+# （保守判据，避免把正常括号描述误报）
+_ANNOTATION_BRACKET_RE = re.compile(r"[（(]([^（）()]*)[)）]")
+_ANNOTATION_WORD_RE = re.compile(r"豆包|Qwen|K3|用户确认|误判")
+
+
+def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
+    """评分值卫生校验（轮次 8，纯告警 —— 与既有 warning 通道同哲学，
+    不改变通过/失败判定，不引入新的失败条件）。防止未来档案数据"乱"：
+
+    1. body_color 与 sublingual_color 同时含「淡紫」→ 两处淡紫同名异义
+       （舌质淡紫 = 异常 6 / 舌下浅蓝紫 = 生理性正常 0），提示确认字段归属。
+    2. 任一评分类指标的值含判读注记特征（括号内出现模型名/判读词）→
+       值应只写当前状态纯描述，判读注记请移入 notes/lessons —— 注记会被
+       关键词评分误命中（已有 08-02 palm_color 实测假阳性 4 分）。
+    """
+    warnings: List[str] = []
+
+    tongue_obs = record.get_observation(VisionDimension.TONGUE)
+    if ("淡紫" in tongue_obs.get("body_color", "")
+            and "淡紫" in tongue_obs.get("sublingual_color", "")):
+        warnings.append(
+            "⚠️ body_color 与 sublingual_color 同时含「淡紫」：两处淡紫同名异义"
+            "（舌质=异常6 / 舌下=正常0），请确认字段归属"
+        )
+
+    for dim in DIMENSIONS:
+        scored = DIMENSION_RULES.get(dim, {})
+        if not scored:
+            continue
+        obs = record.get_observation(dim)
+        for indicator in scored:
+            value = obs.get(indicator, "")
+            if not value:
+                continue
+            for bracket in _ANNOTATION_BRACKET_RE.findall(value):
+                if _ANNOTATION_WORD_RE.search(bracket):
+                    warnings.append(
+                        f"⚠️ {dim.chinese_name}（{dim.english_name}）指标 "
+                        f"{indicator} 的值含判读注记: {value!r} —— "
+                        "值应只写当前状态纯描述，判读注记请移入 notes/lessons"
+                        "（注记会被关键词评分误命中，已有 08-02 palm_color "
+                        "实测假阳性 4 分）"
+                    )
+                    break  # 同一指标只告警一次
+    return warnings
 
 
 def print_report(filepath: str, record: DailyRecord,
