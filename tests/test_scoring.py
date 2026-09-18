@@ -121,10 +121,17 @@ def test_intensifier_feichang_not_negation():
     assert inds["edema"] > 0
 
 
-def test_palm_not_warm_scores_as_cool():
-    # "不温" 语义上等同"凉"，应得分而非被否定守卫抹成 0
-    assert score_indicators(VisionDimension.HAND, {"palm_temp": "不温"})["palm_temp"] == 4
-    assert score_indicators(VisionDimension.HAND, {"palm_temp": "温"})["palm_temp"] == 0
+def test_palm_temp_removed_from_scoring():
+    """轮次 9（2026-09-18）：palm_temp 从评分表降级——掌温需触诊/问诊，
+    静态照片判不了（统一原则：评分层只收静态照片可客观判读的指标），
+    且为 6 维度中唯一零语料指标。降级到辨证层（问诊采集掌温）。
+    观测层（record.py 指标路径）保留，仅退出评分。"""
+    inds = score_indicators(VisionDimension.HAND, {"palm_temp": "厥冷"})
+    assert "palm_temp" not in inds
+    assert "palm_temp" not in DIMENSION_RULES[VisionDimension.HAND]
+    # HAND 评分指标 5 → 4
+    assert set(DIMENSION_RULES[VisionDimension.HAND]) == {
+        "palm_color", "nail_color", "nail_shape", "ecchymosis"}
 
 
 def test_all_occurrences_checked_not_just_first():
@@ -140,9 +147,8 @@ def test_post_negation_guard():
     """后置否定："浮肿不明显""黄染未见" 等"关键词+否定"句式不应计分。"""
     assert score_indicators(VisionDimension.EYE, {"edema": "浮肿不明显"})["edema"] == 0
     assert score_indicators(VisionDimension.EYE, {"jaundice": "黄染未见"})["jaundice"] == 0
-    # 不误伤：程度加重、"厥冷不温"连写（"不温"非否定短语）
+    # 不误伤：程度加重不触发后置否定
     assert score_indicators(VisionDimension.EYE, {"edema": "浮肿明显加重"})["edema"] > 0
-    assert score_indicators(VisionDimension.HAND, {"palm_temp": "厥冷不温"})["palm_temp"] == 8
 
 
 def test_normal_tongue_scores_zero():
@@ -514,3 +520,52 @@ def test_no_bare_normal_keyword():
     for dim_rules in DIMENSION_RULES.values():
         for rules in dim_rules.values():
             assert "正常" not in rules
+
+
+# ============================================================
+# 轮次 9：盾牌词补齐 + P2 词条（2026-09-18，分值用户签认）
+# ============================================================
+
+def test_lip_color_danfenhong_shield():
+    """「淡粉红:0」盾牌词：实测探针「淡粉红」曾误命中裸「红:3」；
+    最长匹配压过后归 0。既有 淡红→0 / 红→3 不变。"""
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "淡粉红"})["lip_color"] == 0
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "淡红"})["lip_color"] == 0
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "红"})["lip_color"] == 3
+
+
+def test_coating_greasy_pianni():
+    """偏腻=4（中间态）：此前命中裸「腻」得 5 分偏重；
+    「偏腻:4」最长匹配压过裸「腻」。顺序：微腻2 < 稍腻3 < 偏腻4 < 腻5。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "偏腻"})["coating_greasy"] == 4
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "苔偏腻"})["coating_greasy"] == 4
+    # 既有值不变
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "腻"})["coating_greasy"] == 5
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "稍腻"})["coating_greasy"] == 3
+
+
+def test_eye_redness_xuesi():
+    """血丝=2：补「轻度，可见少量血丝」漏判；
+    3 字「红血丝:3」仍靠最长匹配压过（既有行为不变）。"""
+    assert score_indicators(VisionDimension.EYE,
+                            {"redness": "轻度，可见少量血丝"})["redness"] == 2
+    assert score_indicators(VisionDimension.EYE,
+                            {"redness": "白睛少许红血丝"})["redness"] == 3
+
+
+def test_ear_helix_new_terms():
+    """耳轮：润泽=0（基线）、略枯=2（补「尚润，略枯」轻度漏判）；
+    既有 干枯=4 不变。"""
+    assert score_indicators(VisionDimension.EAR,
+                            {"helix": "润泽"})["helix"] == 0
+    assert score_indicators(VisionDimension.EAR,
+                            {"helix": "尚润，略枯"})["helix"] == 2
+    assert score_indicators(VisionDimension.EAR,
+                            {"helix": "干枯"})["helix"] == 4
