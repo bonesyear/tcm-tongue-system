@@ -124,6 +124,8 @@ print(allows_formula(level))  # True/False
 | `VISION_MAX_TOKENS` | 否 | 600 | 思考型（reasoning）模型的思考过程占用该额度，建议 ≥8000 |
 | `VISION_TIMEOUT` | 否 | 150 | observe 单次请求超时秒数（classify 固定 60） |
 
+> ⚠️ 代码默认值（`qwen3.8-max` + DashScope 端点）**仅为示例**，目的是 clone 后不配置也能看到结构；**请务必替换为你自己的模型与端点**。
+
 **换模型 checklist（五步）**：
 
 1. 复制 `.env.example`，填好 `VISION_MODEL` / `VISION_BASE_URL` / `VISION_API_KEY` 三件套
