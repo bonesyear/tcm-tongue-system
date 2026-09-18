@@ -323,6 +323,12 @@ def _validate_scoring_vocab_coverage(record: DailyRecord) -> List[str]:
     （body_luster / body_dynamics / coating_distribution / prickles /
     palm_temp / lip_around / nose_color / nose_bleeding 等无词表指标）
     不适用本检查。
+
+    告警文案按「正常描述可忽略 / 异常描述改用规范词」两分支给出处置
+    指引：词表数据无法可靠区分良性与漏判（如齿痕表含显式正常词
+    「无:0」而巩膜表无 0 词条，与实测良恶性分布不相关），故不按情形
+    分级措辞，把判断规则直接交给使用者；「静默按 0 分」的核心事实
+    两种分支下均原样保留。
     """
     warnings: List[str] = []
 
@@ -347,8 +353,10 @@ def _validate_scoring_vocab_coverage(record: DailyRecord) -> List[str]:
                 f"⚠️ 词表外措辞: {dim.chinese_name}（{dim.english_name}）指标 "
                 f"{indicator} 的值 {value!r} 未命中评分词表任何词条——"
                 f"该指标将被静默按 0 分（正常）计入评分与红线推断。"
-                f"这通常是模型措辞问题而非数据错误：请改用该指标的规范词"
-                f"（{'/'.join(rules)}）；若该值确为正常描述，可忽略本告警"
+                f"处置取决于该值的语义：若确为正常描述，0 分即正确结果，"
+                f"可忽略本告警；若意在描述异常表现，则属模型措辞问题而非数据错误，"
+                f"请改用该指标的规范词（{'/'.join(rules)}），"
+                f"否则异常将被静默漏判"
             )
     return warnings
 

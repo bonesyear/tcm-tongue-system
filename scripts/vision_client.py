@@ -19,9 +19,25 @@ WARN_PREFIX = "[vision_client][warn]"
 # 新配置一律用 VISION_API_KEY；使用其他厂商/本地模型的读者无需关心本常量。
 _LEGACY_KEY_NAMES = ("DASHSCOPE_API_KEY",)
 
+# 弃用提示去重状态：同一进程内每个变量名最多提示一次（高频调用
+# pipeline 不被同一提示刷屏；新进程重新提示，不会因去重永久沉默）。
+_legacy_warned: set = set()
+
+
+def _reset_legacy_warn_state():
+    """清空弃用提示去重状态（测试钩子：保证用例独立、与执行顺序无关）。"""
+    _legacy_warned.clear()
+
 
 def _warn_legacy_key(name):
-    """历史兼容 key 变量被实际使用时打一条 stderr 弃用提示（不影响功能）。"""
+    """历史兼容 key 变量被实际使用时打一条 stderr 弃用提示（不影响功能）。
+
+    模块级 once 去重：每进程每名只提示一次；测试用 _reset_legacy_warn_state()
+    显式重置，避免进程级状态在 pytest 单进程内造成用例间顺序依赖。
+    """
+    if name in _legacy_warned:
+        return
+    _legacy_warned.add(name)
     print(f"{WARN_PREFIX} 正在使用历史兼容变量 {name} 提供 API Key——功能正常，"
           f"但该变量仅为兼容保留，建议迁移到 VISION_API_KEY", file=sys.stderr)
 
