@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Hermes 隐私守卫（pre-push hook）
+#
+# 目的：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」。
+# 三层检查：
+#   ① 敏感词表（本地 .privacy-words，gitignored —— 因为词表里含真实姓名，不能进仓库）
+#   ② 凭证模式（sk-/ghp_/github_pat_/LTAI/AKLT/私钥头）
+#   ③ 真实凭证指纹（读 ~/.hermes/ 的 .env，取每个 KEY 值的前 14 字符在待推送内容中比对）
+#
+# 误报豁免：git push --no-verify（仅在已人工复核确认无害时使用）
+set -uo pipefail
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+WORDS_FILE="$REPO/.privacy-words"
+FAIL=0
+CHECKED=0
+
+# 取待推送内容里所有匹配（用指定 commit 的树，避免工作区干扰）
+scan_fixed() {  # $1=词  $2=commit
+  git grep -I -n -F -- "$1" "$2" -- . ':(exclude)scripts/hooks/*' 2>/dev/null | head -3
+}
+scan_regex() {  # $1=正则  $2=commit
+  git grep -I -n -E -- "$1" "$2" -- . ':(exclude)scripts/hooks/*' 2>/dev/null | head -5
+}
+
+# ① 敏感词表
+check_words() {
+  local commit="$1"
+  [ -f "$WORDS_FILE" ] || { echo "  (未找到 $WORDS_FILE，跳过敏感词检查)"; return; }
+  while IFS= read -r w; do
+    w="${w%$'\r'}"
+    [ -z "$w" ] && continue
+    case "$w" in \#*) continue ;; esac
+    local hits
+    hits="$(scan_fixed "$w" "$commit")"
+    if [ -n "$hits" ]; then
+      echo "  ❌ 敏感词「$w」命中："
+      echo "$hits" | sed 's/^/     /'
+      FAIL=1
+    fi
+  done < "$WORDS_FILE"
+}
+
+# ② 凭证模式
+check_patterns() {
+  local commit="$1"
+  local pat='sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|LTAI[A-Za-z0-9]{12,}|AKLT[A-Za-z0-9]{10,}|AIza[A-Za-z0-9_-]{30,}|xoxb-|BEGIN [A-Z ]*PRIVATE KEY'
+  local hits
+  hits="$(scan_regex "$pat" "$commit")"
+  if [ -n "$hits" ]; then
+    echo "  ❌ 疑似凭证模式命中："
+    echo "$hits" | sed 's/^/     /'
+    FAIL=1
+  fi
+}
+
+# ③ 真实凭证指纹（只比对前缀，不打印完整凭证）
+check_key_fingerprints() {
+  local commit="$1"
+  local envf
+  for envf in "$HOME/.hermes/.env" "$HOME/.hermes/profiles/tcm-tongue/.env"; do
+    [ -f "$envf" ] || continue
+    while IFS= read -r line; do
+      line="${line%$'\r'}"
+      case "$line" in ''|\#*) continue ;; esac
+      local var="${line%%=*}"
+      local val="${line#*=}"
+      val="${val%\"}"; val="${val#\"}"
+      val="${val%\'}"; val="${val#\'}"
+      # 只查 KEY/TOKEN/SECRET/ID 类变量，且值足够长
+      case "$var" in
+        *KEY*|*TOKEN*|*SECRET*|*_ID|*ID_*) ;;
+        *) continue ;;
+      esac
+      [ "${#val}" -ge 20 ] || continue
+      local frag="${val:0:14}"
+      local hits
+      hits="$(scan_fixed "$frag" "$commit")"
+      if [ -n "$hits" ]; then
+        echo "  ❌ 真实凭证指纹命中（变量 $var，前缀 ${frag:0:6}…）："
+        echo "$hits" | sed 's/^/     /'
+        FAIL=1
+      fi
+    done < "$envf"
+  done
+}
+
+echo "════════ Hermes 隐私守卫（pre-push）════════"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # stdin 已被 read 消费，后续子命令统一 </dev/null
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+  echo "▶ 检查 $local_ref → $remote_ref  ($local_sha)"
+  CHECKED=$((CHECKED+1))
+  check_words "$local_sha" </dev/null
+  check_patterns "$local_sha" </dev/null
+  check_key_fingerprints "$local_sha" </dev/null
+done
+echo "═══════════════════════════════════════════"
+
+if [ "$CHECKED" -eq 0 ]; then
+  echo "（没有需要检查的新提交）"
+  exit 0
+fi
+
+if [ "$FAIL" -eq 1 ]; then
+  cat <<'EOF'
+🚫 检测到隐私/凭证风险 —— push 已阻止。
+
+处置：
+  1) 若确认是误报（如术语、说明性文字），人工复核后用：git push --no-verify
+  2) 若确实是使用者信息/凭证：先清理该提交内容（amend 或新提交），再 push
+  3) 若已进入历史：见 skill「public-repo-privacy」的历史清理流程（filter-repo）
+EOF
+  exit 1
+fi
+
+echo "✅ 隐私守卫通过 —— 未发现使用者信息 / 凭证 / 真实凭证指纹"
+exit 0
