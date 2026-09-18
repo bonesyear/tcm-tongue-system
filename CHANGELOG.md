@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.4.4（视觉模型可移植性·文档与配置模板，2026-09-18）
+
+> 纯文档批次，零代码改动。目标：让非作者用户仅靠仓库文档即可完成视觉模型配置，并修掉全部已确认的文档漂移。
+
+### 改动
+
+- **新增 `.env.example`**：视觉模型配置模板（`VISION_MODEL` / `VISION_BASE_URL` / `VISION_API_KEY` 必填三件套 + `VISION_TEMPERATURE` / `VISION_MAX_TOKENS` / `VISION_TIMEOUT` 可选项），全部占位符、不含任何真实凭证；注释内嵌「设 0 ≠ 确定性输出（部分模型有官方下限、被服务端静默改写）」与「思考型模型建议 `VISION_MAX_TOKENS≥8000`」两条关键提示。
+- **README 新增「配置自己的视觉模型」章节**：变量表 + 换模型五步 checklist + 「换模型必须重新标定」声明（prompt 封闭词表与 `src/scoring.py` 评分词表逐键对齐，词表外措辞会被评分层**静默读作 0 分 = 正常**）。
+- **README 两处声明修正**：设计原则「LLM 无关」限定为「**框架层** LLM 无关」（`src/` 不绑定 provider；`vision_client.py` 按用户配置的端点发起调用）；隐私声明「本库不发起任何网络请求」修正为「`src/` 框架层不发起请求；`scripts/vision_client.py` 仅向用户自行配置的 `VISION_BASE_URL` 发送照片与 prompt」。
+- **文档抗漂移**：`docs/user-guide.md` 头部不再写死版本号与模型名，改为引用 `VERSION` / `CHANGELOG.md` / `.env.example` 单一事实源；README 顶部版本号同样改为引用 `VERSION`；`templates/adaptive_analysis_prompt.md` 去掉「Doubao 视觉模型」模型名，改为「视觉模型（OpenAI 兼容，可插拔）」。
+- **版本统一（4 处漂移）**：`VERSION`（1.3.4）、CHANGELOG 顶部（v1.4.3）、`README.md` 顶部（v1.4.0）、`docs/user-guide.md` 头部（v1.3.3）原四处不一致；本版统一为 **1.4.4**（README 与 user-guide 改为引用 `VERSION`，今后不再随版本迭代漂移）。
+
+### 测试
+
+- 无新增/无修改（纯文档）；全量 pytest 与 v1.4.3 基线一致（252 项全绿）。
+
 ## v1.4.3（识图采样稳定性处置：温度真相查明（视觉理解下限 0.6）+ 点刺退出评分层 + prompt 安全阀 + 腻腐封闭词表，2026-09-18）
 
 > 依据：同日 Qwen3.8-Max 采样稳定性实验（同一张真实舌照，三组各 3 次，共 9 次调用）——点刺 **9/9 判「有」** 而用户肉眼为「无」；temperature=0 下腻腐仍抖（3 次出 2 种结果）。
