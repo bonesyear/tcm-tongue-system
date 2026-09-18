@@ -262,19 +262,20 @@ def test_empty_records_report_structure():
     assert data["dimension_deviation_detail"] == {}
 
 
-# ---- 多维输出（mean/max/n）与趋势双门槛 ----
+# ---- 多维输出（score/max/n）与趋势双门槛 ----
 
 
 def test_compute_dimension_deviation_detail(real_raw):
-    """多维输出：每维度携带 mean/max/n，mean 与旧口径 compute_dimension_deviation 一致。"""
+    """多维输出：每维度携带 score/max/n，score 与旧口径 compute_dimension_deviation 一致。"""
     detail = g.compute_dimension_deviation_detail(real_raw)
     dev = g.compute_dimension_deviation(real_raw)
     assert set(detail.keys()) == set(dev.keys())
     for dim_cn, d in detail.items():
-        assert set(d.keys()) == {"mean", "max", "n"}
-        assert d["mean"] == dev[dim_cn]
+        assert set(d.keys()) == {"score", "max", "n"}
+        assert "mean" not in d
+        assert d["score"] == dev[dim_cn]
     # fixture 舌诊：齿痕 4 + 胖大 7 + 剥落 6 + 点刺 5 → 均值 5.5、最重单项 7、共 4 项异常
-    assert detail["舌诊"] == {"mean": 5.5, "max": 7.0, "n": 4}
+    assert detail["舌诊"] == {"score": 5.5, "max": 7.0, "n": 4}
 
 
 def test_describe_trend_dual_gate_allows_real_improvement():
@@ -331,12 +332,39 @@ def test_describe_trend_scalar_call_backward_compatible():
     assert g.describe_trend("齿痕程度", 4.0, 4.2) == "齿痕程度整体稳定（4.0 → 4.2）"
 
 
+def test_describe_trend_metric_name_default_verbatim_unchanged():
+    """metric_name 默认"均值"：旧调用（舌诊语义）逐字不变。"""
+    text = g.describe_trend("舌诊偏离度", 7.0, 2.0,
+                            first_max=5.0, last_max=5.0, first_n=2, last_n=5)
+    assert text == ("舌诊偏离度均值较周初降低5.0分，但最重单项未同步减轻"
+                    "（5 → 5 分），暂不判为好转（7.0 → 2.0）")
+
+
+def test_describe_trend_metric_name_non_tongue_wording():
+    """非舌维度传 metric_name="累计分"：不再把 sum 说成"均值"，
+    且不与 name 里的"偏离度"重复。"""
+    text = g.describe_trend("头面诊偏离度", 7.0, 2.0,
+                            first_max=5.0, last_max=5.0, first_n=2, last_n=5,
+                            metric_name="累计分")
+    assert text == ("头面诊偏离度累计分较周初降低5.0分，但最重单项未同步减轻"
+                    "（5 → 5 分），暂不判为好转（7.0 → 2.0）")
+    assert "均值" not in text
+
+
+def test_tongue_summary_phrase_verbatim_unchanged(real_raw):
+    """守卫：舌诊摘要文案逐字不变（键改名 mean→score 不得影响用户可见文案；
+    舌诊 score 确为均值，"均值"措辞原样保留）。"""
+    data = g.generate_weekly_report_data([real_raw])
+    assert "舌诊综合偏离度均值由 5.5 变化至 5.5（最重单项 7 分，共 4 项异常）" \
+        in data["summary"]
+
+
 def test_weekly_report_detail_keys_additive(real_raw):
-    """周报 JSON 纯增量加键：dimension_deviation_detail 含首末 mean/max/n，旧键不动。"""
+    """周报 JSON 纯增量加键：dimension_deviation_detail 含首末 score/max/n，旧键不动。"""
     data = g.generate_weekly_report_data([real_raw])
     detail = data["dimension_deviation_detail"]
-    assert detail["舌诊"]["first"] == {"mean": 5.5, "max": 7.0, "n": 4}
-    assert detail["舌诊"]["last"] == {"mean": 5.5, "max": 7.0, "n": 4}
+    assert detail["舌诊"]["first"] == {"score": 5.5, "max": 7.0, "n": 4}
+    assert detail["舌诊"]["last"] == {"score": 5.5, "max": 7.0, "n": 4}
     # 旧键一个不少
     for key in ("week_id", "start_date", "end_date", "daily_records_count",
                 "trend_analysis", "weekly_comparison", "summary",

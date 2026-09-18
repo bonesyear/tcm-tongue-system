@@ -505,3 +505,39 @@ K3 已对全部 13 个 map 做平局共现审计：仅两类场景（正常词+�
 - `EYE.redness` += 「血丝: 2」（补「轻度，可见少量血丝」漏判；3 字「红血丝: 3」仍靠最长匹配压过，既有行为不变）
 - `EAR.helix` += 「润泽: 0」（基线）、「略枯: 2」（补「尚润，略枯」轻度漏判）
 - **齿痕不收复合词**（「明显齿痕」「舌缘可见」会引入程度/老嫩混杂，同「胖嫩/瘦薄」先例）——走 prompt 规范化：`scripts/vision_client.py` 舌面 prompt 要求齿痕字段只填规范词（无/轻度/中度/重度）；既有 prompt 约定（键名固定、「舌质润燥」单值、不判荣枯、生理沟判定、胖瘦规范词）原样保留。
+
+
+---
+
+## 轮次 10：detail 字段改名 + describe_trend 措辞参数（2026-09-18）
+
+> 编号说明：用户任务书写的是「轮次 9」，但本文档轮次 9 已被「复审问题清单修复」占用，故本轮记为**轮次 10**。
+
+**问题**（KNOWN_ISSUES §4）：
+
+1. `compute_dimension_deviation_detail` 的键 `mean` 名不符实——非舌维度该值是 `score()` 的「各指标之和封顶 10」（实测手诊 `{'mean': 4.0, 'max': 2.0}`，mean > max 数学上矛盾），任何按「mean ≤ max」假设的下游都会误报。
+2. `describe_trend` 的降幅中性文案写死「{name}均值较周初降低…」——`_dim_trend` 服务五个非舌维度，把 sum 说成了「均值」（用户可见措辞错误）。
+
+**分析（C + A 组合，四路线对比后用户采纳）**：
+
+- 路线 A（措辞参数）：`describe_trend` 加 `metric_name` 参数，默认值 `"均值"` 保持旧调用逐字不变；`_dim_trend` 传新词。
+- 路线 B（按维度分支）：在 describe_trend 内按 name 判断维度——把维度知识泄进通用函数，否。
+- 路线 C（键改名）：`mean` → `score`，与 `score()` / `score_dimension` 命名对齐；无仓库外消费者，改名零风险。
+- 路线 D（额外加真均值字段）：为非舌维度再算一个均值——无消费场景，YAGNI，否。
+- 最终 = **C + A**。
+
+**用户决策（2026-09-18）**：豁免兼容（确认无仓库外流程读周报 JSON）；非舌维度措辞用词由 K3 定。选定 **`累计分`**：① 与 `name` 里的「偏离度」不重复（不能传「累计偏离度」，否则会拼成「头面诊偏离度累计偏离度」）；② 「累计」准确表达「各指标之和」；③ 「头面诊偏离度累计分较周初降低…」中文通顺。
+
+**落地清单**：
+
+1. `scripts/generate_weekly_report.py`：`compute_dimension_deviation_detail` 返回键 `mean` → `score`（含 docstring、趋势图取值、舌诊摘要三处键访问、注释共 10 处）；**舌诊用户可见文案「舌诊综合偏离度均值…」逐字保留**（舌诊该值确为 sparse 均值）。`describe_trend` 签名加 `metric_name: str = "均值"`，两条降幅中性文案 `f"{name}均值…"` → `f"{name}{metric_name}…"`；`_dim_trend` 传 `metric_name="累计分"`。`_metric_trend`（逐舌指标）永不触发该两条文案——两端都有观测时 `max` 恒等于标量值本身（first_max=first_val、last_max=last_val），改善方向必有 `max_drop = -delta ≥ 0.5` 且 n 恒为 1→1 不增，双门槛第一支必过，走「异常程度减轻」，不处理。
+2. 测试：`tests/test_weekly_report.py` 5 处键名同步（断言数值不变），新增 3 测试——`metric_name` 默认值逐字不变守卫 / 非舌维度「累计分」措辞逐字断言 / 舌诊摘要逐字守卫；`tests/test_scoring.py` 注释用词同步（该测试不红）。
+3. 文档：KNOWN_ISSUES §4 标记已解决；CHANGELOG 追加 v1.4.1（含 ⚠️ 结构变更提示）。
+
+**回归结论（实跑，2026-09-18）**：
+
+- **250 passed**（247+3）｜ruff `F,E722` 全过
+- **键名实测 ✅**：六维 detail 键集合均为 `{score, max, n}`，不含 `mean`
+- **舌诊文案逐字不变 ✅**：`舌诊综合偏离度均值由 5.5 变化至 5.5（最重单项 7 分，共 4 项异常）`
+- **非舌措辞 ✅**：五维度「降幅 + 门槛不通过」场景均输出「…偏离度累计分较周初降低…」，无「均值」；`describe_trend` 默认值逐字不变（旧调用零变化）
+- **双门槛零改动 ✅**：`describe_trend` 的 diff 仅签名 / docstring / 两条 f-string 措辞；`max_drop >= 0.5`、`last_n <= first_n` 等判定行未动
