@@ -1,6 +1,12 @@
 """Scoring module 测试：打分命中、误匹配不出现。"""
 from src.dimensions import VisionDimension
-from src.scoring import score, score_indicators
+from src.scoring import (
+    DIMENSION_RULES,
+    TONGUE_COATING_GREASY_MAP,
+    _match_score,
+    score,
+    score_indicators,
+)
 
 
 def test_tongue_score_positive_on_red_yellow():
@@ -27,10 +33,16 @@ def test_longest_match_avoids_ambiguity():
 
 def test_no_false_match_red_ruyang():
     # 戴阳「红如妆」应高分
-    assert score(VisionDimension.HEAD_FACE, "面色红如妆") == 9
+    # 轮次 8 起改用结构化 dict 入参（同轮次 3 test_tongue_score_sparse_not_diluted
+    # 的先例）：lip_color 新增裸「红:3」后，纯文本"面色红如妆"会被 lip_color
+    # 跨字段命中而 double-score——纯文本路径的已知局限（score() docstring 已载明），
+    # 生产路径（Record.get_observation）本就是结构化；断言期望值不变
+    assert score(VisionDimension.HEAD_FACE, {"face_color": "红如妆"}) == 9
     # 普通红润/正常不应误命中「红如妆」
-    assert score(VisionDimension.HEAD_FACE, "面色正常 红润有光泽") == 0
-    assert score(VisionDimension.HEAD_FACE, "面色红赤") == 0  # 头面诊未定义红赤规则
+    assert score(VisionDimension.HEAD_FACE,
+                 {"face_color": "正常", "lip_color": "红润", "face_luster": "有光泽"}) == 0
+    # face_color 未定义红赤规则（结构化入参下不受 lip_color 裸「红」干扰）
+    assert score(VisionDimension.HEAD_FACE, {"face_color": "红赤"}) == 0
 
 
 def test_negation_guard_on_edema():
@@ -353,11 +365,14 @@ def test_structured_input_avoids_cross_field_false_match():
 def test_non_tongue_score_mean_is_always_float():
     """轮次 5：非舌诊维度 score()（即周报 mean）恒为 float——
     round(int, 1) 在 Python 3 返回 int，曾让周报 JSON 出现
-    "mean": 0 与 "max": 0.0 并列。只改类型，数值语义不变（0 == 0.0）。"""
-    zero = score(VisionDimension.HEAD_FACE, "面色正常 红润有光泽")
+    "mean": 0 与 "max": 0.0 并列。只改类型，数值语义不变（0 == 0.0）。
+    轮次 8 起用结构化 dict 入参（lip_color 新增裸「红:3」后纯文本会
+    跨字段 double-score，纯文本路径的已知局限）；断言期望值不变。"""
+    zero = score(VisionDimension.HEAD_FACE,
+                 {"face_color": "正常", "lip_color": "红润"})
     assert isinstance(zero, float)
     assert zero == 0
-    positive = score(VisionDimension.HEAD_FACE, "面色红如妆")
+    positive = score(VisionDimension.HEAD_FACE, {"face_color": "红如妆"})
     assert isinstance(positive, float)
     assert positive == 9
 
@@ -392,3 +407,110 @@ def test_body_size_negation_guard():
                             {"body_size": "无明显偏胖"})["body_size"] == 0
     assert score_indicators(VisionDimension.TONGUE,
                             {"body_size": "偏胖不明显"})["body_size"] == 0
+
+
+# ============================================================
+# 轮次 8：跨维度词表补漏 + 档案数据约定（2026-09-18，分值用户签认）
+# ============================================================
+
+def test_body_color_danzi_scores_6_sublingual_isolated():
+    """舌质淡紫 = 血瘀轻/寒凝 = 异常（用户定 6，不是 7）；
+    同名异义隔离：sublingual_color 的「淡紫」仍为 0（舌下浅蓝紫 = 生理性正常），
+    两表独立，同一观测 dict 中互不干扰。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "淡紫"})["body_color"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "舌质淡紫"})["body_color"] == 6
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"sublingual_color": "淡紫"})["sublingual_color"] == 0
+    inds = score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "淡紫", "sublingual_color": "淡紫"})
+    assert inds["body_color"] == 6
+    assert inds["sublingual_color"] == 0
+
+
+def test_coating_thickness_new_terms():
+    """轮次 8 新增：薄=0（显式基线）、略厚=3、稍厚=3、偏厚=4；
+    不收缩裸「厚」（"苔不厚" 无命中归零）。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "薄"})["coating_thickness"] == 0
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "略厚"})["coating_thickness"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "稍厚"})["coating_thickness"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "偏厚"})["coating_thickness"] == 4
+    # 既有值不变：薄白最长匹配仍压过裸「薄」
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "薄白"})["coating_thickness"] == 0
+    # 裸「厚」不入表："苔不厚" 归零（不放大否定窗口边缘案例）
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_thickness": "苔不厚"})["coating_thickness"] == 0
+
+
+def test_coating_greasy_weini():
+    """微腻=2（中间态）；硬约束：微腻 ≤ 稍腻（3）。"""
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "微腻"})["coating_greasy"] == 2
+    assert TONGUE_COATING_GREASY_MAP["微腻"] <= TONGUE_COATING_GREASY_MAP["稍腻"]
+    # 既有值不变
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "稍腻"})["coating_greasy"] == 3
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"coating_greasy": "不腻"})["coating_greasy"] == 0
+
+
+def test_lip_color_shield_word_pair():
+    """盾牌词锁死：「淡红:0」与「红:3」必须成对——仅加「红:3」时
+    「淡红」会被裸「红」误判 3（实测）；成对落地后 淡红→0 / 红→3 / 淡红润→0。"""
+    rules = DIMENSION_RULES[VisionDimension.HEAD_FACE]["lip_color"]
+    without_shield = {k: v for k, v in rules.items() if k != "淡红"}
+    assert _match_score(without_shield, "淡红") == 3  # 反例：无盾牌词时误判
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "淡红"})["lip_color"] == 0
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "红"})["lip_color"] == 3
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "唇色偏红"})["lip_color"] == 3
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_color": "淡红润"})["lip_color"] == 0
+
+
+def test_lip_moisture_new_terms():
+    """轮次 8 新增：润=0、稍干=2、偏干=2、干燥=2；既有 燥裂/干枯=3 不变。"""
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "润"})["lip_moisture"] == 0
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "稍干"})["lip_moisture"] == 2
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "偏干"})["lip_moisture"] == 2
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "干燥"})["lip_moisture"] == 2
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "燥裂"})["lip_moisture"] == 3
+    assert score_indicators(VisionDimension.HEAD_FACE,
+                            {"lip_moisture": "干枯"})["lip_moisture"] == 3
+
+
+def test_palm_color_shield_word_pair():
+    """palm_color 同 lip_color：「淡红:0」盾牌词与「红:3」成对；
+    淡红偏白→0（淡红最长匹配压过红），既有 偏淡白→2 不变。"""
+    rules = DIMENSION_RULES[VisionDimension.HAND]["palm_color"]
+    without_shield = {k: v for k, v in rules.items() if k != "淡红"}
+    assert _match_score(without_shield, "淡红") == 3  # 反例：无盾牌词时误判
+    assert score_indicators(VisionDimension.HAND,
+                            {"palm_color": "淡红"})["palm_color"] == 0
+    assert score_indicators(VisionDimension.HAND,
+                            {"palm_color": "红"})["palm_color"] == 3
+    assert score_indicators(VisionDimension.HAND,
+                            {"palm_color": "淡红偏白"})["palm_color"] == 0
+    assert score_indicators(VisionDimension.HAND,
+                            {"palm_color": "偏淡白"})["palm_color"] == 2
+
+
+def test_no_bare_normal_keyword():
+    """长度压制反例锁死：任何评分表都不收裸「正常」词条——
+    「正常:0」+「红:3」并存时「正常偏红」会被最长匹配误判 0（实测）。"""
+    for dim_rules in DIMENSION_RULES.values():
+        for rules in dim_rules.values():
+            assert "正常" not in rules
