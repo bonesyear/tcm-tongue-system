@@ -48,8 +48,9 @@ def test_weekly_report_data_valid_output(real_raw):
     data = g.generate_weekly_report_data([real_raw])
     assert data["daily_records_count"] == 1
     assert data["start_date"] == "2026-06-25"
-    # 摘要应包含非零的舌诊偏离度数值（fixture：齿痕 4 + 胖大 7 → 均值 5.5）
-    assert "5.5" in data["summary"]
+    # 摘要应包含非零的舌诊偏离度数值（fixture：齿痕 4 + 胖大 7 + 剥落 6 → 均值 5.7；
+    # 点刺已退出评分层，2026-09-18）
+    assert "5.7" in data["summary"]
     # week_id 为 ISO 周格式（%G-W%V）
     assert re.fullmatch(r"\d{4}-W\d{2}", data["week_id"])
     # confidence 校验断言已写入
@@ -274,8 +275,9 @@ def test_compute_dimension_deviation_detail(real_raw):
         assert set(d.keys()) == {"score", "max", "n"}
         assert "mean" not in d
         assert d["score"] == dev[dim_cn]
-    # fixture 舌诊：齿痕 4 + 胖大 7 + 剥落 6 + 点刺 5 → 均值 5.5、最重单项 7、共 4 项异常
-    assert detail["舌诊"] == {"score": 5.5, "max": 7.0, "n": 4}
+    # fixture 舌诊：齿痕 4 + 胖大 7 + 剥落 6 → 均值 5.7、最重单项 7、共 3 项异常
+    # （点刺 5 已于 2026-09-18 退出评分层，不再计入）
+    assert detail["舌诊"] == {"score": 5.7, "max": 7.0, "n": 3}
 
 
 def test_describe_trend_dual_gate_allows_real_improvement():
@@ -355,7 +357,7 @@ def test_tongue_summary_phrase_verbatim_unchanged(real_raw):
     """守卫：舌诊摘要文案逐字不变（键改名 mean→score 不得影响用户可见文案；
     舌诊 score 确为均值，"均值"措辞原样保留）。"""
     data = g.generate_weekly_report_data([real_raw])
-    assert "舌诊综合偏离度均值由 5.5 变化至 5.5（最重单项 7 分，共 4 项异常）" \
+    assert "舌诊综合偏离度均值由 5.7 变化至 5.7（最重单项 7 分，共 3 项异常）" \
         in data["summary"]
 
 
@@ -363,8 +365,8 @@ def test_weekly_report_detail_keys_additive(real_raw):
     """周报 JSON 纯增量加键：dimension_deviation_detail 含首末 score/max/n，旧键不动。"""
     data = g.generate_weekly_report_data([real_raw])
     detail = data["dimension_deviation_detail"]
-    assert detail["舌诊"]["first"] == {"score": 5.5, "max": 7.0, "n": 4}
-    assert detail["舌诊"]["last"] == {"score": 5.5, "max": 7.0, "n": 4}
+    assert detail["舌诊"]["first"] == {"score": 5.7, "max": 7.0, "n": 3}
+    assert detail["舌诊"]["last"] == {"score": 5.7, "max": 7.0, "n": 3}
     # 旧键一个不少
     for key in ("week_id", "start_date", "end_date", "daily_records_count",
                 "trend_analysis", "weekly_comparison", "summary",
@@ -375,7 +377,7 @@ def test_weekly_report_detail_keys_additive(real_raw):
 def test_weekly_summary_shows_mean_max_n(real_raw):
     """摘要舌诊偏离度同时呈现均值/最重单项/异常项数三个数（中文可读）。"""
     data = g.generate_weekly_report_data([real_raw])
-    assert "舌诊综合偏离度均值由 5.5 变化至 5.5（最重单项 7 分，共 4 项异常）" \
+    assert "舌诊综合偏离度均值由 5.7 变化至 5.7（最重单项 7 分，共 3 项异常）" \
         in data["summary"]
 
 
