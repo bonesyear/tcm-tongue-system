@@ -199,7 +199,7 @@ def extract_tongue_metrics(record: Dict[str, Any]) -> Dict[str, float]:
     从单条 daily record 中提取舌象定量指标分数。
 
     通过 Record module 按维度取观测，再交由 Scoring module 按规范指标打分，
-    不再硬编码 doubao_vision_analysis / 舌诊 字段路径。
+    不再硬编码形状 A 容器键（历史名 doubao_vision_analysis，现名 vision_analysis）/ 舌诊 字段路径。
 
     参数:
         record: 单日诊断 JSON 记录（dict 或 DailyRecord）

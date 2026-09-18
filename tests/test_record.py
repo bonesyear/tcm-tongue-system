@@ -93,8 +93,9 @@ def test_all_dimensions_return_stable_structure(real_record):
         assert len(obs) > 0
 
 
-def test_shape_a_template_compatibility():
-    """形状 A（模板格式，doubao_vision_analysis 中文键）也能被解析。"""
+def test_shape_a_legacy_key_compat():
+    """旧名固件：形状 A 旧键 doubao_vision_analysis 永久兼容（历史档案
+    不迁移，读时双收即满足"历史不追溯"）。"""
     shape_a = {
         "date": "2026-01-01",
         "doubao_vision_analysis": {
@@ -113,6 +114,29 @@ def test_shape_a_template_compatibility():
     head = rec.get_observation(VisionDimension.HEAD_FACE)
     assert head["face_color"] == "萎黄"
     assert head["nose_bleeding"] == "无"
+
+
+def test_shape_a_new_key_wins_when_both_present():
+    """同一记录同时含新旧两键时取新名（钉死"新名优先"规则——
+    若被误实现为旧名优先，本测试立即失败）。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "绛红"}},
+        "diagnosis": {
+            "许家栋经方辨证": {"核心病机": "新名辨证"},
+            "方剂建议": {"主方": "新名方"},
+        },
+        "deepseek_diagnosis": {
+            "许家栋经方辨证": {"核心病机": "旧名辨证"},
+            "方剂建议": {"主方": "旧名方"},
+        },
+    })
+    assert rec.shape == "A"
+    tongue = rec.get_observation(VisionDimension.TONGUE)
+    assert tongue["body_color"] == "淡红"
+    assert rec.get_pattern_differentiation() == {"核心病机": "新名辨证"}
+    assert rec.get_formula() == {"主方": "新名方"}
 
 
 def test_unknown_dimension_raises():
@@ -139,7 +163,7 @@ def test_malformed_containers_do_not_crash():
         "date": "2026-01-01",
         "observations": "坏数据",
         "inquiry_coverage": "15/15",
-        "deepseek_diagnosis": "整段文本",
+        "diagnosis": "整段文本",
     })
     assert rec.get_covered_dimension_count() == 0
     assert rec.get_inquiry_coverage() == (0, 0)
@@ -178,31 +202,31 @@ def test_shape_a_body_luster_moisture_path():
     键名一致）；旧键"舌质荣枯"不再解析（历史记录实测全为形状 B，无影响）。"""
     rec = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质润燥": "润泽"}},
+        "vision_analysis": {"舌诊": {"舌质润燥": "润泽"}},
     })
     tongue = rec.get_observation(VisionDimension.TONGUE)
     assert tongue["body_luster"] == "润泽"
     old_key = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质荣枯": "荣润"}},
+        "vision_analysis": {"舌诊": {"舌质荣枯": "荣润"}},
     })
     assert old_key.get_observation(VisionDimension.TONGUE)["body_luster"] == ""
 
 
 def test_shape_a_pattern_differentiation_missing_key_returns_empty():
     """形状 A 缺"许家栋经方辨证"键时必须返回 {}，不得回落为整个
-    deepseek_diagnosis dict（否则无关字段污染辨证结果）。"""
+    diagnosis dict（否则无关字段污染辨证结果）。"""
     rec = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
-        "deepseek_diagnosis": {"综合辨证结论": "脾虚", "方剂建议": {}},
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "diagnosis": {"综合辨证结论": "脾虚", "方剂建议": {}},
     })
     assert rec.get_pattern_differentiation() == {}
     # 键存在时正常取值
     rec2 = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
-        "deepseek_diagnosis": {"许家栋经方辨证": {"核心病机": "脾虚"}},
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "diagnosis": {"许家栋经方辨证": {"核心病机": "脾虚"}},
     })
     assert rec2.get_pattern_differentiation() == {"核心病机": "脾虚"}
 
@@ -213,7 +237,7 @@ def test_shape_a_danger_flags_triggered():
     会让字符串 "true" 静默不触发，fail-open）。"""
     rec = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
         "danger_flags": {
             "daiyang": {"triggered": True, "finding": "面红如妆"},
             "skin_cold": {"triggered": False, "finding": ""},
@@ -223,7 +247,7 @@ def test_shape_a_danger_flags_triggered():
     # 字符串/数值真值同样触发
     rec2 = DailyRecord({
         "date": "2026-01-01",
-        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
         "danger_flags": {
             "daiyang": {"triggered": "true", "finding": "面红如妆"},
             "skin_cold": {"triggered": "yes", "finding": "肢冷"},

@@ -36,7 +36,8 @@ from .dimensions import VisionDimension, DIMENSIONS, from_english, from_chinese
 # ============================================================
 # 形状规范：每个维度的"规范指标"及其在形状 A / B / C 中的字段路径
 # ============================================================
-# 形状 A：模板/校验器期望的 doubao_vision_analysis.<中文维度>.<中文路径>
+# 形状 A：模板/校验器期望的 vision_analysis.<中文维度>.<中文路径>
+#         （旧名 doubao_vision_analysis 永久兼容，见 _A_VISION_KEYS）
 # 形状 B：真实记录的 observations.<英文维度>.<英文路径>
 # 形状 C：顶层直接用规范英文维度键（tongue/head_face/...，兼容别名
 #         face→head_face、palm→hand），维度下的指标键即规范指标名，
@@ -110,6 +111,19 @@ _C_DIMENSION_KEYS = frozenset(
 )
 # 形状 C 维度键别名 → 规范英文名
 _C_KEY_ALIASES = {"face": "head_face", "palm": "hand"}
+
+# 形状 A 容器键：新名优先，旧名永久兼容（历史档案不迁移，
+# 读时双收即满足"历史不追溯"原则）。新记录一律用新名。
+_A_VISION_KEYS = ("vision_analysis", "doubao_vision_analysis")
+_A_DIAGNOSIS_KEYS = ("diagnosis", "deepseek_diagnosis")
+
+
+def _first_present(raw: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
+    """按 keys 顺序取第一个存在的顶层键的值；都不存在返回 None。"""
+    for k in keys:
+        if k in raw:
+            return raw.get(k)
+    return None
 
 
 # 顶层必填字段 schema（数据驱动 validator 用）。
@@ -217,9 +231,10 @@ def _is_triggered(value: Any) -> bool:
 class DailyRecord:
     """一份望诊日报记录的规范化表示。
 
-    无论输入是形状 A（doubao_vision_analysis，中文键）、形状 B
-    （observations，英文键）还是形状 C（顶层规范英文维度键，兼容
-    别名 face/palm），对外都暴露统一的 interface。
+    无论输入是形状 A（vision_analysis，中文键；旧名
+    doubao_vision_analysis 永久兼容）、形状 B（observations，英文键）
+    还是形状 C（顶层规范英文维度键，兼容别名 face/palm），对外都暴露
+    统一的 interface。
     """
 
     def __init__(self, raw_json: Union[Dict[str, Any], str, bytes]):
@@ -232,12 +247,13 @@ class DailyRecord:
             raise TypeError(f"DailyRecord 不支持的类型: {type(raw_json).__name__}")
 
         # 形状探测（优先级 B > A > C > 默认 B）：
-        # B：真实记录，有 observations；A：模板，有 doubao_vision_analysis；
+        # B：真实记录，有 observations；A：模板，有 vision_analysis
+        #     （旧名 doubao_vision_analysis 同样判为 A，新名优先）；
         # C：自由格式，顶层直接含规范英文维度键（tongue/head_face/...，
         #     兼容别名 face/palm）
         if "observations" in self.raw:
             self._shape = "B"
-        elif "doubao_vision_analysis" in self.raw:
+        elif any(k in self.raw for k in _A_VISION_KEYS):
             self._shape = "A"
         elif _C_DIMENSION_KEYS & self.raw.keys():
             self._shape = "C"
@@ -256,7 +272,8 @@ class DailyRecord:
 
     @property
     def shape(self) -> str:
-        """当前记录被识别的形状：'A'（模板/中文键）、'B'（observations/英文键）
+        """当前记录被识别的形状：'A'（模板/中文键，vision_analysis，
+        旧名 doubao_vision_analysis 兼容）、'B'（observations/英文键）
         或 'C'（顶层规范英文维度键，兼容别名 face/palm）。"""
         return self._shape
 
@@ -274,7 +291,7 @@ class DailyRecord:
         处理——库层不崩,由 validator 的结构校验负责报错。
         """
         if self._shape == "A":
-            container = self.raw.get("doubao_vision_analysis")
+            container = _first_present(self.raw, _A_VISION_KEYS)
             key = dim.chinese_name
         elif self._shape == "C":
             container = self.raw
@@ -348,7 +365,8 @@ class DailyRecord:
         """取辨证结果。
 
         形状 B：pattern_differentiation；形状 C：pattern_update（别名）；
-        形状 A：deepseek_diagnosis.许家栋经方辨证。
+        形状 A：diagnosis.许家栋经方辨证（旧名 deepseek_diagnosis 永久兼容，
+        新名优先）。
         容器类型不对时返回空 dict（结构错误由 validator 报告）；
         形状 A 找不到辨证键时返回 {}，不得回落为整个 diagnosis dict
         （否则"综合辨证结论"等无关字段会污染辨证结果）。
@@ -357,7 +375,7 @@ class DailyRecord:
             if key in self.raw:
                 val = self.raw.get(key) or {}
                 return val if isinstance(val, dict) else {}
-        diag = self.raw.get("deepseek_diagnosis") or {}
+        diag = _first_present(self.raw, _A_DIAGNOSIS_KEYS) or {}
         if not isinstance(diag, dict):
             return {}
         return diag.get("许家栋经方辨证") or {}
@@ -366,14 +384,15 @@ class DailyRecord:
         """取方剂建议。
 
         形状 B：formula；形状 C：formula_adjust / formula_with_dosage（别名）；
-        形状 A：deepseek_diagnosis.方剂建议。
+        形状 A：diagnosis.方剂建议（旧名 deepseek_diagnosis 永久兼容，
+        新名优先）。
         正常返回 dict；formula 字段为非 dict（如整段方剂文本）时**原样返回**，
         交 has_formula_content 判定——安全检查不能因结构异常而放行。
         """
         for key in ("formula", "formula_adjust", "formula_with_dosage"):
             if key in self.raw:
                 return self.raw.get(key) or {}
-        diag = self.raw.get("deepseek_diagnosis") or {}
+        diag = _first_present(self.raw, _A_DIAGNOSIS_KEYS) or {}
         if not isinstance(diag, dict):
             return {}
         return diag.get("方剂建议", {}) or {}
