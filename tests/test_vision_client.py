@@ -67,9 +67,10 @@ def test_call_uses_mime_of_extension(monkeypatch, tmp_path, key):
     assert url.startswith("data:image/png;base64,")
 
 
-def test_call_payload_temperature_zero(monkeypatch, img, key):
-    """payload 固定 temperature=0（降低采样噪声；2026-09-18 实测收益幅度
-    未定量、temp=0 不等于消除抖动）。只改这一个变量：不加 seed/top_p。"""
+def test_call_payload_temperature(monkeypatch, img, key):
+    """payload 显式 temperature=0.6（qwen3.8-max 视觉理解的官方下限：0.6 以下
+    被服务端静默改为 0.6，故写 0 与不传参等价；显式 0.6 如实反映生效值，
+    不得表述为降噪）。只改这一个变量：不加 seed/top_p。"""
     seen = {}
 
     def capture(req, timeout=None):
@@ -78,7 +79,7 @@ def test_call_payload_temperature_zero(monkeypatch, img, key):
 
     monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
     vision_client.call(img, "prompt")
-    assert seen["body"]["temperature"] == 0
+    assert seen["body"]["temperature"] == 0.6
     assert "seed" not in seen["body"]
     assert "top_p" not in seen["body"]
 
