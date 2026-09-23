@@ -6,7 +6,7 @@
   python3 vision_client.py classify <img>              # 2a 部位分类
   python3 vision_client.py observe <img> <part-key>    # 2b 详细观察 (part-key 从 prompt_map 选)
 """
-import base64, json, os, socket, sys, time, urllib.error, urllib.request
+import base64, io, json, os, socket, sys, time, urllib.error, urllib.request
 
 USAGE = ("用法: vision_client.py classify <img> | "
          "vision_client.py observe <img> <part-key>")
@@ -42,6 +42,23 @@ def _warn_legacy_key(name):
           f"但该变量仅为兼容保留，建议迁移到 VISION_API_KEY", file=sys.stderr)
 
 
+def _read_env_text(p):
+    """读 .env 为文本。正常按 UTF-8 严格解码（不依赖平台默认编码——中文
+    Windows 默认 GBK，读含中文注释的 UTF-8 .env 会 UnicodeDecodeError 崩掉
+    load_key）；含非 UTF-8 字节时不静默吞掉：降级为替换字符（U+FFFD）并
+    在 stderr 打一条可行动告警（哪个文件、哪一字节、建议转 UTF-8）。
+    stdout JSON 契约与退出码不受影响（告警只走 stderr）。"""
+    with open(p, "rb") as f:
+        raw = f.read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as e:
+        print(f"{WARN_PREFIX} 读取 {p} 发生非 UTF-8 解码失败（{e}）——"
+              f"已按替换字符（U+FFFD）继续处理；该文件可能由其他编码（如 GBK）保存，"
+              f"建议转为 UTF-8", file=sys.stderr)
+        return raw.decode("utf-8", errors="replace")
+
+
 def load_key():
     # 优先级: 环境变量 VISION_API_KEY > 环境变量历史兼容名 > .env VISION_API_KEY > .env 历史兼容名
     env_key = os.environ.get("VISION_API_KEY", "")
@@ -61,22 +78,19 @@ def load_key():
               os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
               os.path.expanduser("~/.hermes/.env")]:
         try:
-            # 显式 UTF-8：不依赖平台默认编码（中文 Windows 默认 GBK，
-            # 读含中文注释的 UTF-8 .env 会 UnicodeDecodeError 崩掉 load_key）；
-            # errors="replace" 兜底非 UTF-8 文件——注释行乱码无害（会被跳过），
-            # ASCII 的 key/value 不受影响。
-            with open(p, encoding="utf-8", errors="replace") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" not in line:
-                        continue
-                    k, v = line.split("=", 1)
-                    k = k.strip()
-                    v = v.split("#", 1)[0].strip().strip('"').strip("'")
-                    if k not in keys and v:
-                        keys[k] = v
+            # StringIO(newline=None) 迭代与文本文件逐行迭代同语义
+            # （\n / \r\n / \r 均分行；默认 newline='\n' 不分 lone \r）。
+            for line in io.StringIO(_read_env_text(p), newline=None):
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.split("#", 1)[0].strip().strip('"').strip("'")
+                if k not in keys and v:
+                    keys[k] = v
         except FileNotFoundError:
             pass
     key = keys.get("VISION_API_KEY")

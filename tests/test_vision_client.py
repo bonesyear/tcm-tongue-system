@@ -437,3 +437,52 @@ def test_missing_key_error_message_vendor_neutral(monkeypatch, img, tmp_path):
     msg = str(e.value)
     assert "VISION_API_KEY" in msg
     assert "历史变量" in msg  # 旧变量仅以兼容说明的身份出现
+
+
+# ⑭ .env 读取编码：显式 UTF-8，不依赖平台默认编码（中文 Windows 默认 GBK，
+#     读含中文注释的 UTF-8 .env 曾直接 UnicodeDecodeError 崩掉 load_key）
+def test_load_key_utf8_env_with_chinese_comments(monkeypatch, tmp_path, capsys):
+    """含中文注释的 UTF-8 .env 不崩溃、key 能取到、无任何告警。
+
+    同时钉住「读取路径不得依赖平台默认编码」：用 open 间谍记录所有 .env 打开
+    方式，文本模式未显式指定 encoding 即为回归（locale 级 mock 在 UTF-8 模式
+    解释器上对 open() 无效，间谍观察是本环境可移植的模拟手段）。
+    """
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        "# 中文注释：视觉模型密钥，请勿提交\nVISION_API_KEY=sk-utf8-key\n",
+        encoding="utf-8")
+    _block_env_files(monkeypatch, tmp_path)
+
+    real_open = open
+    opens = []
+
+    def spy_open(file, mode="r", *args, **kwargs):
+        opens.append((str(file), mode, kwargs.get("encoding")))
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", spy_open)
+    assert vision_client.load_key() == "sk-utf8-key"
+    assert capsys.readouterr().err == ""
+    env_opens = [o for o in opens if o[0].endswith(".env")]
+    assert env_opens  # 确实读过 .env
+    for _f, mode, enc in env_opens:
+        assert "b" in mode or enc == "utf-8", \
+            f".env 读取依赖平台默认编码（{mode=}, {enc=}）"
+
+
+def test_load_key_non_utf8_bytes_warns_and_survives(monkeypatch, tmp_path, capsys):
+    """.env 含非 UTF-8 字节（如被 GBK 保存的中文注释）：不崩溃，stderr 打可行动
+    告警（哪个文件、非 UTF-8 解码失败、已按替换字符处理），ASCII key 仍取到。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    raw = "# 中文注释（GBK 保存）\nVISION_API_KEY=sk-gbk-key\n".encode("gbk")
+    (tmp_path / ".env").write_bytes(raw)
+    _block_env_files(monkeypatch, tmp_path)
+    assert vision_client.load_key() == "sk-gbk-key"
+    err = capsys.readouterr().err
+    assert vision_client.WARN_PREFIX in err
+    assert ".env" in err      # 告警说明是哪个文件
+    assert "非 UTF-8" in err  # 说明发生了非 UTF-8 解码失败
+    assert "U+FFFD" in err    # 说明已按替换字符处理

@@ -1,5 +1,19 @@
 # 更新日志
 
+## v1.4.14（Windows 兼容修复：.env 显式 UTF-8 读取 + grep 路径正斜杠统一，2026-09-23）
+
+> 修两处可移植性问题：① `load_key` 读 .env 原依赖平台默认编码，中文 Windows 默认 GBK，读含中文注释的 UTF-8 .env 会 `UnicodeDecodeError` 崩掉整个 key 加载；② `os.path.relpath` 在 Windows 返回反斜杠，命中路径与按 "/" 比较的消费者（含测试断言）跨平台不一致。**stdout JSON 契约、退出码、检索返回结构均不变**。
+
+### 改动
+
+- `scripts/vision_client.py` `load_key`：.env 读取改为「读原始 bytes → 严格 UTF-8 解码」，不再依赖平台默认编码；含非 UTF-8 字节时不静默吞掉——解码失败才降级为替换字符（U+FFFD）并在 stderr 打一条可行动告警（哪个文件、哪一字节失败、建议转 UTF-8），正常路径零告警、stdout 契约不变。
+- `src/retrieval/grep_search.py` `_relpath`：命中路径统一为正斜杠（`.replace(os.sep, "/")`），消除 Windows 下返回反斜杠的跨平台不一致；跨盘符 `ValueError` 仍原样返回传入路径，不抛异常。
+- README「跑测试」注释不再写死测试数量（数字会随开发腐烂），只保留「跑全部测试确认环境 OK」的意图。
+
+### 测试
+
+- 290 → **294 项**：vision_client +2（含中文注释的 UTF-8 .env 不崩溃且取到 key、并钉住「读取不得依赖平台默认编码」；非 UTF-8 字节 stderr 告警且 key 仍取到）；grep +2（模拟 `os.sep` 为反斜杠时 `_relpath` 统一正斜杠、跨盘符 `ValueError` 走 except 原样返回不抛异常）。fixture 均为纯合成内容。
+
 ## v1.4.13（词表覆盖校验 docstring 补充：封闭词表含 0 分基线词的语义说明，2026-09-19）
 
 > 同日另完成作者环境的 API Key 配置迁移（`VISION_API_KEY` 追加、旧变量保留，消除弃用提示）——属作者本地环境操作，文件在仓库外，不入库。**本版仓库内改动仅 docstring 一处：不改任何逻辑、文案与判据，`score()` 语义与评分词表分值不变**。
