@@ -61,7 +61,11 @@ def load_key():
               os.path.expanduser("~/.hermes/profiles/tcm-tongue/.env"),
               os.path.expanduser("~/.hermes/.env")]:
         try:
-            with open(p) as f:
+            # 显式 UTF-8：不依赖平台默认编码（中文 Windows 默认 GBK，
+            # 读含中文注释的 UTF-8 .env 会 UnicodeDecodeError 崩掉 load_key）；
+            # errors="replace" 兜底非 UTF-8 文件——注释行乱码无害（会被跳过），
+            # ASCII 的 key/value 不受影响。
+            with open(p, encoding="utf-8", errors="replace") as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith("#"):
