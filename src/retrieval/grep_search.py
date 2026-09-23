@@ -89,9 +89,12 @@ def _read_lines(path: str) -> list[str]:
 
 
 def _relpath(path: str, kb_root: str) -> str:
-    """相对 kb_root 的路径，便于阅读（如 formulas/formula-system.md）。"""
+    """相对 kb_root 的路径，便于阅读（如 formulas/formula-system.md）。
+
+    统一为正斜杠：os.path.relpath 在 Windows 返回反斜杠，会让下游
+    按 "/" 比较路径的消费者（含测试断言）跨平台不一致。"""
     try:
-        return os.path.relpath(path, kb_root)
+        return os.path.relpath(path, kb_root).replace(os.sep, "/")
     except ValueError:
         return path
 
