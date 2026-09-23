@@ -68,7 +68,7 @@ pip install -r requirements.txt   # matplotlib numpy（周报画图）+ Pillow�
 ### 跑测试
 
 ```bash
-python3 -m pytest tests/ -v       # 290 项，确认环境 OK（自带脱敏 fixture，开箱即跑）
+python3 -m pytest tests/ -v       # 跑全部测试，确认环境 OK（自带脱敏 fixture，开箱即跑）
 ```
 
 ### 作为库使用
