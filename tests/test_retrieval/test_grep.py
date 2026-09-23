@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from src.retrieval import grep_search
 from src.retrieval.grep_search import (
     search,
     search_and,
@@ -202,6 +203,31 @@ class TestEdgeCases:
         kb = tmp_path / "kb"
         kb.mkdir()
         assert search("anything", kb_root=str(kb)) == []
+
+
+# ============================================================
+# _relpath 跨平台一致性
+# ============================================================
+class TestRelpath:
+    """_relpath：命中路径统一为正斜杠（os.path.relpath 在 Windows 返回反斜杠，
+    会让按 "/" 比较路径的消费者跨平台不一致）。"""
+
+    def test_backslash_sep_normalized_to_forward_slash(self, monkeypatch):
+        """模拟 Windows：os.path.relpath 返回反斜杠分隔 → 统一替换为正斜杠。"""
+        monkeypatch.setattr(grep_search.os, "sep", "\\")
+        monkeypatch.setattr(grep_search.os.path, "relpath",
+                            lambda p, root: "formulas\\formula-system.md")
+        rel = grep_search._relpath("C:\\kb\\formulas\\formula-system.md", "C:\\kb")
+        assert rel == "formulas/formula-system.md"
+
+    def test_cross_drive_value_error_returns_original(self, monkeypatch):
+        """模拟 Windows 跨盘符：os.path.relpath 抛 ValueError → 原样返回传入
+        路径，不向调用方抛异常。"""
+        def _raise(p, root):
+            raise ValueError("path is on mount 'D:', start on mount 'C:'")
+        monkeypatch.setattr(grep_search.os.path, "relpath", _raise)
+        rel = grep_search._relpath("D:\\kb\\a.md", "C:\\kb")
+        assert rel == "D:\\kb\\a.md"
 
 
 # ============================================================
