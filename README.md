@@ -176,7 +176,7 @@ scripts/
   vision_client.py         # 识图统一入口（OpenAI 兼容视觉模型，可用环境变量插拔）
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
-tests/                     # 159 项 pytest（fixtures/ 内置脱敏样例记录）
+tests/                     # 294 项 pytest（fixtures/ 内置脱敏样例记录）
 knowledge_base/            # 经方体系知识库（含版权说明见其 README）
 docs/                      # 用户指南、架构分析、审查报告
 ```

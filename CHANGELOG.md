@@ -8,7 +8,7 @@
 
 - `scripts/vision_client.py` `load_key`：.env 读取改为「读原始 bytes → 严格 UTF-8 解码」，不再依赖平台默认编码；含非 UTF-8 字节时不静默吞掉——解码失败才降级为替换字符（U+FFFD）并在 stderr 打一条可行动告警（哪个文件、哪一字节失败、建议转 UTF-8），正常路径零告警、stdout 契约不变。
 - `src/retrieval/grep_search.py` `_relpath`：命中路径统一为正斜杠（`.replace(os.sep, "/")`），消除 Windows 下返回反斜杠的跨平台不一致；跨盘符 `ValueError` 仍原样返回传入路径，不抛异常。
-- README「跑测试」注释不再写死测试数量（数字会随开发腐烂），只保留「跑全部测试确认环境 OK」的意图。
+- README：①「跑测试」注释不再写死数量（数字会随开发腐烂），只保留「跑全部测试确认环境 OK」的意图；② 目录结构说明处 `tests/` 的数量同步为 294，与套件实测一致。
 
 ### 测试
 
