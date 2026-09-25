@@ -2,11 +2,17 @@
 # Hermes 隐私守卫（pre-push hook）
 #
 # 目的：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」，并强制版本一致性。
-# 四层检查：
+# 四层内容检查 + 一层提交信息检查：
 #   ① 敏感词表（本地 .privacy-words，gitignored —— 因为词表里含真实姓名，不能进仓库）
 #   ② 凭证模式（sk-/ghp_/github_pat_/LTAI/AKLT/私钥头）
 #   ③ 真实凭证指纹（读作者环境的多个 .env 路径，见下方 _ENV_FILES；取每个 KEY 值的前 14 字符在待推送内容中比对）
 #   ④ 版本一致性（VERSION 文件 ↔ CHANGELOG.md 最新条目；防「只改一处」的版本漂移）
+#   ⑤ 提交信息检查（commit message 里的敏感词/凭证模式）
+#
+# 为何需要 ⑤：①③ 都基于「快照」（git grep <词> <commit>），而 commit message
+# 不属于任何快照 —— 敏感词写在提交信息里可绕过全部快照检查。同理，
+# git filter-repo 的 --replace-text 只替换 blob 内容、不覆盖 message，
+# 历史清理时若漏加 --replace-message 会留下 message 残留。
 #
 # 误报豁免：git push --no-verify（仅在已人工复核确认无害时使用）
 set -uo pipefail
@@ -109,6 +115,50 @@ check_version_consistency() {
   fi
 }
 
+# ⑤ 提交信息检查（commit message 里的敏感词 / 凭证模式）
+# 只报告位置与规则长度，**不打印敏感词本身**（避免守卫日志成为新的泄露面）。
+check_messages() {
+  local commit="$1" remote="$2"
+  local range
+  if [ -n "$remote" ] && [ "$remote" != "0000000000000000000000000000000000000000" ]; then
+    range="$remote..$commit"
+  else
+    local root
+    root="$(git rev-list --max-parents=0 "$commit" 2>/dev/null | tail -1)"
+    range="${root:+$root..}$commit"
+  fi
+
+  # 用临时文件而非 shell 变量：实测「变量 + printf | grep」对大段 UTF-8 文本
+  # 会漏命中（同一内容写成文件则命中），故此处一律走文件。
+  local tmp
+  tmp="$(mktemp)"
+  git log --format='%B' "$range" > "$tmp" 2>/dev/null || true
+  if [ ! -s "$tmp" ]; then rm -f "$tmp"; return; fi
+
+  # ① 敏感词
+  if [ -f "$WORDS_FILE" ]; then
+    while IFS= read -r w; do
+      w="${w%$'\r'}"
+      [ -z "$w" ] && continue
+      case "$w" in \#*) continue ;; esac
+      if grep -qF -- "$w" "$tmp"; then
+        echo "  ❌ 提交信息含敏感词（规则长度 ${#w}，词本身不打印）—— 命中位置："
+        grep -nF -- "$w" "$tmp" | cut -d: -f1 | head -3 | sed 's/^/     提交信息第 /;s/$/ 行/'
+        FAIL=1
+      fi
+    done < "$WORDS_FILE"
+  fi
+
+  # ② 凭证模式
+  local pat='sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|LTAI[A-Za-z0-9]{12,}|AKLT[A-Za-z0-9]{10,}|AIza[A-Za-z0-9_-]{30,}|xoxb-|BEGIN [A-Z ]*PRIVATE KEY'
+  if grep -qE -- "$pat" "$tmp"; then
+    echo "  ❌ 提交信息含疑似凭证模式"
+    FAIL=1
+  fi
+
+  rm -f "$tmp"
+}
+
 echo "════════ Hermes 隐私守卫（pre-push）════════"
 while read -r local_ref local_sha remote_ref remote_sha; do
   # stdin 已被 read 消费，后续子命令统一 </dev/null
@@ -119,6 +169,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   check_patterns "$local_sha" </dev/null
   check_key_fingerprints "$local_sha" </dev/null
   check_version_consistency "$local_sha" </dev/null
+  check_messages "$local_sha" "$remote_sha" </dev/null
 done
 echo "═══════════════════════════════════════════"
 
