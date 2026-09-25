@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.4.15（隐私加固：历史敏感词清理 + 守卫新增提交信息检查，2026-09-25）
+
+> 三项：① 用 `git filter-repo` 清理全历史里的敏感词残留；② pre-push 守卫新增第 ⑤ 层「提交信息检查」，堵住 commit message 可绕过快照检查的缺口；③ 修 README 隐私声明「最后更新」日期漂移。**代码行为、stdout 契约、测试全部不变**。
+
+### 改动
+
+- **历史清理**：`git filter-repo --replace-text` + `--replace-message`，84 个 commit 全部重写。清理前命中 6 条规则 / 19 次；清理后 `main`、`--all`、`--reflog` 三个范围均 0 命中。**所有旧 commit SHA 已作废**——已 clone 的人需重新 clone。
+- `scripts/hooks/pre-push`：新增第 ⑤ 层 `check_messages`。原四层全部基于「快照」（`git grep <词> <commit>`），而 commit message 不属于任何快照，敏感词写在提交信息里可绕过全部检查。新层对推送范围内的 message 做敏感词 + 凭证模式检查，**只报告命中位置与规则长度、不打印词本身**（避免守卫日志成为新的泄露面）。
+  - 实现注意：用临时文件而非 shell 变量。实测「shell 变量 + `printf | grep`」对约 36k 字符的 UTF-8 文本会漏命中，同一内容写成文件则命中。
+- `README.md` 隐私声明「最后更新」：`2026-08-28` → `2026-09-25`（v1.4.9 已于 2026-09-18 实质修订该声明，日期未同步）。
+
+### 测试
+
+- 294 项全通过（历史重写后复跑）。
+- 守卫第 ⑤ 层经「造探针 commit → 跑守卫 → `reset --mixed` 回滚」实测：message 含敏感词时守卫以退出码 1 阻断。
+
 ## v1.4.14（Windows 兼容修复：.env 显式 UTF-8 读取 + grep 路径正斜杠统一，2026-09-23）
 
 > 修两处可移植性问题：① `load_key` 读 .env 原依赖平台默认编码，中文 Windows 默认 GBK，读含中文注释的 UTF-8 .env 会 `UnicodeDecodeError` 崩掉整个 key 加载；② `os.path.relpath` 在 Windows 返回反斜杠，命中路径与按 "/" 比较的消费者（含测试断言）跨平台不一致。**stdout JSON 契约、退出码、检索返回结构均不变**。
