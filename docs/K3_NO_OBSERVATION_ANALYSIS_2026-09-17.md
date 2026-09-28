@@ -1,4 +1,6 @@
 kimi version 2.0.0
+
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
 • Let me analyze the code. I need to read src/scoring.py, src/record.py, scripts/generate_weekly_report.py, and check records/daily data. Let me do this efficiently — read key files in parallel.2026-06-25
 2026-06-25_analysis.json
 2026-06-29

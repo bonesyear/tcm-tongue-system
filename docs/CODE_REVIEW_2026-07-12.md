@@ -1,5 +1,7 @@
 # 代码审查报告:优化建议 · 风险识别 · Bug 清单
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
 > 审查日期:2026-07-12 | 审查范围:全部源码(src/、scripts/)、测试(tests/)、模板(templates/)、文档(docs/、README、CHANGELOG)、知识库元数据
 > 审查方法:全量通读 + 在本机(macOS, Python 3.12)实际运行测试与复现验证
 > **本报告只做分析,未改动任何代码。等你确认后按第五节顺序修复。**
@@ -151,7 +153,7 @@
    - knowledge_base/README.md 目录树补 `jingfang_tanyuan_full.md` 与 `synonym_map.yaml`;
    - retrieval-design.md 与 grep_search docstring 的"1752 行"改为现状(~10800 行)并重新评估"亚毫秒"结论(实测 grep 单查询仍在几十 ms 量级,可接受,但应如实记录)。
 7. **周报小优化**:`generate_weekly_report_data` 与 `_check_confidence_for_records` 对同一条记录重复构造 `DailyRecord` 多次,可传一次构造的实例;趋势描述只比首末两天,建议注明或改用线性拟合斜率。
-8. **prompt 模板**:§1.1 "经典经方(经典经方)教授"重复笔误;建议按风险 F 增加数据/指令隔离条款。
+8. **prompt 模板**:§1.1 原存在「同名重复」式笔误（该笔误已随框架名去名化一并修正）;建议按风险 F 增加数据/指令隔离条款。
 
 ---
 

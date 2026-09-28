@@ -1,5 +1,7 @@
 [去名化说明 · 2026-09-28 追加] 本文档为 2026-09-17 的历史审计记录（Kimi Code CLI 原始输出）。文中的框架名（原以一位当代中医学者的姓名命名）已统一替换为「经方六经辨证」，除此之外内容未作任何改动。
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
 kimi version 2.0.0
 • This is a substantial read-only audit task. I should delegate deep investigation to subagents, but I need to understand the codebase enough first. The task asks for sections ①-④ with file:line evidence and test outputs. Given the complexity, I could do it myself or delegate. The repo is small enough — let me look at key files directly. Key files: src/record.py, src/scoring.py, src/dimensions.py, src/confidence.py, scripts/generate_weekly_report.py, scripts/vision_client.py, scripts/input_validator.py, tests.
 
@@ -42,8 +44,8 @@ ef2f40a fix(round2): 辨证层修复6条 + 方案A落地10项 + #19平局取高�
 311fa3a docs: 决策'老档案不用在意'(评分口径扩展不追溯/不标注趋势断点)
 bf3fd71 docs: K3评分层意见归档 + 轮次3(评分覆盖扩展)入档 + 更正coating_thickness已有规则
 5b37335 docs: C档案端到端实测发现两问题(同长度关键词低估湿盛/剥落斑无评分规则)
-3711410 feat(record): 形状C支持 — 顶层规范英文维度键档案可被解析(0/6→6/6)
-728514c docs: ⑤历史迁移决策=不做(C只对新档案生效,旧档保留原样)
+b2bd87c feat(record): 形状C支持 — 顶层规范英文维度键档案可被解析(0/6→6/6)
+fc69d6f docs: ⑤历史迁移决策=不做(C只对新档案生效,旧档保留原样)
 commit ef2f40aa0cf76ed421bd5069dff4de82af12e5bf
 Author: bonesyear <199043401+bonesyear@users.noreply.github.com>
 Date:   Thu Sep 17 21:13:15 2026 +0800

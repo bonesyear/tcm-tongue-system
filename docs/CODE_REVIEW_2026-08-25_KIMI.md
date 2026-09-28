@@ -1,5 +1,7 @@
 • # 完整代码审查与修改规划文档
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
   > 审查范围：`scripts/vision_qwen.py`、`src/confidence.py`、`src/record.py`、`src/scoring.py`、`tests/`。  
   > 审查纪律：编码规范/Fowler 坏味道 + 功能忠实度 + ponytail + karpathy-guidelines。  
   > 未修改任何文件，未执行 git 操作。
@@ -274,7 +276,7 @@ To resume this session: kimi -r session_1107b89d-3ddd-4113-9dde-5e13b0ea967e
 
 ## 增量确认补充（2026-08-25，kimi 复审 vision_qwen.py 配置化改造后）
 
-**审查对象**：commit bc2facc（MODEL/URL → VISION_MODEL/VISION_BASE_URL 环境变量，load_key 重构 VISION_API_KEY > DASHSCOPE_API_KEY）
+**审查对象**：commit 6465204（MODEL/URL → VISION_MODEL/VISION_BASE_URL 环境变量，load_key 重构 VISION_API_KEY > DASHSCOPE_API_KEY）
 
 **确认结论（经本地实测校准）**：
 1. ✅ 新问题 A：load_key 两个循环重复读 .env —— 建议抽成"读一次→按优先级取"

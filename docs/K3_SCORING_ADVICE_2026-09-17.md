@@ -1,6 +1,8 @@
 kimi version 2.0.0
 • Read-only analysis task. Need to read src/scoring.py and docs/REPAIR_PLAN_2026-08-25.md. Let me read the key files.Now let me check dimensions.py _DIMENSION_INDICATORS to list the 17 tongue indicators, and glance at tests/test_scoring.py for regression risk. Also maybe knowledge_base for clinical scoring references. Let me read dimensions.py.Now find _DIMENSION_INDICATORS — it's in record.py probably. Let me grep.Now I have the full 18 tongue indicators (17 listed + body_luster; actually count: body_color, body_luster, body_size, petechiae, tooth_marks, fissure, prickles, body_dynamics, coating_color, coating_thickness, coating_moisture, coating_greasy, coating_peeling, coating_distribution, sublingual_color, sublingual_thickness, sublingual_varicosity, sublingual_petechiae = 18). User said 17 tongue indicators; maybe excluding body_luster. Fine.
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
   Also check test count and test_scoring to assess regression risk briefly. Also check weekly report usage of TONGUE_RADAR_METRIC_KEYS. Probably enough. Let me quickly check tests for _match_score edge cases to gauge regression risk for "take highest score on tie".I now have everything I need. Let me do a quick sanity audit of "tie → highest score" across all maps to answer ① rigorously.
 
   For each indicator's rules dict, check whether two same-length keywords can co-occur in one observation text where picking highest score would be wrong:

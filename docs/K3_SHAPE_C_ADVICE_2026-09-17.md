@@ -1,6 +1,8 @@
 kimi version 2.0.0
 • This is a read-only analysis task. I need to examine the relevant files: src/record.py, src/scoring.py, scripts/vision_client.py, scripts/input_validator.py, docs/REPAIR_PLAN_2026-08-25.md, and some records/daily files. That's a fair amount of exploration. I could delegate, but I need precise details (line numbers, negation guards in scoring). Let me read key files myself — record.py is central (~300 lines?), scoring.py, and peek at a sample archive file. Also the repair plan doc.
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
   Let me do parallel reads.Now I need to look at actual archive files to see the real structure of shape C candidates, especially 2026-08-28_analysis.json, and the two styles. Also check vision_client.py output format, input_validator.py usage of SCHEMA, confidence.py briefly, and generate_weekly_report.py usage. Let me look at a few archive files and the validator.2026-08-03_sm_img2.jpg
 2026-08-03_sm_img3.jpg
 2026-08-03_sm_img4.jpg
