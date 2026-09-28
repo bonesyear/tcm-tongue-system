@@ -1,6 +1,8 @@
 kimi version 2.0.0
 • The user wants a read-only analysis. I need to read src/scoring.py (around lines 300-330), scripts/generate_weekly_report.py, src/confidence.py, and look at records/daily/*.json real data. Let me explore.
 
+> ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
+
   This is an analysis task — I could delegate exploration, but the analysis itself needs me to reason. Let me read the key files directly, plus look at real record data. records/ is not in git but the files exist locally (charts reference 2026-08-28, and the example file records/daily/2026-08-28_analysis.json exists).
 
   Let me start reading files in parallel.
