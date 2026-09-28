@@ -1,3 +1,5 @@
+[去名化说明 · 2026-09-28 追加] 本文档为 2026-09-17 的历史审计记录（Kimi Code CLI 原始输出）。文中的框架名（原以一位当代中医学者的姓名命名）已统一替换为「经方六经辨证」，除此之外内容未作任何改动。
+
 kimi version 2.0.0
 • This is a substantial read-only audit task. I should delegate deep investigation to subagents, but I need to understand the codebase enough first. The task asks for sections ①-④ with file:line evidence and test outputs. Given the complexity, I could do it myself or delegate. The repo is small enough — let me look at key files directly. Key files: src/record.py, src/scoring.py, src/dimensions.py, src/confidence.py, scripts/generate_weekly_report.py, scripts/vision_client.py, scripts/input_validator.py, tests.
 
