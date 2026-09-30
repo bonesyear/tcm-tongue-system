@@ -7,12 +7,24 @@
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/base.css">
 <style>
-  .chart { width: 100%; height: 340px; }
-  .chart.tall { height: 300px; }
+  /* 页面节奏：所有区块统一 20px 间距 */
+  .stack { display: grid; gap: var(--gap); }
+
+  .chart { width: 100%; height: 320px; }
+  .chart.tall { height: 330px; }
+
+  /* 图表卡头：标题 + 数据源说明，等高对齐 */
+  .chart-head { min-height: 30px; }
+
   .trend-row { padding: 8px 10px; border-radius: 8px; display: grid; grid-template-columns: 132px 1fr; gap: 12px; }
   .trend-row:nth-child(odd) { background: rgba(245,240,230,.55); }
   .trend-row .k { color: var(--ink-2); font-size: 13.5px; }
   .cmp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cmp-col .cmp-label { font-size: 12.5px; letter-spacing: .1em; color: var(--ink-2); margin-bottom: 8px; }
+
+  /* 周导航：三个控件视觉等高 */
+  .week-nav { display: flex; align-items: stretch; gap: 8px; }
+  .week-nav .tag { display: inline-flex; align-items: center; padding: 5px 14px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -39,7 +51,7 @@
   </div>
 </header>
 
-<main class="page">
+<main class="page stack">
 
   <div class="row">
     <div>
@@ -47,28 +59,28 @@
       <p class="page-sub num" id="week-range"></p>
     </div>
     <span class="spacer"></span>
-    <button class="btn btn-ghost btn-sm">‹ 上一周</button>
-    <span class="tag cinnabar num" id="week-id"></span>
-    <button class="btn btn-ghost btn-sm">下一周 ›</button>
+    <div class="week-nav">
+      <button class="btn btn-ghost btn-sm">‹ 上一周</button>
+      <span class="tag cinnabar num" id="week-id"></span>
+      <button class="btn btn-ghost btn-sm">下一周 ›</button>
+    </div>
   </div>
-
-  <div style="height: 22px"></div>
 
   <!-- 周摘要 -->
   <div class="card">
     <div class="card-head"><h2>本周摘要</h2></div>
-    <p style="margin: 0 0 14px;" id="summary"></p>
-    <div class="grid cols-3">
-      <div>
-        <div class="group-label muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">好转指标</div>
+    <p style="margin: 0 0 16px;" id="summary"></p>
+    <div class="grid cols-3" style="gap: 16px;">
+      <div class="cmp-col">
+        <div class="cmp-label">好转指标</div>
         <div class="cmp-chips" id="cmp-better"></div>
       </div>
-      <div>
-        <div class="muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">恶化指标</div>
+      <div class="cmp-col">
+        <div class="cmp-label">恶化指标</div>
         <div class="cmp-chips" id="cmp-worse"></div>
       </div>
-      <div>
-        <div class="muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">稳定指标</div>
+      <div class="cmp-col">
+        <div class="cmp-label">稳定指标</div>
         <div class="cmp-chips" id="cmp-stable"></div>
       </div>
     </div>
@@ -77,18 +89,18 @@
   <!-- 图：六维偏离度 + 舌象雷达 -->
   <div class="grid cols-2">
     <div class="card">
-      <div class="card-head"><h2>六维偏离度</h2><span class="muted" style="font-size:12.5px;">compute_dimension_deviation() · 0–10</span></div>
+      <div class="card-head chart-head"><h2>六维偏离度</h2><span class="muted" style="font-size:12.5px;">compute_dimension_deviation() · 0–10</span></div>
       <div class="chart" id="chart-dims"></div>
     </div>
     <div class="card">
-      <div class="card-head"><h2>舌象雷达</h2><span class="muted" style="font-size:12.5px;">extract_tongue_metrics() · 首末对照</span></div>
+      <div class="card-head chart-head"><h2>舌象雷达</h2><span class="muted" style="font-size:12.5px;">extract_tongue_metrics() · 首末对照</span></div>
       <div class="chart" id="chart-radar"></div>
     </div>
   </div>
 
   <!-- 图：舌象九轴热力 -->
   <div class="card">
-    <div class="card-head"><h2>舌象九轴 × 逐日</h2><span class="muted" style="font-size:12.5px;">颜色越深偏离越大；斜纹位 = 无观测</span></div>
+    <div class="card-head"><h2>舌象九轴 × 逐日</h2><span class="muted" style="font-size:12.5px;">颜色越深偏离越大；空白位 = 无观测</span></div>
     <div class="chart tall" id="chart-heat"></div>
   </div>
 
@@ -128,11 +140,12 @@ fill("cmp-better", cmp["好转指标"], "ok", "本周无");
 fill("cmp-worse", cmp["恶化指标"], "cinnabar", "本周无");
 fill("cmp-stable", cmp["稳定指标"], "", "本周无");
 
-/* 六维偏离度折线 */
+/* 六维偏离度折线：图例单行圆点，与雷达图例同高对齐 */
 echarts.init(document.getElementById("chart-dims")).setOption({
   color: ["#b0442a", "#b05e21", "#9a7b2d", "#4d7c58", "#6f6558", "#a2937f"],
-  grid: { left: 40, right: 16, top: 36, bottom: 28 },
-  legend: { top: 0, textStyle: { color: INK2, fontSize: 12 }, itemWidth: 14 },
+  grid: { left: 40, right: 16, top: 42, bottom: 28 },
+  legend: { top: 2, left: "center", icon: "circle", itemWidth: 9, itemHeight: 9,
+            itemGap: 14, textStyle: { color: INK2, fontSize: 12 } },
   tooltip: { trigger: "axis" },
   xAxis: { type: "category", data: MOCK_WEEK.dates, axisLine: { lineStyle: { color: LINE } }, axisLabel: { color: INK2 } },
   yAxis: { type: "value", max: 10, splitLine: { lineStyle: { color: LINE } }, axisLabel: { color: INK2 } },
@@ -143,13 +156,14 @@ echarts.init(document.getElementById("chart-dims")).setOption({
   })),
 });
 
-/* 舌象雷达：首日 vs 末日 */
+/* 舌象雷达：首日 vs 末日（图例与折线图同款式同高度） */
 echarts.init(document.getElementById("chart-radar")).setOption({
   color: ["#a2937f", "#b0442a"],
-  legend: { top: 0, data: ["周首日", "周末日"], textStyle: { color: INK2, fontSize: 12 } },
+  legend: { top: 2, left: "center", icon: "circle", itemWidth: 9, itemHeight: 9,
+            itemGap: 14, data: ["周首日", "周末日"], textStyle: { color: INK2, fontSize: 12 } },
   radar: {
     indicator: MOCK_WEEK.radarAxes.map(a => ({ name: a, max: 10 })),
-    radius: "62%", center: ["50%", "56%"],
+    radius: "60%", center: ["50%", "58%"],
     axisName: { color: INK2, fontSize: 12, fontFamily: PAPER_FONT },
     splitArea: { areaStyle: { color: ["rgba(245,240,230,.4)", "rgba(255,253,249,.6)"] } },
     splitLine: { lineStyle: { color: LINE } },
@@ -177,12 +191,13 @@ echarts.init(document.getElementById("chart-radar")).setOption({
     }
   }
   echarts.init(document.getElementById("chart-heat")).setOption({
-    grid: { left: 90, right: 20, top: 10, bottom: 56 },
+    grid: { left: 96, right: 24, top: 14, bottom: 64 },
     tooltip: {},
     xAxis: { type: "category", data: MOCK_WEEK.dates, axisLabel: { color: INK2 }, axisLine: { lineStyle: { color: LINE } } },
     yAxis: { type: "category", data: axes, axisLabel: { color: INK2, fontFamily: PAPER_FONT }, axisLine: { lineStyle: { color: LINE } } },
     visualMap: {
-      min: 0, max: 10, orient: "horizontal", left: "center", bottom: 0,
+      min: 0, max: 10, orient: "horizontal", left: "center", bottom: 6,
+      itemWidth: 12, textGap: 8,
       textStyle: { color: INK2, fontSize: 12 },
       inRange: { color: ["#f5f0e6", "#e8dcc8", "#d9bfa0", "#c98d63", "#b0442a"] },
     },
