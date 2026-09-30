@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>单日详情 · 六维望诊</title>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/base.css">
+<style>
+  .dim-card h3 { font-size: 17px; letter-spacing: 0.06em; }
+  .group-name {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    letter-spacing: 0.14em;
+    margin: 12px 4px 4px;
+    font-family: var(--font-serif);
+  }
+  .field-row .edit {
+    opacity: 0;
+    border: none;
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+  }
+  .field-row:hover .edit { opacity: 1; }
+  .field-row .edit:hover { color: var(--cinnabar); }
+  .field-row .ref {
+    font-size: 12px;
+    color: var(--ink-3);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-pill);
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  /* 编辑态演示行 */
+  .field-row.editing { background: var(--cinnabar-tint); }
+  .field-row.editing .v input {
+    width: 100%;
+    padding: 5px 9px;
+    border: 1px solid var(--cinnabar);
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .photos-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .diag-views { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .diag-view {
+    background: var(--card-sunken);
+    border-radius: var(--radius-inner);
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .diag-view .k { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.1em; }
+  .diag-view .v { font-family: var(--font-serif); font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .herbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; margin-top: 10px; }
+  .herb {
+    display: flex; justify-content: space-between;
+    background: var(--card-sunken);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13.5px;
+  }
+  .herb b { font-family: var(--font-serif); }
+  .herb span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="index.html" class="active">记录</a>
+      <a href="trends.html">趋势</a>
+      <a href="wizard.html">拍照</a>
+      <a href="settings.html">设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <p style="margin: 0 0 10px;"><a href="index.html">‹ 返回记录列表</a></p>
+
+  <div class="card">
+    <div class="row wrap">
+      <div>
+        <h1 class="page-title num">2026 年 6 月 25 日 <span style="font-size:16px; color:var(--ink-2); font-weight:400;">星期四</span></h1>
+        <div class="row wrap" style="margin-top: 8px; gap: 8px;">
+          <span class="tag ok">覆盖 6 / 6 维</span>
+          <span class="tag">置信度 HIGH</span>
+          <span class="tag">v1.5.0</span>
+        </div>
+      </div>
+      <span class="spacer"></span>
+      <div class="scoreline" style="min-width: 260px;">
+        <span class="muted" style="font-size:13px;">总偏离度</span>
+        <span class="badge lg sev-4 num">24.7 / 60</span>
+        <div class="scorebar"><i class="sev-4" style="width:41.2%"></i></div>
+      </div>
+      <button class="btn btn-ghost">✎ 修正观察值</button>
+    </div>
+  </div>
+
+  <!-- 安全红线：未触发态 -->
+  <div class="card" style="display:flex; align-items:center; gap:12px; padding:14px 22px;">
+    <i class="dot sev-0"></i>
+    <span>今日九项安全红线<strong style="color:var(--sev-0);">均未触发</strong></span>
+    <span class="faint" style="font-size:12.5px;">戴阳 · 肤冷脉微 · 大肉已脱 · 舌体强硬 · 舌象危重 · 镜面舌 · 急性黄疸 · 中风重症 · 狐惑重症</span>
+  </div>
+
+  <!-- 六维卡片 -->
+  <div class="grid cols-2" id="dims" style="margin-top: var(--gap);"></div>
+
+  <!-- 原图对照 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>原图对照</h2>
+      <span class="muted" style="font-size:13px;">识图结果需肉眼复核；点刺、腻腐两字段以肉眼为最终权威</span>
+    </div>
+    <div class="photos-row" id="photos"></div>
+  </div>
+
+  <!-- 辨证报告 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>辨证报告</h2>
+      <span class="tag">模板 v1.5.0</span>
+      <span class="spacer"></span>
+      <button class="btn btn-subtle btn-sm">重新生成</button>
+    </div>
+
+    <div class="diag-views" id="three-views"></div>
+
+    <div class="row wrap" style="gap:8px; margin-bottom:14px;">
+      <span class="muted" style="font-size:13px; letter-spacing:0.1em;">四证</span>
+      <span class="tag">水证 · 轻度</span>
+      <span class="tag">火证 · 轻度</span>
+      <span class="tag">气证 · 轻度</span>
+      <span class="tag">血证 · 轻度</span>
+    </div>
+
+    <div class="fields">
+      <div class="field-row"><span class="k">六经归属</span><span class="v">示例六经归属（合成数据）</span></div>
+      <div class="field-row"><span class="k">核心病机</span><span class="v">示例病机描述（合成数据，无临床含义）</span></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="row">
+      <h3 style="font-size:16px;">示例方（合成数据，12 味）</h3>
+      <span class="spacer"></span>
+      <span class="faint" style="font-size:12.5px;">剂量仅供参考，请在执业中医师指导下使用</span>
+    </div>
+    <div class="herbs" id="herbs"></div>
+    <p class="muted" style="margin:12px 0 0; font-size:13.5px;">方义：健脾化湿、和中养胃（合成数据，无临床含义）</p>
+  </div>
+
+</main>
+
+<script src="../assets/mock-data.js"></script>
+<script>
+/* ---------- 六维卡片 ---------- */
+(function renderDims() {
+  const box = document.getElementById("dims");
+  MOCK_RECORD.dims.forEach(dim => {
+    const sev = sevClass(dim.score);
+    const groups = dim.groups.map(g => `
+      <div class="group-name">${g.name}</div>
+      <div class="fields">
+        ${g.fields.map(f => {
+          const right = f.s === null || f.s === undefined
+            ? `<span class="ref" title="${f.ref || ""}">参考项</span>`
+            : `<span class="badge ${sevClass(f.s)} num">${f.s}</span>`;
+          return `<div class="field-row">
+            <span class="k">${f.k}</span>
+            <span class="v">${f.v}</span>
+            <span class="row" style="gap:2px;">${right}<button class="edit" title="修正此项">✎</button></span>
+          </div>`;
+        }).join("")}
+      </div>`).join("");
+    box.insertAdjacentHTML("beforeend", `
+      <section class="card dim-card">
+        <div class="row">
+          <h3>${dim.name}</h3>
+          <span class="spacer"></span>
+          <div class="scoreline" style="width: 180px;">
+            <span class="badge ${sev} num">${dim.score}</span>
+            <div class="scorebar"><i class="${sev}" style="width:${dim.score * 10}%"></i></div>
+          </div>
+        </div>
+        ${groups}
+      </section>`);
+  });
+
+  /* 编辑态演示：把「齿痕」一行切换为修正中的样子 */
+  const rows = [...document.querySelectorAll(".field-row")];
+  const target = rows.find(r => r.querySelector(".k").textContent === "齿痕");
+  if (target) {
+    target.classList.add("editing");
+    target.innerHTML = `
+      <span class="k">齿痕</span>
+      <span class="v"><input value="轻度" aria-label="修正齿痕观察值"></span>
+      <span class="row" style="gap:6px;">
+        <button class="btn btn-primary btn-sm">保存</button>
+        <button class="btn btn-subtle btn-sm">取消</button>
+      </span>`;
+  }
+})();
+
+/* ---------- 原图占位 ---------- */
+(function renderPhotos() {
+  const cam = `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+    <rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.6"/><path d="M8.5 7l1.2-2.4h4.6L15.5 7"/></svg>`;
+  document.getElementById("photos").innerHTML = MOCK_RECORD.photos.map(p =>
+    `<div class="photo-frame">${cam}<span>${p.part}照</span><span style="font-size:11px;">records/photos/2026-06-25/</span></div>`
+  ).join("");
+})();
+
+/* ---------- 辨证三观 / 方剂 ---------- */
+(function renderDiag() {
+  document.getElementById("three-views").innerHTML = MOCK_RECORD.diagnosis.threeViews.map(v =>
+    `<div class="diag-view"><div class="k">${v.k}</div><div class="v">${v.v}</div></div>`).join("");
+  document.getElementById("herbs").innerHTML = MOCK_RECORD.diagnosis.formula.ingredients.map(([h, d]) =>
+    `<div class="herb"><b>${h}</b><span>${d}</span></div>`).join("");
+})();
+</script>
+</body>
+</html>

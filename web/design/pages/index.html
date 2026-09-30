@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>记录 · 六维望诊</title>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/base.css">
+<style>
+  /* ---- 首页私有：日历 ---- */
+  .cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+  .cal .wd {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-3);
+    padding: 4px 0;
+    letter-spacing: 0.1em;
+  }
+  .cal .day {
+    min-height: 74px;
+    border-radius: var(--radius-inner);
+    border: 1px solid var(--line);
+    background: var(--card);
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: default;
+  }
+  .cal .day.out { background: transparent; border-color: transparent; }
+  .cal .day.has { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .cal .day.has:hover { border-color: var(--cinnabar); box-shadow: var(--shadow-card); }
+  .cal .day.today { border-color: var(--cinnabar); }
+  .cal .dnum { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .cal .day.today .dnum { color: var(--cinnabar-deep); font-weight: 700; }
+  .cal .day.out .dnum { color: var(--line-strong); }
+  .cal .ddots { display: flex; gap: 3px; flex-wrap: wrap; }
+  .cal .dscore {
+    margin-top: auto;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- 首页私有：记录行 ---- */
+  .rec-row {
+    display: grid;
+    grid-template-columns: 132px 86px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 14px;
+    border-radius: var(--radius-inner);
+    border: 1px solid transparent;
+  }
+  .rec-row:hover { background: var(--card); border-color: var(--line-strong); cursor: pointer; }
+  .rec-row + .rec-row { border-top: 1px solid var(--line); border-radius: 0; }
+  .rec-row .date { font-family: var(--font-serif); font-size: 16px; font-weight: 700; }
+  .rec-row .date small { font-family: var(--font-sans); font-weight: 400; color: var(--ink-3); margin-left: 6px; font-size: 12px; }
+  .rec-row .dimmini { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rec-row .dimmini span { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); margin-bottom: var(--gap); }
+  .stat { text-align: center; padding: 16px 10px; }
+  .stat .n { font-family: var(--font-serif); font-size: 28px; font-weight: 700; }
+  .stat .l { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.08em; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="index.html" class="active">记录</a>
+      <a href="trends.html">趋势</a>
+      <a href="wizard.html">拍照</a>
+      <a href="settings.html">设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- 空库首启演示：载入示例数据 -->
+  <div class="alert-note" style="margin-bottom: var(--gap); display:flex; align-items:center; gap:12px;">
+    <span>首次使用？数据库为空时可载入一份合成示例数据体验完整流程。</span>
+    <span class="spacer"></span>
+    <button class="btn btn-subtle btn-sm">载入示例数据</button>
+  </div>
+
+  <h1 class="page-title">记录</h1>
+  <p class="page-sub">2026 年 6 月 · 当日覆盖维度与总分一览</p>
+
+  <div style="height: 22px"></div>
+
+  <div class="stat-strip">
+    <div class="card stat"><div class="n num">7</div><div class="l">本周记录天数</div></div>
+    <div class="card stat"><div class="n num">14</div><div class="l">连续记录（天）</div></div>
+    <div class="card stat">
+      <div class="n num">18.7<span style="font-size:15px; color:var(--ink-3);"> / 60</span></div>
+      <div class="l">本周平均总偏离度</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>日历</h2>
+      <span class="muted" style="font-size:13px;">圆点 = 当日六维等级色；数字 = 总偏离度</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm">‹ 上月</button>
+      <button class="btn btn-ghost btn-sm">下月 ›</button>
+    </div>
+    <div class="cal" id="calendar"></div>
+  </div>
+
+  <div class="card" style="padding: 10px 12px;">
+    <div class="card-head" style="margin: 8px 10px 6px;">
+      <h2>近七日</h2>
+      <span class="spacer"></span>
+      <a class="btn btn-primary btn-sm" href="wizard.html">＋ 今日记录</a>
+    </div>
+    <div id="records"></div>
+  </div>
+
+</main>
+
+<script src="../assets/mock-data.js"></script>
+<script>
+/* ---------- 日历 ---------- */
+(function renderCalendar() {
+  const cal = document.getElementById("calendar");
+  const year = 2026, month = 5; // 2026 年 6 月
+  const byDate = Object.fromEntries(MOCK_DAYS.map(d => [d.date, d]));
+
+  ["一","二","三","四","五","六","日"].forEach(w => {
+    cal.insertAdjacentHTML("beforeend", `<div class="wd">${w}</div>`);
+  });
+
+  const first = new Date(year, month, 1);
+  const lead = (first.getDay() + 6) % 7; // 周一开头
+  const days = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 0; i < lead; i++) cal.insertAdjacentHTML("beforeend", `<div class="day out"></div>`);
+
+  for (let d = 1; d <= days; d++) {
+    const key = `${year}-06-${String(d).padStart(2, "0")}`;
+    const rec = byDate[key];
+    const today = d === 25;
+    if (!rec) {
+      cal.insertAdjacentHTML("beforeend",
+        `<div class="day${today ? " today" : ""}"><span class="dnum">${d}</span></div>`);
+      continue;
+    }
+    const dots = DIMENSIONS.map(dim => {
+      const s = rec.dims[dim.name];
+      return `<i class="dot ${sevClass(s)}" title="${dim.name}"></i>`;
+    }).join("");
+    const sev = sevClass(rec.total / 6);
+    cal.insertAdjacentHTML("beforeend", `
+      <div class="day has${today ? " today" : ""}" onclick="location.href='record.html'">
+        <span class="dnum">${d}</span>
+        <span class="ddots">${dots}</span>
+        <span class="dscore" style="color:var(--${sev === "sev-none" ? "sev-none" : sev});">${rec.total.toFixed(1)}</span>
+      </div>`);
+  }
+})();
+
+/* ---------- 记录列表 ---------- */
+(function renderRecords() {
+  const box = document.getElementById("records");
+  const cn = ["日","一","二","三","四","五","六"];
+  MOCK_DAYS.forEach(d => {
+    const wd = "周" + cn[new Date(d.date + "T00:00:00").getDay()];
+    const minis = DIMENSIONS.map(dim => {
+      const s = d.dims[dim.name];
+      return `<span><i class="dot ${sevClass(s)}"></i>${dim.name.replace("诊","")}</span>`;
+    }).join("");
+    const sev = sevClass(d.total / 6);
+    box.insertAdjacentHTML("beforeend", `
+      <div class="rec-row" onclick="location.href='record.html'">
+        <div class="date num">${d.date.slice(5).replace("-", " / ")}<small>${wd}</small></div>
+        <span class="tag ${d.coverage === 6 ? "ok" : ""}">覆盖 ${d.coverage} / 6</span>
+        <div class="dimmini">${minis}</div>
+        <div class="scoreline" style="min-width: 200px;">
+          <span class="badge lg ${sev}">${d.total.toFixed(1)}</span>
+          <div class="scorebar"><i class="${sev}" style="width:${(d.total / 60 * 100).toFixed(1)}%"></i></div>
+        </div>
+      </div>`);
+  });
+})();
+</script>
+</body>
+</html>

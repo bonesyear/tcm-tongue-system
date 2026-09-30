@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置 · 六维望诊</title>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/base.css">
+<style>
+  .test-result { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .env-note {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12.5px;
+    background: var(--card-sunken);
+    border-radius: 8px;
+    padding: 2px 8px;
+    color: var(--ink-2);
+  }
+  .radio-row { display: flex; gap: 18px; align-items: center; }
+  .radio-row label { display: flex; gap: 7px; align-items: center; color: var(--ink); font-size: 14px; text-align: left; }
+  .radio-row input { accent-color: var(--cinnabar); }
+  .sec-tag { font-size: 12px; color: var(--ink-3); letter-spacing: .06em; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="index.html">记录</a>
+      <a href="trends.html">趋势</a>
+      <a href="wizard.html">拍照</a>
+      <a href="settings.html" class="active">设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <h1 class="page-title">设置</h1>
+  <p class="page-sub">所有配置写回项目根目录的 <span class="env-note">.env</span>（唯一存储），不入库、不上报</p>
+
+  <div style="height: 22px"></div>
+
+  <!-- 首次启动引导演示 -->
+  <div class="alert-note" style="margin-bottom: var(--gap);">
+    <strong>欢迎使用。</strong>检测到尚未配置视觉模型 —— 完成下方「视觉模型」设置后即可开始第一次拍照记录。
+  </div>
+
+  <!-- 视觉模型 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>视觉模型</h2>
+      <span class="sec-tag">识图 · 七部位照片分析</span>
+      <span class="spacer"></span>
+      <span class="test-result"><i class="dot sev-0"></i><span style="color:var(--sev-0);">连通正常 · 耗时 1.2s</span></span>
+    </div>
+    <div class="form-grid">
+      <label>API Key</label>
+      <input class="input" type="password" value="••••••••••••••••••••" readonly>
+      <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span></div>
+
+      <label>模型</label>
+      <input class="input" value="qwen3.8-max">
+      <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；换模型后需重新标定封闭词表</div>
+
+      <label>端点</label>
+      <input class="input" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span></div>
+
+      <label>温度</label>
+      <input class="input" value="0.6" style="max-width: 160px;">
+      <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 留空则不发送；注意部分端点有服务端下限（如 DashScope 钳制到 0.6）</div>
+
+      <label>超时（秒）</label>
+      <input class="input" value="150" style="max-width: 160px;">
+      <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span></div>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      <button class="btn btn-ghost btn-sm">测试连通性</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary">保存</button>
+    </div>
+  </div>
+
+  <!-- 辨证模型 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>辨证模型</h2>
+      <span class="sec-tag">六经辨证 · 报告生成</span>
+      <span class="spacer"></span>
+      <span class="test-result"><i class="dot sev-none"></i><span class="faint">未测试</span></span>
+    </div>
+    <div class="form-grid">
+      <label>API Key</label>
+      <input class="input" type="password" placeholder="sk-…">
+      <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span></div>
+
+      <label>模型</label>
+      <input class="input" placeholder="例如 qwen-max / deepseek-v3">
+      <div class="form-hint"><span class="env-note">LLM_MODEL</span></div>
+
+      <label>端点</label>
+      <input class="input" placeholder="https://…">
+      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span></div>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      <button class="btn btn-ghost btn-sm">测试连通性</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary">保存</button>
+    </div>
+  </div>
+
+  <!-- 访问与安全 -->
+  <div class="card">
+    <div class="card-head"><h2>访问与安全</h2></div>
+    <div class="form-grid">
+      <label>监听地址</label>
+      <div class="radio-row">
+        <label><input type="radio" name="bind" checked>仅本机（127.0.0.1，默认）</label>
+        <label><input type="radio" name="bind">局域网（0.0.0.0）</label>
+      </div>
+      <div class="form-hint">开启局域网访问需先设置管理口令，否则局域网设备对设置页只读</div>
+
+      <label>管理口令</label>
+      <input class="input" type="password" placeholder="局域网开启时必填">
+      <div class="form-hint">环境变量 <span class="env-note">WEB_ADMIN_TOKEN</span></div>
+    </div>
+  </div>
+
+  <!-- 局域网只读态演示 -->
+  <div class="alert-note">
+    <strong>演示态：</strong>当前以局域网访客身份访问且未设管理口令 —— 设置页为只读，无法修改或测试连通性。
+  </div>
+
+</main>
+
+</body>
+</html>

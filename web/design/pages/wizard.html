@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拍照向导 · 六维望诊</title>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/base.css">
+<style>
+  .capture-zone {
+    border: 2px dashed var(--line-strong);
+    border-radius: var(--radius-card);
+    background: var(--card-sunken);
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .capture-zone:hover { border-color: var(--cinnabar); background: #f8f2e8; }
+  .capture-zone svg { opacity: .55; }
+  .tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tips li { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; color: var(--ink-2); }
+  .tips li::before { content: "◆"; color: var(--cinnabar); font-size: 10px; margin-top: 5px; }
+  .tips li.warn { color: var(--cinnabar-deep); font-weight: 600; }
+  .tips li.warn::before { content: "⚠"; font-size: 12px; margin-top: 2px; }
+  .skip-col { display: grid; gap: 8px; align-content: start; }
+  .skip-hint { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="index.html">记录</a>
+      <a href="trends.html">趋势</a>
+      <a href="wizard.html" class="active">拍照</a>
+      <a href="settings.html">设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <h1 class="page-title">拍照向导</h1>
+  <p class="page-sub num">2026 年 9 月 30 日 · 一步一个部位，全部数据仅存本机</p>
+
+  <div style="height: 22px"></div>
+
+  <!-- 状态演示：当日已有记录时的三选入口 -->
+  <div class="alert-note" style="margin-bottom: var(--gap);">
+    <strong>今日已有记录（覆盖 4 / 6 维）。</strong>
+    <div class="row wrap" style="margin-top:10px; gap:8px;">
+      <button class="btn btn-primary btn-sm">补充未覆盖维度</button>
+      <button class="btn btn-ghost btn-sm">重新分析（旧版自动备份）</button>
+      <button class="btn btn-subtle btn-sm">取消</button>
+    </div>
+  </div>
+
+  <!-- 步骤条 -->
+  <div class="card">
+    <ol class="steps" id="steps"></ol>
+  </div>
+
+  <!-- 当前步 -->
+  <div class="card">
+    <div class="card-head">
+      <h2 id="step-title">第 1 / 7 步 · 舌面</h2>
+      <span class="tag cinnabar" id="step-dim">舌诊</span>
+      <span class="spacer"></span>
+      <span class="faint" style="font-size:12.5px;">识图模型在提交后自动分析，结果可人工修正</span>
+    </div>
+
+    <div class="grid cols-2" style="align-items:start;">
+      <div class="capture-zone">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.6"/><path d="M8.5 7l1.2-2.4h4.6L15.5 7"/>
+        </svg>
+        <strong>点击拍照或上传照片</strong>
+        <span style="font-size:12.5px; color:var(--ink-3);">保存至 records/photos/&lt;日期&gt;/舌面.jpg</span>
+      </div>
+      <div>
+        <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:8px; font-family:var(--font-serif);">拍摄纪律</div>
+        <ul class="tips" id="tips"></ul>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="row wrap">
+      <button class="btn btn-subtle">‹ 上一步</button>
+      <button class="btn btn-primary">下一步 · 舌底 ›</button>
+      <span class="spacer"></span>
+      <div class="skip-col" style="grid-auto-flow:column; gap:8px;">
+        <button class="btn btn-ghost btn-sm">跳过（声明正常）</button>
+        <button class="btn btn-ghost btn-sm">跳过（未覆盖）</button>
+      </div>
+    </div>
+    <p class="skip-hint" style="margin:10px 2px 0;">
+      「声明正常」= 未拍摄但确认无异常，计入覆盖度；「未覆盖」= 未拍摄且无法确认，该维度不计分。
+      两种跳过都会在记录中明确标注，不会伪造观察值。
+    </p>
+  </div>
+
+  <!-- 演示入口 -->
+  <p class="faint" style="text-align:center; font-size:12.5px;">
+    设计稿演示：<a href="#" id="demo-danger">查看「危险信号拦截式提示」样式</a>
+  </p>
+
+</main>
+
+<!-- 危险信号拦截弹层（设计稿默认隐藏，点击上方链接演示） -->
+<div class="overlay" id="danger-modal" style="display:none;">
+  <div class="modal">
+    <div class="alert-danger" style="margin-bottom:14px;">
+      <svg class="seal-mini" width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="22" font-weight="700" fill="#fff8f3">警</text>
+      </svg>
+      <div>
+        <strong>安全红线触发：戴阳证疑似</strong>
+        <div style="font-size:13.5px; margin-top:2px;">识图发现「面红如妆」，与手足厥逆并见时为戴阳证危候。</div>
+      </div>
+    </div>
+    <p style="margin:0; font-size:14px;">
+      <strong>真阳欲脱，阴阳离决。严禁解表发汗</strong>（不得使用麻黄汤 / 桂枝汤等解表剂），建议立即就医。
+    </p>
+    <p class="muted" style="font-size:13px; margin:10px 0 0;">
+      模型判读可能误判。请先肉眼复核照片：确认面色是否真正「红如妆」（浮红娇嫩、游移不定），并核对四肢温度。
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost">误判，去修正观察值</button>
+      <button class="btn btn-primary">已肉眼复核，保留警示</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/mock-data.js"></script>
+<script>
+/* 步骤条：前 0 步已完成，第 1 步当前（演示态） */
+(function renderSteps() {
+  const cur = 0;
+  document.getElementById("steps").innerHTML = WIZARD_STEPS.map((s, i) =>
+    `<li class="${i < cur ? "done" : i === cur ? "current" : ""}">${s.part}</li>`).join("");
+  document.getElementById("tips").innerHTML = WIZARD_STEPS[cur].tips.map(t =>
+    `<li class="${t.includes("⚠") || t.includes("严禁") || t.includes("禁") ? "warn" : ""}">${t.replace("⚠️ ", "")}</li>`).join("");
+})();
+
+/* 拦截弹层演示 */
+const modal = document.getElementById("danger-modal");
+document.getElementById("demo-danger").addEventListener("click", e => {
+  e.preventDefault();
+  modal.style.display = "flex";
+});
+modal.addEventListener("click", e => {
+  if (e.target === modal || e.target.closest(".btn")) modal.style.display = "none";
+});
+</script>
+</body>
+</html>
