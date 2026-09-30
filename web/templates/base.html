@@ -32,6 +32,11 @@
 </header>
 
 <main class="page stack">
+{% if vision_missing and page != "welcome" %}
+<div class="alert-note">
+  ⚠ 未配置视觉模型 API Key，识图分析功能不可用。请到 <a href="/settings">设置页</a> 填写 <code>VISION_API_KEY</code>。
+</div>
+{% endif %}
 {% block content %}{% endblock %}
 </main>
 

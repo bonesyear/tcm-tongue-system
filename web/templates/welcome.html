@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}使用前须知 · 六维望诊{% endblock %}
+{% block content %}
+<div>
+  <h1 class="page-title">使用前须知</h1>
+  <p class="page-sub">请逐项阅读并确认后进入系统（每次服务重启后需重新确认）</p>
+</div>
+
+<form method="post" action="/welcome" class="stack">
+
+  <div class="card">
+    <div class="card-head"><h2>一、开源许可</h2></div>
+    <p>本软件以 <strong>GNU GPL v3</strong> 许可证开源（Copyright © 2026 bonesyear）。
+      你可以自由使用、修改与再分发，但衍生作品必须以相同许可证开源并保留版权声明。
+      完整条款见 <a href="/license" target="_blank">LICENSE 全文</a>（网上版本：<a href="https://www.gnu.org/licenses/gpl-3.0.txt" target="_blank">gnu.org/licenses/gpl-3.0.txt</a>）。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"> 我已阅读并理解开源许可条款</label>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>二、免责声明</h2></div>
+    <p>本系统<strong>不是医疗器械</strong>，所有输出（观察记录、评分、辨证报告）均为
+      <strong>健康管理的参考信息，不构成医疗诊断</strong>。中医望诊必须由具备执业资质的
+      医师完成；如有不适或急重症表现，请及时就医。作者与贡献者不对因使用本系统
+      产生的任何后果承担责任。所有数据仅保存在你的本机，请自行做好备份。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"> 我已阅读并接受免责声明</label>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>三、视觉模型与望诊精确度</h2></div>
+    <p>望诊识图由<strong>你在设置页自配置的视觉模型</strong>完成，识图准确度直接取决于
+      所选模型的能力：</p>
+    <ul class="plain-list">
+      <li>不同模型对舌色、苔质等特征的辨识差异很大，模型偏弱会拉低整体结论质量；</li>
+      <li>评分使用封闭词表，更换模型后其输出措辞可能落出词表而被读作 0 分，
+        换模型需重新核对识图结果；</li>
+      <li>拍摄光线、角度、闪光灯使用同样显著影响识图准确度。</li>
+    </ul>
+    <p>首次分析后请对照原图人工复核观察值，必要时使用修正功能。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"> 我了解自配视觉模型对望诊精确度的影响</label>
+  </div>
+
+  <div class="row">
+    <span class="spacer"></span>
+    <button id="enter-btn" class="btn btn-primary" type="submit" disabled>全部已了解，进入系统</button>
+  </div>
+</form>
+
+<script>
+(function () {
+  var boxes = document.querySelectorAll(".ack");
+  var btn = document.getElementById("enter-btn");
+  function sync() {
+    btn.disabled = !Array.prototype.every.call(boxes, function (b) { return b.checked; });
+  }
+  boxes.forEach(function (b) { b.addEventListener("change", sync); });
+})();
+</script>
+{% endblock %}
