@@ -1,0 +1,8 @@
+{
+  "name": "tcm-tongue-web-design",
+  "private": true,
+  "description": "六维望诊 Web 层设计稿（静态 mockup，仅供预览，无构建链）",
+  "scripts": {
+    "dev": "node dev-server.js"
+  }
+}

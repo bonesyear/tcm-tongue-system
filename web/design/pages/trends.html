@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>趋势 · 六维望诊</title>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/base.css">
+<style>
+  .chart { width: 100%; height: 340px; }
+  .chart.tall { height: 300px; }
+  .trend-row { padding: 8px 10px; border-radius: 8px; display: grid; grid-template-columns: 132px 1fr; gap: 12px; }
+  .trend-row:nth-child(odd) { background: rgba(245,240,230,.55); }
+  .trend-row .k { color: var(--ink-2); font-size: 13.5px; }
+  .cmp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="index.html">记录</a>
+      <a href="trends.html" class="active">趋势</a>
+      <a href="wizard.html">拍照</a>
+      <a href="settings.html">设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <div class="row">
+    <div>
+      <h1 class="page-title">趋势</h1>
+      <p class="page-sub num" id="week-range"></p>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn btn-ghost btn-sm">‹ 上一周</button>
+    <span class="tag cinnabar num" id="week-id"></span>
+    <button class="btn btn-ghost btn-sm">下一周 ›</button>
+  </div>
+
+  <div style="height: 22px"></div>
+
+  <!-- 周摘要 -->
+  <div class="card">
+    <div class="card-head"><h2>本周摘要</h2></div>
+    <p style="margin: 0 0 14px;" id="summary"></p>
+    <div class="grid cols-3">
+      <div>
+        <div class="group-label muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">好转指标</div>
+        <div class="cmp-chips" id="cmp-better"></div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">恶化指标</div>
+        <div class="cmp-chips" id="cmp-worse"></div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:12.5px; letter-spacing:.1em; margin-bottom:6px;">稳定指标</div>
+        <div class="cmp-chips" id="cmp-stable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图：六维偏离度 + 舌象雷达 -->
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h2>六维偏离度</h2><span class="muted" style="font-size:12.5px;">compute_dimension_deviation() · 0–10</span></div>
+      <div class="chart" id="chart-dims"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>舌象雷达</h2><span class="muted" style="font-size:12.5px;">extract_tongue_metrics() · 首末对照</span></div>
+      <div class="chart" id="chart-radar"></div>
+    </div>
+  </div>
+
+  <!-- 图：舌象九轴热力 -->
+  <div class="card">
+    <div class="card-head"><h2>舌象九轴 × 逐日</h2><span class="muted" style="font-size:12.5px;">颜色越深偏离越大；斜纹位 = 无观测</span></div>
+    <div class="chart tall" id="chart-heat"></div>
+  </div>
+
+  <!-- 趋势文字 -->
+  <div class="card">
+    <div class="card-head"><h2>趋势解读</h2><span class="muted" style="font-size:12.5px;">generate_weekly_report_data().trend_analysis</span></div>
+    <div id="trend-text"></div>
+    <hr class="divider">
+    <div class="trend-row" style="background:var(--card-sunken);">
+      <span class="k">下周建议</span><span id="next-week"></span>
+    </div>
+  </div>
+
+</main>
+
+<script src="../vendor/echarts.min.js"></script>
+<script src="../assets/mock-data.js"></script>
+<script>
+const SEV = ["#4d7c58", "#9a7b2d", "#b05e21", "#b0442a"];
+const INK2 = "#6f6558", LINE = "#eae2d2", PAPER_FONT = "'Songti SC','SimSun',serif";
+
+/* 头部 */
+document.getElementById("week-id").textContent = MOCK_WEEK.week_id;
+document.getElementById("week-range").textContent =
+  `${MOCK_WEEK.start_date} — ${MOCK_WEEK.end_date} · 共 ${MOCK_WEEK.dates.length} 天`;
+document.getElementById("summary").textContent = MOCK_WEEK.summary;
+document.getElementById("next-week").textContent = MOCK_WEEK.next_week_suggestion;
+
+/* 对比 chips */
+const cmp = MOCK_WEEK.weekly_comparison;
+const fill = (id, arr, cls, empty) => {
+  document.getElementById(id).innerHTML = arr.length
+    ? arr.map(x => `<span class="tag ${cls}">${x}</span>`).join("")
+    : `<span class="faint" style="font-size:13px;">${empty}</span>`;
+};
+fill("cmp-better", cmp["好转指标"], "ok", "本周无");
+fill("cmp-worse", cmp["恶化指标"], "cinnabar", "本周无");
+fill("cmp-stable", cmp["稳定指标"], "", "本周无");
+
+/* 六维偏离度折线 */
+echarts.init(document.getElementById("chart-dims")).setOption({
+  color: ["#b0442a", "#b05e21", "#9a7b2d", "#4d7c58", "#6f6558", "#a2937f"],
+  grid: { left: 40, right: 16, top: 36, bottom: 28 },
+  legend: { top: 0, textStyle: { color: INK2, fontSize: 12 }, itemWidth: 14 },
+  tooltip: { trigger: "axis" },
+  xAxis: { type: "category", data: MOCK_WEEK.dates, axisLine: { lineStyle: { color: LINE } }, axisLabel: { color: INK2 } },
+  yAxis: { type: "value", max: 10, splitLine: { lineStyle: { color: LINE } }, axisLabel: { color: INK2 } },
+  series: DIMENSIONS.map(d => ({
+    name: d.name, type: "line", smooth: true, connectNulls: false,
+    symbolSize: 6, lineStyle: { width: 2 },
+    data: MOCK_WEEK.dimSeries[d.name],
+  })),
+});
+
+/* 舌象雷达：首日 vs 末日 */
+echarts.init(document.getElementById("chart-radar")).setOption({
+  color: ["#a2937f", "#b0442a"],
+  legend: { top: 0, data: ["周首日", "周末日"], textStyle: { color: INK2, fontSize: 12 } },
+  radar: {
+    indicator: MOCK_WEEK.radarAxes.map(a => ({ name: a, max: 10 })),
+    radius: "62%", center: ["50%", "56%"],
+    axisName: { color: INK2, fontSize: 12, fontFamily: PAPER_FONT },
+    splitArea: { areaStyle: { color: ["rgba(245,240,230,.4)", "rgba(255,253,249,.6)"] } },
+    splitLine: { lineStyle: { color: LINE } },
+    axisLine: { lineStyle: { color: LINE } },
+  },
+  series: [{
+    type: "radar",
+    data: [
+      { value: MOCK_WEEK.radarFirst, name: "周首日", areaStyle: { opacity: 0.12 } },
+      { value: MOCK_WEEK.radarLast,  name: "周末日", areaStyle: { opacity: 0.22 } },
+    ],
+  }],
+});
+
+/* 舌象九轴 × 逐日热力（数据为演示：雷达首末日线性插值 + 一日无观测） */
+(function heat() {
+  const axes = MOCK_WEEK.radarAxes;
+  const data = [];
+  for (let d = 0; d < MOCK_WEEK.dates.length; d++) {
+    for (let a = 0; a < axes.length; a++) {
+      if (d === 4 && a >= 3) continue; // 06-23 部分舌形轴无观测
+      const v = MOCK_WEEK.radarFirst[a] +
+        (MOCK_WEEK.radarLast[a] - MOCK_WEEK.radarFirst[a]) * (d / (MOCK_WEEK.dates.length - 1));
+      data.push([d, a, Math.round(v * 10) / 10]);
+    }
+  }
+  echarts.init(document.getElementById("chart-heat")).setOption({
+    grid: { left: 90, right: 20, top: 10, bottom: 56 },
+    tooltip: {},
+    xAxis: { type: "category", data: MOCK_WEEK.dates, axisLabel: { color: INK2 }, axisLine: { lineStyle: { color: LINE } } },
+    yAxis: { type: "category", data: axes, axisLabel: { color: INK2, fontFamily: PAPER_FONT }, axisLine: { lineStyle: { color: LINE } } },
+    visualMap: {
+      min: 0, max: 10, orient: "horizontal", left: "center", bottom: 0,
+      textStyle: { color: INK2, fontSize: 12 },
+      inRange: { color: ["#f5f0e6", "#e8dcc8", "#d9bfa0", "#c98d63", "#b0442a"] },
+    },
+    series: [{
+      type: "heatmap", data,
+      label: { show: true, fontSize: 11, color: "#2e2a23" },
+      itemStyle: { borderColor: "#faf7f1", borderWidth: 2, borderRadius: 4 },
+    }],
+  });
+})();
+
+/* 趋势文字 */
+(function trendText() {
+  const labels = {
+    "舌质变化": "舌质", "舌苔变化": "舌苔", "舌形变化": "舌形", "舌下络脉变化": "舌下络脉",
+    "head_face_trend": "头面诊", "eye_trend": "目诊", "ear_trend": "耳诊",
+    "hand_trend": "手诊", "skin_trend": "皮肤诊", "体质变化趋势": "体质总览",
+  };
+  document.getElementById("trend-text").innerHTML =
+    Object.entries(MOCK_WEEK.trend_analysis).map(([k, v]) =>
+      `<div class="trend-row"><span class="k">${labels[k] || k}</span><span>${v}</span></div>`).join("");
+})();
+</script>
+</body>
+</html>
