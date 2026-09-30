@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}设置 · 六维望诊{% endblock %}
+{% block content %}
+<style>
+  .test-result { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .env-note {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12.5px;
+    background: var(--card-sunken);
+    border-radius: 8px;
+    padding: 2px 8px;
+    color: var(--ink-2);
+  }
+  .radio-row { display: flex; gap: 18px; align-items: center; }
+  .radio-row label { display: flex; gap: 7px; align-items: center; color: var(--ink); font-size: 14px; text-align: left; }
+  .radio-row input { accent-color: var(--cinnabar); }
+  .sec-tag { font-size: 12px; color: var(--ink-3); letter-spacing: .06em; }
+</style>
+
+<div>
+  <h1 class="page-title">设置</h1>
+  <p class="page-sub">所有配置写回项目根目录的 <span class="env-note">.env</span>（唯一存储），不入库、不上报</p>
+</div>
+
+{% if welcome %}
+<div class="alert-note">
+  <strong>欢迎使用。</strong>检测到尚未配置视觉模型 —— 完成下方「视觉模型」设置后即可开始第一次拍照记录。
+</div>
+{% endif %}
+{% if saved %}
+<div class="alert-note" style="border-color: var(--sev-0); background: var(--sev-0-bg);">
+  <strong>已保存。</strong>配置已写入 .env；监听地址的变更在下次启动服务后生效。
+</div>
+{% endif %}
+{% if env_error %}
+<div class="alert-danger"><strong>保存失败</strong>：{{ env_error }}</div>
+{% endif %}
+{% if read_only %}
+<div class="alert-note">
+  <strong>只读态：</strong>当前以局域网访客身份访问且未通过管理口令验证 —— 设置页为只读，无法修改或测试连通性。
+</div>
+{% endif %}
+
+{% macro secret_input(key, placeholder) -%}
+<input class="input" type="password" name="{{ key }}" autocomplete="off"
+       placeholder="{{ '已保存（留空则不修改）' if values[key].set else placeholder }}"
+       {% if read_only %}disabled{% endif %}>
+{%- endmacro %}
+
+{% macro test_button(target) -%}
+<button class="btn btn-ghost btn-sm" type="button" data-test="{{ target }}"
+        {% if read_only %}disabled{% endif %}>测试连通性</button>
+<span class="test-result" id="test-{{ target }}">
+  <i class="dot sev-none"></i><span class="faint">未测试</span>
+</span>
+{%- endmacro %}
+
+<!-- 视觉模型 -->
+<div class="card">
+  <div class="card-head">
+    <h2>视觉模型</h2>
+    <span class="sec-tag">识图 · 七部位照片分析</span>
+  </div>
+  <form method="post" action="/settings">
+    <input type="hidden" name="admin_token" value="{{ token_arg }}">
+    <div class="form-grid">
+      <label>API Key</label>
+      {{ secret_input("VISION_API_KEY", "sk-…") }}
+      <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span> · 当前来源：{{ values["VISION_API_KEY"].source }}</div>
+
+      <label>模型</label>
+      <input class="input" name="VISION_MODEL" value="{{ values['VISION_MODEL'].value }}" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；换模型后需重新标定封闭词表</div>
+
+      <label>端点</label>
+      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 完整的 chat/completions 端点地址</div>
+
+      <label>温度</label>
+      <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 留空则不发送；注意部分端点有服务端下限（如 DashScope 钳制到 0.6）</div>
+
+      <label>超时（秒）</label>
+      <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span></div>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      {{ test_button("vision") }}
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
+    </div>
+  </form>
+</div>
+
+<!-- 辨证模型 -->
+<div class="card">
+  <div class="card-head">
+    <h2>辨证模型</h2>
+    <span class="sec-tag">六经辨证 · 报告生成</span>
+  </div>
+  <form method="post" action="/settings">
+    <input type="hidden" name="admin_token" value="{{ token_arg }}">
+    <div class="form-grid">
+      <label>API Key</label>
+      {{ secret_input("LLM_API_KEY", "sk-…") }}
+      <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span> · 当前来源：{{ values["LLM_API_KEY"].source }}</div>
+
+      <label>模型</label>
+      <input class="input" name="LLM_MODEL" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">LLM_MODEL</span></div>
+
+      <label>端点</label>
+      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…" {% if read_only %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 完整的 chat/completions 端点地址</div>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      {{ test_button("llm") }}
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
+    </div>
+  </form>
+</div>
+
+<!-- 访问与安全 -->
+<div class="card">
+  <div class="card-head"><h2>访问与安全</h2></div>
+  <form method="post" action="/settings">
+    <input type="hidden" name="admin_token" value="{{ token_arg }}">
+    <div class="form-grid">
+      <label>监听地址</label>
+      <div class="radio-row">
+        <label><input type="radio" name="WEB_HOST" value="127.0.0.1"
+               {% if values["WEB_HOST"].value != "0.0.0.0" %}checked{% endif %}
+               {% if read_only %}disabled{% endif %}>仅本机（127.0.0.1，默认）</label>
+        <label><input type="radio" name="WEB_HOST" value="0.0.0.0"
+               {% if values["WEB_HOST"].value == "0.0.0.0" %}checked{% endif %}
+               {% if read_only %}disabled{% endif %}>局域网（0.0.0.0）</label>
+      </div>
+      <div class="form-hint">开启局域网访问需先设置管理口令，否则局域网设备对设置页只读；保存后重启服务生效</div>
+
+      <label>管理口令</label>
+      {{ secret_input("WEB_ADMIN_TOKEN", "局域网开启时必填") }}
+      <div class="form-hint">环境变量 <span class="env-note">WEB_ADMIN_TOKEN</span> · 局域网访问设置页时在网址后加 <span class="env-note">?token=口令</span></div>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      <span class="spacer"></span>
+      <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.querySelectorAll("[data-test]").forEach(function (btn) {
+  btn.addEventListener("click", async function () {
+    var target = btn.dataset.test;
+    var slot = document.getElementById("test-" + target);
+    slot.innerHTML = '<i class="dot sev-1"></i><span class="muted">测试中…</span>';
+    btn.disabled = true;
+    try {
+      var resp = await fetch("/settings/test", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({target: target, admin_token: "{{ token_arg }}"})
+      });
+      var data = await resp.json();
+      if (data.ok) {
+        slot.innerHTML = '<i class="dot sev-0"></i><span style="color:var(--sev-0);">' + data.detail + "</span>";
+      } else {
+        slot.innerHTML = '<i class="dot sev-7"></i><span style="color:var(--sev-7);">' + data.detail + "</span>";
+      }
+    } catch (e) {
+      slot.innerHTML = '<i class="dot sev-7"></i><span style="color:var(--sev-7);">请求失败：' + e + "</span>";
+    }
+    btn.disabled = false;
+  });
+});
+</script>
+{% endblock %}

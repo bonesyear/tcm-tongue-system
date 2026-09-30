@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}六维望诊{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <rect x="6.5" y="6.5" width="35" height="35" rx="4.5" fill="none" stroke="#f7e9e4" stroke-width="1.6"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="23" font-weight="700" fill="#fff8f3">望</text>
+      </svg>
+      <div>
+        <div class="brand-name">六维望诊</div>
+        <div class="brand-sub">自托管 · 数据不出本机</div>
+      </div>
+    </div>
+    <nav class="appnav">
+      <a href="/" {% if page == "index" %}class="active"{% endif %}>记录</a>
+      <a class="faint" title="切片 5 实现" onclick="return false" href="#">趋势</a>
+      <a class="faint" title="切片 4 实现" onclick="return false" href="#">拍照</a>
+      <a href="/settings" {% if page == "settings" %}class="active"{% endif %}>设置</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page stack">
+{% block content %}{% endblock %}
+</main>
+
+</body>
+</html>
