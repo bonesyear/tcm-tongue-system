@@ -134,7 +134,8 @@ a:hover { color: var(--cinnabar-deep); }
   padding: 20px 22px;
 }
 
-.card + .card { margin-top: var(--gap); }
+/* 卡片间距一律由 .stack 节奏容器负责（见工具区），不写相邻卡 margin，
+   避免 stack gap 与 margin 叠加出双倍间距 */
 
 .card-head {
   display: flex;
@@ -469,6 +470,9 @@ a:hover { color: var(--cinnabar-deep); }
 .photo-frame svg { opacity: 0.5; }
 
 /* ---------------- 工具 ---------------- */
+
+/* 页面节奏容器：所有顶层区块统一 20px 间距，页面内不再用裸 spacer div */
+.stack { display: grid; gap: var(--gap); }
 
 .grid { display: grid; gap: var(--gap); }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/base.css">
 <style>
+  #dims { align-items: start; }  /* 卡片按内容自然高度，不强制同行等高 */
   .dim-card h3 { font-size: 17px; letter-spacing: 0.06em; }
   .group-name {
     font-size: 12.5px;
@@ -90,9 +91,9 @@
   </div>
 </header>
 
-<main class="page">
+<main class="page stack">
 
-  <p style="margin: 0 0 10px;"><a href="index.html">‹ 返回记录列表</a></p>
+  <p style="margin: 0;"><a href="index.html">‹ 返回记录列表</a></p>
 
   <div class="card">
     <div class="row wrap">
@@ -122,7 +123,7 @@
   </div>
 
   <!-- 六维卡片 -->
-  <div class="grid cols-2" id="dims" style="margin-top: var(--gap);"></div>
+  <div class="grid cols-2" id="dims"></div>
 
   <!-- 原图对照 -->
   <div class="card">
