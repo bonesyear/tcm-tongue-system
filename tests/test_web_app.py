@@ -29,7 +29,9 @@ def client(env_path, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     app = create_app(env_file=env_path)
     app.config["TESTING"] = True
-    return app.test_client()
+    c = app.test_client()
+    c.post("/welcome")  # 完成启动声明确认，免打扰其余用例
+    return c
 
 
 # ---------------- envfile ----------------
@@ -65,18 +67,53 @@ def test_envfile_missing_returns_empty(env_path):
     assert envfile.read_env(env_path) == {}
 
 
-# ---------------- 设置页行为 ----------------
+# ---------------- 启动须知页 + 缺 key 警告 ----------------
 
-def test_first_run_redirects_to_settings(client):
-    resp = client.get("/")
+def test_first_visit_redirects_to_welcome(env_path, monkeypatch):
+    for k in ("VISION_API_KEY",):
+        monkeypatch.delenv(k, raising=False)
+    app = create_app(env_file=env_path)
+    app.config["TESTING"] = True
+    c = app.test_client()
+    resp = c.get("/")
+    assert resp.status_code == 302
+    assert "/welcome" in resp.headers["Location"]
+    # 确认后放行，且未配 key 时落到设置页
+    resp = c.post("/welcome")
     assert resp.status_code == 302
     assert "/settings" in resp.headers["Location"]
+    assert c.get("/").status_code == 200
+
+
+def test_welcome_ack_lands_home_when_configured(client, env_path):
+    envfile.write_env(env_path, {"VISION_API_KEY": "sk-x"})
+    resp = client.post("/welcome")
+    assert resp.headers["Location"] == "/"
+    # 已确认用户可随时回看须知页
+    assert client.get("/welcome").status_code == 200
+
+
+def test_index_warns_when_key_missing(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "VISION_API_KEY" in resp.get_data(as_text=True)
 
 
 def test_index_ok_when_configured(client, env_path):
     envfile.write_env(env_path, {"VISION_API_KEY": "sk-x"})
     resp = client.get("/")
     assert resp.status_code == 200
+    assert "VISION_API_KEY</code>" not in resp.get_data(as_text=True)
+
+
+def test_license_served_locally_without_ack(env_path, monkeypatch):
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    app = create_app(env_file=env_path)
+    app.config["TESTING"] = True
+    c = app.test_client()  # 未确认须知也可直接读 LICENSE
+    resp = c.get("/license")
+    assert resp.status_code == 200
+    assert "GNU GENERAL PUBLIC LICENSE" in resp.get_data(as_text=True)
 
 
 def test_settings_save_writes_env(client, env_path):

@@ -19,7 +19,8 @@
 
 <div>
   <h1 class="page-title">设置</h1>
-  <p class="page-sub">所有配置写回项目根目录的 <span class="env-note">.env</span>（唯一存储），不入库、不上报</p>
+  <p class="page-sub">所有配置写回项目根目录的 <span class="env-note">.env</span>（唯一存储），不入库、不上报 ·
+    <a href="/welcome">查看使用前须知</a></p>
 </div>
 
 {% if welcome %}
@@ -139,6 +140,9 @@
                {% if read_only %}disabled{% endif %}>局域网（0.0.0.0）</label>
       </div>
       <div class="form-hint">开启局域网访问需先设置管理口令，否则局域网设备对设置页只读；保存后重启服务生效</div>
+      {% if lan_ip %}
+      <div class="form-hint">本机局域网地址：<span class="env-note">http://{{ lan_ip }}:8600</span>（手机与电脑连同一 WiFi 时用它访问）</div>
+      {% endif %}
 
       <label>管理口令</label>
       {{ secret_input("WEB_ADMIN_TOKEN", "局域网开启时必填") }}

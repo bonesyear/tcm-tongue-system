@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import os
+import secrets
 import sys
 import tempfile
 
@@ -69,10 +70,41 @@ def create_app(env_file: str | None = None) -> Flask:
     def vision_configured() -> bool:
         return bool(cfg("VISION_API_KEY"))
 
+    # 每次进程启动生成新口令 → 重启后声明页必重新确认
+    boot_token = secrets.token_hex(8)
+
+    @app.before_request
+    def require_boot_ack():
+        if request.endpoint in ("welcome", "welcome_ack", "license_text", "static"):
+            return None
+        if request.cookies.get("boot_ack") != boot_token:
+            return redirect("/welcome")
+        return None
+
+    @app.context_processor
+    def inject_flags():
+        return {"vision_missing": not vision_configured()}
+
+    @app.get("/welcome")
+    def welcome():
+        return render_template("welcome.html", page="welcome")
+
+    @app.post("/welcome")
+    def welcome_ack():
+        resp = redirect("/" if vision_configured() else "/settings")
+        resp.set_cookie("boot_ack", boot_token)
+        return resp
+
+    @app.get("/license")
+    def license_text():
+        try:
+            with open(os.path.join(_REPO_ROOT, "LICENSE"), encoding="utf-8") as f:
+                return app.response_class(f.read(), mimetype="text/plain; charset=utf-8")
+        except OSError:
+            return "LICENSE 文件缺失，见 https://www.gnu.org/licenses/gpl-3.0.txt", 404
+
     @app.get("/")
     def index():
-        if not vision_configured():
-            return redirect("/settings?welcome=1")
         return render_template("index.html", page="index")
 
     def settings_values() -> dict:
@@ -95,6 +127,7 @@ def create_app(env_file: str | None = None) -> Flask:
             welcome=request.args.get("welcome") == "1",
             saved=request.args.get("saved") == "1",
             env_error=request.args.get("env_error", ""),
+            lan_ip=_lan_ip(),
         )
 
     @app.post("/settings")
@@ -161,6 +194,19 @@ def create_app(env_file: str | None = None) -> Flask:
             return jsonify({"ok": False, "detail": f"{type(e).__name__}: {e}"})
 
     return app
+
+
+def _lan_ip() -> str:
+    """本机局域网 IP（UDP 探测默认路由网卡，不实际发包）；探测失败返回空串。"""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 80))  # TEST-NET-1，仅用于让内核选路
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
 
 
 def main():
