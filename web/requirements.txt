@@ -1,0 +1,2 @@
+# Web 层依赖（独立于根 requirements.txt，不污染核心库）
+Flask>=3.0

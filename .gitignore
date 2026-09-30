@@ -32,3 +32,6 @@ knowledge_base/jingfang_tanyuan_full.md
 
 # 档案备份目录（含真实病案/姓名，禁止入公开仓库）
 records/_backup/
+
+# Web 层上传的原始照片（健康数据，永不上传）
+records/photos/

@@ -1,0 +1,58 @@
+/* ============================================================
+   设计令牌 · 六维望诊 Web 层
+   方向（AGENTS.md §1 锁定）：现代暖纸底卡片 + 中医点缀
+   - 浅色主题 only
+   - 暖纸背景 + 纯 CSS/SVG 纸纹（零图片资源）
+   - 宋体标题 / 朱砂点缀 / 印章式 logo
+   - 分数双编码：彩色徽章 + 进度条
+   ============================================================ */
+
+:root {
+  /* ---- 纸与墨 ---- */
+  --paper:        #faf7f1;   /* 暖纸底（锁定值） */
+  --card:         #fffdf9;   /* 卡片：比纸略亮的暖白 */
+  --card-sunken:  #f5f0e6;   /* 凹陷区 / 占位区 */
+  --ink:          #2e2a23;   /* 主文字：暖黑 */
+  --ink-2:        #6f6558;   /* 次要文字 */
+  --ink-3:        #a2937f;   /* 弱提示 / 占位 */
+  --line:         #eae2d2;   /* 细分隔线 */
+  --line-strong:  #ddd2bd;   /* 卡片描边 */
+
+  /* ---- 朱砂（点缀色，锁定值） ---- */
+  --cinnabar:      #b0442a;
+  --cinnabar-deep: #93351f;  /* hover / 印章压角 */
+  --cinnabar-tint: #f7e9e4;  /* 朱砂浅底（徽章/选中态） */
+
+  /* ---- 分数四级（锁定值，双编码的第一维：颜色） ---- */
+  --sev-0: #4d7c58;          /* 0 分 · 正常 · 绿 */
+  --sev-1: #9a7b2d;          /* 1–3 · 轻 */
+  --sev-4: #b05e21;          /* 4–6 · 中 */
+  --sev-7: #b0442a;          /* 7–10 · 重（同朱砂） */
+  --sev-0-bg: #edf3ec;
+  --sev-1-bg: #f5f0df;
+  --sev-4-bg: #f8ece1;
+  --sev-7-bg: #f7e9e4;
+  --sev-none: #b9ac97;       /* 未覆盖 / 无数据 · 灰 */
+
+  /* ---- 字体 ---- */
+  --font-serif: "Songti SC", "STSong", "SimSun", "Noto Serif CJK SC",
+                "Source Han Serif SC", serif;          /* 标题：宋体 */
+  --font-sans:  -apple-system, "Segoe UI", "PingFang SC",
+                "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+
+  /* ---- 形状与层次 ---- */
+  --radius-card: 14px;
+  --radius-inner: 10px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(88, 70, 42, 0.05),
+                 0 10px 28px rgba(88, 70, 42, 0.08);
+  --shadow-pop:  0 4px 10px rgba(88, 70, 42, 0.10),
+                 0 18px 48px rgba(88, 70, 42, 0.16);
+
+  /* ---- 布局 ---- */
+  --page-max: 1080px;
+  --gap: 20px;
+
+  /* ---- 纸纹：feTurbulence SVG data-URI，零图片资源 ---- */
+  --paper-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");
+}
