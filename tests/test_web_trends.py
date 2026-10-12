@@ -61,15 +61,20 @@ def test_trends_empty_week(client):
 
 
 def test_week_payload_structure(data_root):
-    """数据装配直接来自纯函数：九轴热力无观测位为 None（不补零）。"""
+    """数据装配直接来自纯函数：连续 7 天轴，无记录日为 None；热力无观测位留空。"""
     payload = trends_store.week_payload(
         os.path.join(data_root, "records", "daily"), "2026-06-25")
     assert payload["count"] == 3
-    assert payload["dates"] == ["06-23", "06-24", "06-25"]
+    assert payload["dates"] == ["06-19", "06-20", "06-21", "06-22",
+                                "06-23", "06-24", "06-25"]
     assert len(payload["radar"]["axes"]) == 9
     assert set(payload["dim_series"].keys()) == {
         "舌诊", "头面诊", "目诊", "耳诊", "手诊", "皮肤诊"}
-    assert payload["dim_series"]["舌诊"] == [5.7, 5.7, 5.7]
+    assert payload["dim_series"]["舌诊"] == [None, None, None, None,
+                                             5.7, 5.7, 5.7]
+    # 趋势解读标签完整映射（服务端装配，不在模板里猜）
+    labels = {r["k"] for r in payload["trend_rows"]}
+    assert "体质总览" in labels and "舌质" in labels
 
 
 def test_report_generation_writes_back(client, data_root, monkeypatch):
@@ -82,9 +87,10 @@ def test_report_generation_writes_back(client, data_root, monkeypatch):
     with open(os.path.join(data_root, "records", "daily",
                            "2026-06-25_analysis.json"), encoding="utf-8") as f:
         raw = json.load(f)
-    rep = raw["diagnosis_report"]
+    rep = raw["diagnosis"]["report"]  # 形状 A diagnosis 容器约定
     assert "太阴" in rep["markdown"]
-    assert rep["prompt_template_version"]
+    assert rep["prompt_template_version"].startswith(
+        "adaptive_analysis_prompt.md@")  # 模板内容哈希，非工程版本号
     assert rep["generated_at"]
 
     html = client.get("/record/2026-06-25").get_data(as_text=True)

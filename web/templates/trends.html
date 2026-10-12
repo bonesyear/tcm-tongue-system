@@ -77,8 +77,8 @@
 <div class="card">
   <div class="card-head"><h2>趋势解读</h2><span class="muted" style="font-size:12.5px;">generate_weekly_report_data().trend_analysis</span></div>
   <div>
-    {% for k, v in week.trend_analysis.items() if v %}
-    <div class="trend-row"><span class="k">{{ {"head_face_trend":"头面诊","eye_trend":"目诊","ear_trend":"耳诊","hand_trend":"手诊","skin_trend":"皮肤诊"}.get(k, k) }}</span><span>{{ v }}</span></div>
+    {% for row in week.trend_rows %}
+    <div class="trend-row"><span class="k">{{ row.k }}</span><span>{{ row.v }}</span></div>
     {% endfor %}
   </div>
   <hr class="divider">

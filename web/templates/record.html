@@ -228,10 +228,13 @@
     document.body.classList.toggle("show-edits");
   });
 
-  function alertBox(html, danger) {
+  function alertBox(text, danger) {
     var box = document.getElementById("correction-alert");
     box.className = danger ? "alert-danger" : "alert-note";
-    box.innerHTML = html;
+    var strong = document.createElement("strong");
+    strong.textContent = text;
+    box.innerHTML = "";
+    box.appendChild(strong);
     box.style.display = "";
     box.scrollIntoView({behavior: "smooth", block: "nearest"});
   }
@@ -277,11 +280,11 @@
           if (data.ok) {
             location.reload();  // 重评分结果以服务端重渲为准
           } else {
-            alertBox("<strong>保存被拦截：</strong>" + data.errors.join("；"), true);
+            alertBox("保存被拦截：" + data.errors.join("；"), true);
             saveBtn.disabled = false;
           }
         } catch (e) {
-          alertBox("<strong>保存失败：</strong>" + e, true);
+          alertBox("保存失败：" + e, true);
           saveBtn.disabled = false;
         }
       });
@@ -299,9 +302,9 @@
         var resp = await fetch("/record/" + RECORD_DATE + "/report", {method: "POST"});
         var data = await resp.json();
         if (data.ok) { location.reload(); }
-        else { alertBox("<strong>报告生成失败：</strong>" + (data.error || "未知错误"), true); }
+        else { alertBox("报告生成失败：" + (data.error || "未知错误"), true); }
       } catch (e) {
-        alertBox("<strong>报告生成失败：</strong>" + e, true);
+        alertBox("报告生成失败：" + e, true);
       }
       repBtn.disabled = false;
       repBtn.textContent = "重新生成";
