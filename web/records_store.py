@@ -249,6 +249,112 @@ def load_demo(daily_dir: str) -> str:
     return "2026-06-25"
 
 
+# ============================================================
+# 修正流（切片 3）：形状感知写回 + 校验拦截 + 备份 + 打标
+# ============================================================
+
+def _write_path(rec: DailyRecord, dim, indicator: str):
+    """指标在当前记录形状下的写入路径（容器链 + 键路径）。
+
+    返回 (container, path)；调用方负责逐层 setdefault 后写入叶子。
+    """
+    from src.record import _DIMENSION_INDICATORS, _A_VISION_KEYS, _C_KEY_ALIASES
+    paths_map = _DIMENSION_INDICATORS[dim][indicator]
+    shape = rec.shape
+    if shape == "B":
+        container = rec.raw.setdefault("observations", {})
+        node = container.setdefault(dim.english_name, {})
+        return node, paths_map["B"]
+    if shape == "C":
+        key = dim.english_name
+        if key not in rec.raw:
+            for alias, canonical in _C_KEY_ALIASES.items():
+                if canonical == key and alias in rec.raw:
+                    key = alias
+                    break
+        return rec.raw.setdefault(key, {}), paths_map["C"]
+    # 形状 A：容器新名优先，旧名永久兼容（与读取同序）
+    container_key = next((k for k in _A_VISION_KEYS if k in rec.raw),
+                         _A_VISION_KEYS[0])
+    container = rec.raw.setdefault(container_key, {})
+    return container.setdefault(dim.chinese_name, {}), paths_map["A"]
+
+
+def update_observation(daily_dir: str, backup_dir: str, date_str: str,
+                       dim_key: str, indicator: str, value: str) -> dict:
+    """修正一个观察值：校验 → 备份 → 形状感知写回 → 打标 → 重评分。
+
+    返回 {"ok", "errors", "warnings", ...}。validator 的 ❌ 级错误拦截保存
+    （不留半成品），⚠️ 级仅回传展示。文件替换用「临时文件 + os.replace」，
+    中途崩溃不损坏原档。
+    """
+    from src.dimensions import from_english
+    from src.record import _DIMENSION_INDICATORS
+    from input_validator import validate_record
+
+    dim = from_english(dim_key)
+    if dim is None or indicator not in _DIMENSION_INDICATORS.get(dim, {}):
+        return {"ok": False, "errors": [f"未知的维度或指标: {dim_key}/{indicator}"],
+                "warnings": []}
+    filepath = _select_daily_file(daily_dir, date_str)
+    if not filepath:
+        return {"ok": False, "errors": [f"{date_str} 无记录"], "warnings": []}
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        return {"ok": False, "errors": [f"记录读取失败: {e}"], "warnings": []}
+
+    rec = DailyRecord(raw)
+    node, path = _write_path(rec, dim, indicator)
+    if not isinstance(node, dict):
+        return {"ok": False, "errors": ["记录结构异常：维度节点不是对象"],
+                "warnings": []}
+    for key in path[:-1]:
+        node = node.setdefault(key, {})
+        if not isinstance(node, dict):
+            return {"ok": False, "errors": [f"记录结构异常：{key} 不是对象"],
+                    "warnings": []}
+    node[path[-1]] = value.strip()
+    raw["manually_corrected"] = True
+    raw["corrected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+
+    # 先写临时档校验，❌ 拦截（原档不动）
+    tmp = filepath + ".validate-tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _, errors, warnings = validate_record(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    blocking = [e for e in errors if e.startswith("❌")]
+    if blocking:
+        return {"ok": False, "errors": blocking, "warnings": warnings}
+
+    # 备份旧版 → 原子替换
+    os.makedirs(backup_dir, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = os.path.join(backup_dir,
+                          f"{os.path.basename(filepath)}.{stamp}.bak")
+    shutil.copyfile(filepath, backup)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False, indent=2)
+
+    new_rec = DailyRecord(raw)
+    obs = new_rec.get_observation(dim)
+    scored = score_indicators(dim, obs)
+    return {
+        "ok": True,
+        "errors": [],
+        "warnings": warnings,
+        "backup": os.path.basename(backup),
+        "field_score": scored.get(indicator),
+        "dim_score": round(score(dim, obs), 1) if dim.is_covered(obs) else None,
+        "summary": record_summary(new_rec),
+    }
+
+
 def list_photos(photos_dir: str, date_str: str):
     """records/photos/<date>/ 下的照片文件名列表（排序）。"""
     d = os.path.join(photos_dir, date_str)
@@ -270,16 +376,14 @@ def record_detail(rec: DailyRecord) -> dict:
             fields = []
             for ind in indicators:
                 v = obs.get(ind, "")
+                base = {"k": INDICATOR_LABELS.get(ind, ind), "v": v, "ind": ind}
                 if ind in REF_FIELDS:
-                    fields.append({"k": INDICATOR_LABELS.get(ind, ind), "v": v,
-                                   "s": None, "ref": REF_FIELDS[ind]})
+                    fields.append({**base, "s": None, "ref": REF_FIELDS[ind]})
                 elif ind in scored:
-                    fields.append({"k": INDICATOR_LABELS.get(ind, ind), "v": v,
-                                   "s": scored[ind]})
+                    fields.append({**base, "s": scored[ind]})
                 else:
                     # 有规则集之外的指标（如舌体动态/舌苔分布）：设计稿口径按 0 展示
-                    fields.append({"k": INDICATOR_LABELS.get(ind, ind), "v": v,
-                                   "s": 0})
+                    fields.append({**base, "s": 0})
             # 空组不展示（该维度未覆盖时整组无值）
             if any(f["v"] for f in fields):
                 groups.append({"name": gname, "fields": fields})

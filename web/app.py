@@ -53,6 +53,7 @@ def create_app(env_file: str | None = None,
     data_root = data_root or paths.DATA_ROOT
     daily_dir = os.path.join(data_root, "records", "daily")
     photos_dir = os.path.join(data_root, "records", "photos")
+    backup_dir = os.path.join(data_root, "records", "_backup")
 
     def cfg(key: str, default: str = "") -> str:
         return envfile.effective(key, env_path, default)
@@ -152,6 +153,21 @@ def create_app(env_file: str | None = None,
             photos=records_store.list_photos(photos_dir, date),
             sev=records_store.sev_class,
         )
+
+    @app.post("/record/<date>/field")
+    def record_update_field(date):
+        """修正一个观察值：validator ❌ 拦截 / ⚠️ 放行展示；成功后前端整页刷新。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "errors": ["无权限：需管理口令"]}), 403
+        if not _DATE_RE.match(date):
+            abort(404)
+        body = request.json or {}
+        result = records_store.update_observation(
+            daily_dir, backup_dir, date,
+            str(body.get("dim", "")), str(body.get("indicator", "")),
+            str(body.get("value", "")))
+        status = 200 if result["ok"] else 400
+        return jsonify(result), status
 
     @app.get("/photos/<date>/<path:filename>")
     def photo(date, filename):

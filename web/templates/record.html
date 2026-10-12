@@ -19,6 +19,12 @@
     font-size: 12px; color: var(--ink-3); border: 1px dashed var(--line-strong);
     border-radius: var(--radius-pill); padding: 2px 9px; white-space: nowrap;
   }
+  .field-row.editing { background: var(--cinnabar-tint); }
+  .field-row.editing .v input {
+    width: 100%; padding: 5px 9px; border: 1px solid var(--cinnabar);
+    border-radius: 8px; font-size: 14px; background: #fff;
+  }
+  body.show-edits .field-row .edit { opacity: 1; }
   .photos-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
   .photos-row img {
     width: 100%; aspect-ratio: 4/3; object-fit: cover;
@@ -36,6 +42,8 @@
 </style>
 
 <p style="margin: 0;"><a href="/">‹ 返回记录列表</a></p>
+
+<div id="correction-alert" style="display:none;"></div>
 
 <div class="card">
   <div class="row wrap">
@@ -55,7 +63,7 @@
       <span class="badge lg {{ r.total_sev }} num">{{ "%.1f"|format(r.total) }} / 60</span>
       <div class="scorebar"><i class="{{ r.total_sev }}" style="width:{{ (r.total / 60 * 100) | round(1) }}%"></i></div>
     </div>
-    <button class="btn btn-ghost" disabled title="切片 3（修正流）实现">✎ 修正观察值</button>
+    <button class="btn btn-ghost" id="edit-toggle" title="显示/隐藏全部修正入口（触屏用）">✎ 修正观察值</button>
   </div>
 </div>
 
@@ -97,7 +105,7 @@
     <div class="group-name">{{ g.name }}</div>
     <div class="fields">
       {% for f in g.fields %}
-      <div class="field-row">
+      <div class="field-row" data-dim="{{ dim.key }}" data-ind="{{ f.ind }}">
         <span class="k">{{ f.k }}</span>
         <span class="v">{{ f.v }}</span>
         <span class="row" style="gap:2px;">
@@ -106,7 +114,7 @@
           {% else %}
           <span class="badge {{ sev(f.s) }} num">{{ f.s }}</span>
           {% endif %}
-          <button class="edit" title="切片 3（修正流）实现" disabled>✎</button>
+          <button class="edit" title="修正此项">✎</button>
         </span>
       </div>
       {% endfor %}
@@ -184,4 +192,76 @@
   <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
 </div>
+
+<script>
+(function () {
+  var RECORD_DATE = {{ r.date | tojson }};
+
+  /* 触屏无 hover：顶栏按钮切换全部 ✎ 的常驻可见 */
+  var toggle = document.getElementById("edit-toggle");
+  toggle.addEventListener("click", function () {
+    document.body.classList.toggle("show-edits");
+  });
+
+  function alertBox(html, danger) {
+    var box = document.getElementById("correction-alert");
+    box.className = danger ? "alert-danger" : "alert-note";
+    box.innerHTML = html;
+    box.style.display = "";
+    box.scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+
+  document.querySelectorAll(".field-row .edit").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var row = btn.closest(".field-row");
+      if (row.classList.contains("editing")) return;
+      var vSpan = row.querySelector(".v");
+      var old = vSpan.textContent;
+      row.classList.add("editing");
+      var actionCell = btn.parentElement;
+      vSpan.innerHTML = "";
+      actionCell.innerHTML = "";
+      var input = document.createElement("input");
+      input.value = old;
+      input.setAttribute("aria-label", "修正观察值");
+      vSpan.appendChild(input);
+      var saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-primary btn-sm";
+      saveBtn.textContent = "保存";
+      var cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn btn-subtle btn-sm";
+      cancelBtn.textContent = "取消";
+      actionCell.appendChild(saveBtn);
+      actionCell.appendChild(cancelBtn);
+      input.focus();
+
+      cancelBtn.addEventListener("click", function () { location.reload(); });
+      saveBtn.addEventListener("click", async function () {
+        saveBtn.disabled = true;
+        try {
+          var resp = await fetch("/record/" + RECORD_DATE + "/field", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              dim: row.dataset.dim,
+              indicator: row.dataset.ind,
+              value: input.value
+            })
+          });
+          var data = await resp.json();
+          if (data.ok) {
+            location.reload();  // 重评分结果以服务端重渲为准
+          } else {
+            alertBox("<strong>保存被拦截：</strong>" + data.errors.join("；"), true);
+            saveBtn.disabled = false;
+          }
+        } catch (e) {
+          alertBox("<strong>保存失败：</strong>" + e, true);
+          saveBtn.disabled = false;
+        }
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}
