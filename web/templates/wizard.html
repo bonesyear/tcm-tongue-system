@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}拍照向导 · 六维望诊{% endblock %}
+{% block content %}
+<style>
+  .capture-zone {
+    border: 2px dashed var(--line-strong); border-radius: var(--radius-card);
+    background: var(--card-sunken); min-height: 220px; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; color: var(--ink-2); cursor: pointer;
+    transition: border-color .15s, background .15s; overflow: hidden;
+  }
+  .capture-zone:hover { border-color: var(--cinnabar); background: #f8f2e8; }
+  .capture-zone svg { opacity: .55; }
+  .capture-zone img { width: 100%; height: 100%; object-fit: cover; }
+  .capture-zone.done { border-style: solid; border-color: var(--sev-0); }
+  .tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tips li { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; color: var(--ink-2); }
+  .tips li::before { content: "◆"; color: var(--cinnabar); font-size: 10px; margin-top: 5px; }
+  .tips li.warn { color: var(--cinnabar-deep); font-weight: 600; }
+  .tips li.warn::before { content: "⚠"; font-size: 12px; margin-top: 2px; }
+  .skip-hint { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+  .obs-preview { font-size: 13px; color: var(--ink-2); background: var(--card-sunken);
+    border-radius: var(--radius-inner); padding: 10px 14px; max-height: 160px;
+    overflow: auto; white-space: pre-wrap; }
+  .step-status { font-size: 12.5px; }
+</style>
+
+<div>
+  <h1 class="page-title">拍照向导</h1>
+  <p class="page-sub num">{{ state.date }} · 一步一个部位，全部数据仅存本机</p>
+</div>
+
+{% if state.existing %}
+<div class="alert-note">
+  <strong>今日已有记录（覆盖 {{ state.existing.coverage }} / 6 维）。</strong>
+  {% if state.existing.uncovered %}未覆盖：{{ state.existing.uncovered | join("、") }}{% endif %}
+  <div class="row wrap" style="margin-top:10px; gap:8px;">
+    <button class="btn btn-primary btn-sm" id="mode-merge">补充未覆盖维度</button>
+    <button class="btn btn-ghost btn-sm" id="mode-new">重新分析（旧版自动备份）</button>
+    <a class="btn btn-subtle btn-sm" href="/record/{{ state.date }}">取消</a>
+  </div>
+  <p class="faint" style="font-size:12.5px; margin:8px 0 0;" id="mode-hint">
+    未选择时按「重新分析」处理；「补充」只写入未覆盖维度，已覆盖维度不动。</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <ol class="steps" id="steps">
+    {% for p in state.parts %}
+    <li data-part="{{ p.part }}" class="{{ 'done' if p.status != 'pending' }}">{{ p.part }}</li>
+    {% endfor %}
+  </ol>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 id="step-title"></h2>
+    <span class="tag cinnabar" id="step-dim"></span>
+    <span class="spacer"></span>
+    <span class="step-status faint" id="step-status"></span>
+  </div>
+
+  <div class="grid cols-2" style="align-items:start;">
+    <label class="capture-zone" id="capture">
+      <input type="file" id="file-input" accept="image/*" capture="environment" style="display:none;">
+      <span id="capture-inner" style="display:contents;">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.6"/><path d="M8.5 7l1.2-2.4h4.6L15.5 7"/></svg>
+        <strong>点击拍照或上传照片</strong>
+        <span style="font-size:12.5px; color:var(--ink-3);">保存至 records/photos/{{ state.date }}/</span>
+      </span>
+    </label>
+    <div>
+      <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:8px; font-family:var(--font-serif);">拍摄纪律</div>
+      <ul class="tips" id="tips"></ul>
+    </div>
+  </div>
+
+  <div id="obs-box" style="display:none; margin-top:12px;">
+    <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:6px; font-family:var(--font-serif);">识图结果（提交后可在详情页修正）</div>
+    <div class="obs-preview" id="obs-preview"></div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row wrap">
+    <button class="btn btn-subtle" id="btn-prev">‹ 上一步</button>
+    <button class="btn btn-primary" id="btn-next">下一步 ›</button>
+    <span class="spacer"></span>
+    <button class="btn btn-ghost btn-sm" id="skip-normal">跳过（声明正常）</button>
+    <button class="btn btn-ghost btn-sm" id="skip-uncovered">跳过（未覆盖）</button>
+  </div>
+  <p class="skip-hint" style="margin:10px 2px 0;">
+    「声明正常」= 未拍摄但确认无异常，计入覆盖度；「未覆盖」= 未拍摄且无法确认，该维度不计分。
+    两种跳过都会在记录中明确标注，不会伪造观察值。
+  </p>
+</div>
+
+<div class="card">
+  <div class="row">
+    <div class="muted" style="font-size:13px;" id="progress-text"></div>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" id="btn-submit" disabled>提交分析</button>
+  </div>
+</div>
+
+<!-- 危险信号拦截弹层 -->
+<div class="overlay" id="danger-modal" style="display:none;">
+  <div class="modal">
+    <div class="alert-danger" style="margin-bottom:14px;">
+      <svg class="seal-mini" width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="22" font-weight="700" fill="#fff8f3">警</text>
+      </svg>
+      <div>
+        <strong>安全红线触发</strong>
+        <div style="font-size:13.5px; margin-top:2px;" id="danger-list"></div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13px; margin:10px 0 0;">
+      模型判读可能误判。请先肉眼复核照片与实际情况；确认无误请选择保留警示，误判请选择修正。
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="danger-fix">误判，去修正观察值</button>
+      <button class="btn btn-primary" id="danger-keep">已肉眼复核，保留警示</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var STATE = {{ state | tojson }};
+var DANGER_FLAGS = {{ danger_flags | tojson }};
+var PARTS = STATE.parts;
+var cur = 0;
+var mode = {{ ("merge" if state.existing else "new") | tojson }};
+
+var modeMergeBtn = document.getElementById("mode-merge");
+var modeNewBtn = document.getElementById("mode-new");
+if (modeMergeBtn) {
+  modeMergeBtn.addEventListener("click", function () { mode = "merge"; document.getElementById("mode-hint").textContent = "已选：补充未覆盖维度（已覆盖维度不动）"; });
+  modeNewBtn.addEventListener("click", function () { mode = "new"; document.getElementById("mode-hint").textContent = "已选：重新分析（旧版自动备份）"; });
+}
+
+function isWarnTip(t) { return t.indexOf("⚠") >= 0 || t.indexOf("禁") >= 0; }
+
+function render() {
+  var p = PARTS[cur];
+  document.querySelectorAll("#steps li").forEach(function (li, i) {
+    li.className = (PARTS[i].status !== "pending" ? "done " : "") + (i === cur ? "current" : "");
+  });
+  document.getElementById("step-title").textContent = "第 " + (cur + 1) + " / 7 步 · " + p.part;
+  document.getElementById("step-dim").textContent = p.dim;
+  document.getElementById("step-status").textContent =
+    p.status === "observed" ? "✓ 已识图" :
+    p.status === "skip_normal" ? "✓ 跳过（声明正常）" :
+    p.status === "skip_uncovered" ? "✓ 跳过（未覆盖）" : "";
+  document.getElementById("tips").innerHTML = p.tips.map(function (t) {
+    return '<li class="' + (isWarnTip(t) ? "warn" : "") + '">' + t.replace("⚠️ ", "") + "</li>";
+  }).join("");
+  var obsBox = document.getElementById("obs-box");
+  if (p.observation) {
+    obsBox.style.display = "";
+    document.getElementById("obs-preview").textContent = JSON.stringify(p.observation, null, 2);
+  } else {
+    obsBox.style.display = "none";
+  }
+  document.getElementById("btn-prev").disabled = cur === 0;
+  document.getElementById("btn-next").textContent = cur === 6 ? "到最后一步了" : "下一步 · " + PARTS[cur + 1].part + " ›";
+  document.getElementById("btn-next").disabled = cur === 6;
+  var done = PARTS.filter(function (x) { return x.status !== "pending"; }).length;
+  document.getElementById("progress-text").textContent = "已完成 " + done + " / 7 部位";
+  document.getElementById("btn-submit").disabled = done < 7;
+}
+
+document.getElementById("btn-prev").addEventListener("click", function () { if (cur > 0) { cur--; render(); } });
+document.getElementById("btn-next").addEventListener("click", function () { if (cur < 6) { cur++; render(); } });
+
+function postJSON(url, body) {
+  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+    .then(function (r) { return r.json(); });
+}
+
+document.getElementById("skip-normal").addEventListener("click", function () { skip("normal"); });
+document.getElementById("skip-uncovered").addEventListener("click", function () { skip("uncovered"); });
+function skip(m) {
+  postJSON("/wizard/skip", {part: PARTS[cur].part, mode: m}).then(function (d) {
+    if (d.ok) { PARTS[cur].status = "skip_" + m; PARTS[cur].observation = null; render(); }
+  });
+}
+
+document.getElementById("file-input").addEventListener("change", function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var part = PARTS[cur].part;
+  var statusEl = document.getElementById("step-status");
+  statusEl.textContent = "上传并识图中（视觉模型调用可能需数十秒）…";
+  var fd = new FormData();
+  fd.append("part", part);
+  fd.append("file", file);
+  fetch("/wizard/photo", {method: "POST", body: fd})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        PARTS[cur].status = "observed";
+        PARTS[cur].observation = d.observation;
+        if (d.unmapped && d.unmapped.length) {
+          alert("部分识图字段未识别，已保留在记录 _raw 中：" + d.unmapped.join("、"));
+        }
+      } else {
+        alert(d.error || "识图失败");
+      }
+      render();
+    })
+    .catch(function (e) { alert("请求失败：" + e); render(); });
+  e.target.value = "";
+});
+
+var pendingSubmit = null;
+document.getElementById("btn-submit").addEventListener("click", function () { submit(""); });
+function submit(ack) {
+  postJSON("/wizard/submit", {mode: mode, acknowledge: ack}).then(function (d) {
+    if (d.ok) {
+      location.href = "/record/" + d.date;
+    } else if (d.need_danger_ack) {
+      pendingSubmit = d;
+      document.getElementById("danger-list").innerHTML = d.danger.map(function (f) {
+        return "<strong>" + f.name + "</strong>：" + f.note;
+      }).join("<br>");
+      document.getElementById("danger-modal").style.display = "flex";
+    } else {
+      alert(d.error || (d.errors || []).join("；") || "提交失败");
+    }
+  });
+}
+document.getElementById("danger-keep").addEventListener("click", function () { submit("keep"); });
+document.getElementById("danger-fix").addEventListener("click", function () { submit("fix"); });
+
+render();
+</script>
+{% endblock %}

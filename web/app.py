@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import importlib
+import json
 import os
 import re
 import secrets
@@ -31,7 +32,9 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, \
 import envfile
 import llm_client
 import records_store
+import wizard_store
 from src import paths
+from src.record import DailyRecord
 
 # 设置页管理的键（顺序即页面展示顺序）
 VISION_KEYS = ["VISION_API_KEY", "VISION_MODEL", "VISION_BASE_URL",
@@ -175,6 +178,145 @@ def create_app(env_file: str | None = None,
         if not _DATE_RE.match(date):
             abort(404)
         return send_from_directory(os.path.join(photos_dir, date), filename)
+
+    # ---------------- 拍照向导（切片 4） ----------------
+
+    def _configure_vision():
+        """把当前生效的视觉配置注入环境变量（vision_client 模块级读取）。"""
+        os.environ["VISION_MODEL"] = cfg("VISION_MODEL", "qwen3.8-max")
+        os.environ["VISION_BASE_URL"] = cfg(
+            "VISION_BASE_URL",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
+        os.environ["VISION_API_KEY"] = cfg("VISION_API_KEY")
+
+    @app.get("/wizard")
+    def wizard():
+        today = datetime.date.today().isoformat()
+        existing_rec = records_store.load_record(daily_dir, today)
+        existing = None
+        if existing_rec:
+            covered = existing_rec.get_dimension_coverage()
+            existing = {
+                "coverage": existing_rec.get_covered_dimension_count(),
+                "uncovered": [d.chinese_name for d, c in covered.items() if not c],
+            }
+        return render_template(
+            "wizard.html", page="wizard",
+            state=wizard_store.wizard_state(daily_dir, today, existing),
+            danger_flags=records_store.DANGER_FLAGS,
+        )
+
+    @app.post("/wizard/photo")
+    def wizard_photo():
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        part = request.form.get("part", "")
+        meta = wizard_store.PART_BY_NAME.get(part)
+        file = request.files.get("file")
+        if not meta or not file or not file.filename:
+            return jsonify({"ok": False, "error": "缺少部位或文件"}), 400
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+            return jsonify({"ok": False, "error": f"不支持的图片格式 {ext}"}), 400
+        today = datetime.date.today().isoformat()
+        day_dir = os.path.join(photos_dir, today)
+        os.makedirs(day_dir, exist_ok=True)
+        img_path = os.path.join(day_dir, f"{part}{ext}")
+        file.save(img_path)
+
+        if not vision_configured():
+            return jsonify({"ok": False, "photo_saved": True,
+                            "error": "照片已保存，但未配置视觉模型——请到设置页配置后重试识图"}), 400
+        _configure_vision()
+        try:
+            observe_json, _ = wizard_store.observe_photo(part, img_path)
+        except RuntimeError as e:
+            return jsonify({"ok": False, "photo_saved": True, "error": str(e)}), 502
+        node, unmapped = wizard_store.map_observation(part, observe_json)
+        draft = wizard_store.load_draft(daily_dir, today)
+        draft["parts"][part] = {"status": "observed", "observation": node,
+                                "photo": f"{part}{ext}"}
+        wizard_store.save_draft(daily_dir, draft)
+        return jsonify({"ok": True, "observation": node,
+                        "unmapped": unmapped,
+                        "photo": f"/photos/{today}/{part}{ext}"})
+
+    @app.post("/wizard/skip")
+    def wizard_skip():
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = request.json or {}
+        part = body.get("part", "")
+        mode = body.get("mode", "")
+        if part not in wizard_store.PART_BY_NAME or mode not in ("normal", "uncovered"):
+            return jsonify({"ok": False, "error": "参数错误"}), 400
+        today = datetime.date.today().isoformat()
+        draft = wizard_store.load_draft(daily_dir, today)
+        draft["parts"][part] = {"status": f"skip_{mode}"}
+        wizard_store.save_draft(daily_dir, draft)
+        return jsonify({"ok": True})
+
+    @app.post("/wizard/submit")
+    def wizard_submit():
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = request.json or {}
+        mode = body.get("mode", "new")          # new（整体重建）| merge（只补未覆盖）
+        acknowledge = body.get("acknowledge", "")  # "keep"=已复核保留 | "fix"=误判去修正
+        today = datetime.date.today().isoformat()
+        draft = wizard_store.load_draft(daily_dir, today)
+
+        pending = [p["part"] for p in wizard_store.PARTS
+                   if draft["parts"].get(p["part"], {}).get("status") == "pending"
+                   or p["part"] not in draft["parts"]]
+        if pending:
+            return jsonify({"ok": False,
+                            "error": f"还有未处理的部位：{'、'.join(pending)}"}), 400
+
+        existing_rec = records_store.load_record(daily_dir, today)
+        with open(os.path.join(_REPO_ROOT, "VERSION"), encoding="utf-8") as vf:
+            version = vf.read().strip()
+        raw = wizard_store.assemble_record(
+            draft, version,
+            existing_raw=existing_rec.raw if existing_rec else None,
+            merge_only_uncovered=(mode == "merge"))
+
+        # 校验：先临时档过 validator，❌ 拦截
+        from input_validator import validate_record
+        target = records_store._select_daily_file(daily_dir, today) or \
+            os.path.join(daily_dir, f"{today}_analysis.json")
+        tmp = target + ".wizard-tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _, errors, warnings = validate_record(tmp)
+        os.unlink(tmp)
+        blocking = [e for e in errors if e.startswith("❌")]
+        if blocking:
+            return jsonify({"ok": False, "errors": blocking}), 400
+
+        # 危险信号：未确认则返回给前端弹拦截层
+        triggered = wizard_store.danger_triggered(raw)
+        if triggered and not acknowledge:
+            return jsonify({
+                "ok": False, "need_danger_ack": True,
+                "danger": [{"key": k,
+                            **records_store.DANGER_FLAGS.get(k, {"name": k, "note": ""})}
+                           for k in triggered]})
+
+        # 落盘：覆盖旧档前备份（merge 与重新分析都动旧档）
+        os.makedirs(daily_dir, exist_ok=True)
+        if os.path.exists(target):
+            os.makedirs(backup_dir, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            import shutil
+            shutil.copyfile(target, os.path.join(
+                backup_dir, f"{os.path.basename(target)}.{stamp}.bak"))
+        with open(target, "w", encoding="utf-8") as f:
+            json.dump(raw, f, ensure_ascii=False, indent=2)
+        wizard_store.discard_draft(daily_dir, today)
+        return jsonify({"ok": True, "date": today, "warnings": warnings,
+                        "danger_acknowledged": acknowledge or None})
+
 
     def settings_values() -> dict:
         values = {}
