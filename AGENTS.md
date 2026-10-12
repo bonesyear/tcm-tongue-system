@@ -11,7 +11,7 @@
   Flask 骨架/设置页（切片 1 已合入）。
   更早的 v1.5.0 含一次 breaking change：框架键名去名化（「经方六经辨证」体系），
   接入方与解析层必须按新键名对齐。动手前先读 `README.md` 与 `CHANGELOG.md` 顶部。
-- 测试基线 **309 passed**（含 web 层）。改动完成后必须保持全绿：
+- 测试必须全绿（数量随开发变化，不写死——KNOWN_ISSUES #19）。改动完成后运行：
   ```bash
   python3 -m pytest tests/ -q
   ```
