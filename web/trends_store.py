@@ -16,50 +16,73 @@ import records_store
 
 
 def week_payload(daily_dir: str, target: str) -> dict | None:
-    """target 日起往前 7 天的周报数据（ECharts 直接可消费的结构）。"""
+    """target 日起往前 7 天的周报数据（ECharts 直接可消费的结构）。
+
+    x 轴为连续 7 天（无记录的日期留 None，不断列——对应「正常 0 分与
+    无数据可区分」原则）。无记录返回 None。
+    """
     target_d = datetime.date.fromisoformat(target)
     dates = [(target_d - datetime.timedelta(days=i)).isoformat()
              for i in range(6, -1, -1)]
-    recs = []
-    kept_dates = []
+    rec_by_date = {}
     for d in dates:
         rec = records_store.load_record(daily_dir, d)
         if rec and rec.date:
-            recs.append(rec.raw)
-            kept_dates.append(rec.date)
-    if not recs:
+            rec_by_date[d] = rec.raw
+    if not rec_by_date:
         return None
 
+    recs = [rec_by_date[d] for d in dates if d in rec_by_date]
     data = gwr.generate_weekly_report_data(recs)
-    devs = [gwr.compute_dimension_deviation(r) for r in recs]
+
+    # 连续 7 天轴：无记录日 None（折线 connectNulls:false 断线、热力留空）
+    dev_by_date = {d: gwr.compute_dimension_deviation(rec_by_date[d])
+                   for d in rec_by_date}
     dim_series = {}
     for dim in DIMENSIONS:
         cn = dim.chinese_name
-        dim_series[cn] = [d.get(cn) for d in devs]
+        dim_series[cn] = [dev_by_date[d].get(cn) if d in dev_by_date else None
+                          for d in dates]
 
-    tms = [gwr.extract_tongue_metrics(r) for r in recs]
-    flags = [gwr.extract_tongue_observation_flags(r) for r in recs]
-    axes = list(tms[0].keys()) if tms else []
+    tm_by_date = {d: gwr.extract_tongue_metrics(rec_by_date[d]) for d in rec_by_date}
+    flag_by_date = {d: gwr.extract_tongue_observation_flags(rec_by_date[d])
+                    for d in rec_by_date}
+    axes = list(next(iter(tm_by_date.values())).keys()) if tm_by_date else []
     heat_rows = []
-    for tm, fl in zip(tms, flags):
-        heat_rows.append([tm.get(a) if fl.get(a) else None for a in axes])
+    for d in dates:
+        if d in tm_by_date:
+            tm, fl = tm_by_date[d], flag_by_date[d]
+            heat_rows.append([tm.get(a) if fl.get(a) else None for a in axes])
+        else:
+            heat_rows.append([None] * len(axes))
 
+    first_d, last_d = recs[0]["date"], recs[-1]["date"]
     return {
         "week_id": data["week_id"],
-        "start_date": data["start_date"],
-        "end_date": data["end_date"],
+        "start_date": dates[0],
+        "end_date": dates[-1],
         "count": len(recs),
-        "dates": [d[5:] for d in kept_dates],
+        "dates": [d[5:] for d in dates],
         "dim_series": dim_series,
         "radar": {"axes": axes,
-                  "first": [tms[0].get(a) for a in axes],
-                  "last": [tms[-1].get(a) for a in axes]},
+                  "first": [tm_by_date[first_d].get(a) for a in axes],
+                  "last": [tm_by_date[last_d].get(a) for a in axes]},
         "heat": {"axes": axes, "rows": heat_rows},
-        "trend_analysis": data["trend_analysis"],
+        "trend_rows": [{"k": _TREND_LABELS.get(k, k), "v": v}
+                       for k, v in data["trend_analysis"].items() if v],
         "weekly_comparison": data["weekly_comparison"],
         "summary": data["summary"],
         "next_week_suggestion": data["next_week_suggestion"],
     }
+
+
+# 趋势解读标签（与 web/design/pages/trends.html 的 labels 锁定表一致）
+_TREND_LABELS = {
+    "舌质变化": "舌质", "舌苔变化": "舌苔", "舌形变化": "舌形",
+    "舌下络脉变化": "舌下络脉", "head_face_trend": "头面诊",
+    "eye_trend": "目诊", "ear_trend": "耳诊", "hand_trend": "手诊",
+    "skin_trend": "皮肤诊", "体质变化趋势": "体质总览",
+}
 
 
 def build_report_input(rec) -> str:
@@ -72,11 +95,12 @@ def build_report_input(rec) -> str:
             lines.append(f"【{dim.chinese_name}】今日未覆盖")
             continue
         s = score(dim, obs)
+        scored = score_indicators(dim, obs)
         lines.append(f"【{dim.chinese_name}】偏离度 {s:.1f}/10")
-        for ind, v in score_indicators(dim, obs).items():
+        for ind, v in scored.items():
             lines.append(f"  - {ind}: {obs.get(ind, '')}（{v} 分）")
         for ind, v in obs.items():
-            if ind not in score_indicators(dim, obs) and v:
+            if ind not in scored and v:
                 lines.append(f"  - {ind}: {v}（参考项，不参与评分）")
     triggered = rec.get_triggered_danger_flags()
     lines.append("")
@@ -85,6 +109,14 @@ def build_report_input(rec) -> str:
     asked, total = rec.get_inquiry_coverage()
     lines.append(f"问诊覆盖：{asked}/{total}")
     return "\n".join(lines)
+
+
+def _template_version(template_path: str) -> str:
+    """prompt 模板版本 = 文件名 + 内容短哈希（模板无内嵌版本号，哈希可溯源）。"""
+    import hashlib
+    with open(template_path, "rb") as f:
+        digest = hashlib.sha1(f.read()).hexdigest()[:8]
+    return f"adaptive_analysis_prompt.md@{digest}"
 
 
 def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
@@ -103,13 +135,11 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     if rec is None:
         return {"ok": False, "error": "记录解析失败"}
 
-    with open(os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "templates",
-            "adaptive_analysis_prompt.md"), encoding="utf-8") as f:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    template_path = os.path.join(repo_root, "templates",
+                                 "adaptive_analysis_prompt.md")
+    with open(template_path, encoding="utf-8") as f:
         system_prompt = f.read()
-    with open(os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "VERSION"), encoding="utf-8") as f:
-        version = f.read().strip()
 
     model, base_url, api_key = llm_cfg()
     try:
@@ -118,10 +148,15 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     except RuntimeError as e:
         return {"ok": False, "error": str(e)}
 
-    rec.raw["diagnosis_report"] = {
+    # 存储约定：形状 A 的 diagnosis 容器（任务书 §3），报告为其下的 report 子键；
+    # 形状 B 记录新增 diagnosis 键不影响形状探测（探测只认 observations）。
+    diag = rec.raw.setdefault("diagnosis", {})
+    if not isinstance(diag, dict):
+        return {"ok": False, "error": "记录的 diagnosis 字段不是对象，写回中止"}
+    diag["report"] = {
         "markdown": md,
         "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        "prompt_template_version": version,
+        "prompt_template_version": _template_version(template_path),
     }
     errors, _ = records_store.validate_candidate(rec.raw, daily_dir)
     blocking = [e for e in errors if e.startswith("❌")]

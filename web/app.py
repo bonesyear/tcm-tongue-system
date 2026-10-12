@@ -153,10 +153,11 @@ def create_app(env_file: str | None = None,
         rec = records_store.load_record(daily_dir, date)
         if rec is None:
             abort(404)
+        diag = rec.raw.get("diagnosis")
         return render_template(
             "record.html", page="index",
             r=records_store.record_detail(rec),
-            report=(rec.raw.get("diagnosis_report") or None),
+            report=(diag.get("report") if isinstance(diag, dict) else None),
             llm_configured=bool(cfg("LLM_API_KEY") and cfg("LLM_MODEL")
                                 and cfg("LLM_BASE_URL")),
             photos=records_store.list_photos(photos_dir, date),
