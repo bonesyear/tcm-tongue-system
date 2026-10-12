@@ -75,17 +75,27 @@ DIM_GROUPS = {
 }
 
 # 危险信号字典（键对齐 templates/multi_dim_record_template.json，
-# 中文名对齐 templates/adaptive_analysis_prompt.md §4.5）
+# 中文名对齐 templates/adaptive_analysis_prompt.md §4.5；
+# sign = 体征，拦截弹层与红线横幅展示用）
 DANGER_FLAGS = {
-    "daiyang":         {"name": "戴阳证",   "note": "真阳欲脱，严禁解表发汗，立即就医"},
-    "skin_cold":       {"name": "肤冷脉微", "note": "真阳衰竭，立即就医"},
-    "flesh_wasted":    {"name": "大肉已脱", "note": "精血枯竭，预后不良，建议就医"},
-    "tongue_rigid":    {"name": "舌体强硬", "note": "中风先兆，立即就医"},
-    "tongue_critical": {"name": "舌象危重", "note": "危重症，立即就医"},
-    "mirror_tongue":   {"name": "镜面舌",   "note": "重症消耗，立即就医"},
-    "acute_jaundice":  {"name": "急性黄疸", "note": "急性肝胆重症，紧急就医"},
-    "wind_stroke":     {"name": "中风重症", "note": "中风重症（风痱），立即就医"},
-    "throat_erosion":  {"name": "狐惑重症", "note": "建议就医"},
+    "daiyang":         {"name": "戴阳证",   "sign": "面红如妆 + 手足厥逆",
+                        "note": "真阳欲脱，严禁解表发汗，立即就医"},
+    "skin_cold":       {"name": "肤冷脉微", "sign": "皮肤触之冰冷 + 脉微",
+                        "note": "真阳衰竭，立即就医"},
+    "flesh_wasted":    {"name": "大肉已脱", "sign": "大肉已脱 + 大骨陷下",
+                        "note": "精血枯竭，预后不良，建议就医"},
+    "tongue_rigid":    {"name": "舌体强硬", "sign": "舌体短缩强硬 + 言语不利",
+                        "note": "中风先兆，立即就医"},
+    "tongue_critical": {"name": "舌象危重", "sign": "舌质紫暗 + 苔焦黑干裂",
+                        "note": "危重症，立即就医"},
+    "mirror_tongue":   {"name": "镜面舌",   "sign": "镜面舌 + 极度消瘦",
+                        "note": "重症消耗，立即就医"},
+    "acute_jaundice":  {"name": "急性黄疸", "sign": "巩膜黄染 + 皮肤黄如橘皮",
+                        "note": "急性肝胆重症，紧急就医"},
+    "wind_stroke":     {"name": "中风重症", "sign": "口不能言 + 身体不收",
+                        "note": "中风重症（风痱），立即就医"},
+    "throat_erosion":  {"name": "狐惑重症", "sign": "咽干 + 吞咽困难 + 面目乍赤乍黑",
+                        "note": "建议就医"},
 }
 
 _WEEKDAYS = "一二三四五六日"
@@ -124,6 +134,37 @@ def _select_daily_file(daily_dir: str, date_str: str):
               f"{sorted(os.path.basename(m) for m in matches)}；"
               f"选用 mtime 最新者 {os.path.basename(filepath)}", file=sys.stderr)
     return filepath
+
+
+# 公开别名：跨模块调用不走私有名
+select_daily_file = _select_daily_file
+
+
+def validate_candidate(raw: dict, workdir: str):
+    """候选记录先写临时档过 input_validator；返回 (errors, warnings)。
+
+    ❌ 级由调用方决定是否拦截；⚠️/ℹ️ 仅展示。临时档即写即删。
+    """
+    from input_validator import validate_record
+    os.makedirs(workdir, exist_ok=True)
+    tmp = os.path.join(workdir, ".validate-candidate.json")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _, errors, warnings = validate_record(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return errors, warnings
+
+
+def backup_file(filepath: str, backup_dir: str) -> str:
+    """把 filepath 复制到 backup_dir（原名 + 时间戳 .bak），返回备份路径。"""
+    os.makedirs(backup_dir, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = os.path.join(backup_dir, f"{os.path.basename(filepath)}.{stamp}.bak")
+    shutil.copyfile(filepath, backup)
+    return backup
 
 
 def list_dates(daily_dir: str):
@@ -290,7 +331,6 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
     """
     from src.dimensions import from_english
     from src.record import _DIMENSION_INDICATORS
-    from input_validator import validate_record
 
     dim = from_english(dim_key)
     if dim is None or indicator not in _DIMENSION_INDICATORS.get(dim, {}):
@@ -319,27 +359,21 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
     raw["manually_corrected"] = True
     raw["corrected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
 
-    # 先写临时档校验，❌ 拦截（原档不动）
+    # 临时档先校验，❌ 拦截（原档不动）；通过则备份旧版 → 原子替换
     tmp = filepath + ".validate-tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(raw, f, ensure_ascii=False, indent=2)
+        from input_validator import validate_record
         _, errors, warnings = validate_record(tmp)
+        blocking = [e for e in errors if e.startswith("❌")]
+        if blocking:
+            return {"ok": False, "errors": blocking, "warnings": warnings}
+        backup = backup_file(filepath, backup_dir)
+        os.replace(tmp, filepath)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
-    blocking = [e for e in errors if e.startswith("❌")]
-    if blocking:
-        return {"ok": False, "errors": blocking, "warnings": warnings}
-
-    # 备份旧版 → 原子替换
-    os.makedirs(backup_dir, exist_ok=True)
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = os.path.join(backup_dir,
-                          f"{os.path.basename(filepath)}.{stamp}.bak")
-    shutil.copyfile(filepath, backup)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(raw, f, ensure_ascii=False, indent=2)
 
     new_rec = DailyRecord(raw)
     obs = new_rec.get_observation(dim)

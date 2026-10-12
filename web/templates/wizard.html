@@ -132,7 +132,7 @@ var STATE = {{ state | tojson }};
 var DANGER_FLAGS = {{ danger_flags | tojson }};
 var PARTS = STATE.parts;
 var cur = 0;
-var mode = {{ ("merge" if state.existing else "new") | tojson }};
+var mode = "new";  // 默认「重新分析」（与提示文案一致）；点「补充未覆盖维度」才切 merge
 
 var modeMergeBtn = document.getElementById("mode-merge");
 var modeNewBtn = document.getElementById("mode-new");
@@ -224,7 +224,8 @@ function submit(ack) {
     } else if (d.need_danger_ack) {
       pendingSubmit = d;
       document.getElementById("danger-list").innerHTML = d.danger.map(function (f) {
-        return "<strong>" + f.name + "</strong>：" + f.note;
+        return "<strong>" + f.name + "</strong>" +
+               (f.sign ? "（体征：" + f.sign + "）" : "") + "：" + f.note;
       }).join("<br>");
       document.getElementById("danger-modal").style.display = "flex";
     } else {

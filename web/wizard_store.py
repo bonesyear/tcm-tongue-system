@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 import re
+import sys
 
 from src import paths
 from src.confidence import from_coverage
@@ -80,7 +81,17 @@ def load_draft(daily_dir: str, date_str: str) -> dict:
     try:
         with open(p, encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except FileNotFoundError:
+        return {"date": date_str, "parts": {}}
+    except (OSError, json.JSONDecodeError) as e:
+        # 草稿损坏不可静默重置（AGENTS.md §0：失败要可诊断）——
+        # 告警并备份损坏文件，再返回空白草稿
+        print(f"⚠️ 警告: 向导草稿 {p} 读取失败（{e}），已重置为空白草稿；"
+              f"原文件已保留为 {p}.corrupt", file=sys.stderr)
+        try:
+            os.replace(p, p + ".corrupt")
+        except OSError:
+            pass
         return {"date": date_str, "parts": {}}
 
 
@@ -167,20 +178,51 @@ def observe_photo(part: str, img_path: str) -> tuple[dict, list]:
             f"模型可能未遵守「只输出 JSON」约定，请重试或更换模型")
 
 
+# 从观察值文本探测危险信号的保守词表（仅含照片可判且措辞特异的体征；
+# 识图封闭词表外的正常描述不含这些词，「无黄染」等否定式不会命中）。
+# 这是初审提示而非诊断——触发后由用户在拦截弹层里肉眼复核裁决。
+DANGER_PATTERNS = {
+    "daiyang": "面红如妆",
+    "tongue_rigid": "强硬",
+    "tongue_critical": "焦黑",
+    "mirror_tongue": "镜面",
+    "acute_jaundice": "黄如橘皮",
+    "flesh_wasted": "大肉已脱",
+    "wind_stroke": "口不能言",
+    "skin_cold": "触之冰冷",
+    "throat_erosion": "狐惑",
+}
+
+
+def detect_danger(observations: dict) -> list:
+    """扫描观察值文本，返回命中的危险信号键列表（无命中返回 []）。"""
+    from src.record import _flatten_to_text
+    text = _flatten_to_text(observations)
+    return [key for key, pat in DANGER_PATTERNS.items() if pat in text]
+
+
 def assemble_record(draft: dict, version: str,
                     existing_raw: dict | None = None,
                     merge_only_uncovered: bool = False) -> dict:
     """把草稿组装为形状 B 记录。
 
-    merge_only_uncovered=True 时在 existing_raw 基础上只补未覆盖维度
-    （「补充未覆盖维度」入口）；否则整体重建（当日重分析由调用方先备份）。
+    merge_only_uncovered=True（「补充未覆盖维度」）时深拷贝 existing_raw
+    整体保留（辨证/方剂/问诊/tags 不动），只写入当前未覆盖维度；
+    existing_raw 非形状 B 时抛 ValueError（旧格式不支持补充，应选重新分析）。
+    否则整体重建（当日重分析由调用方先备份）。
     """
     date_str = draft["date"]
-    observations: dict = {}
     if merge_only_uncovered and existing_raw:
-        observations = json.loads(json.dumps(
-            existing_raw.get("observations", {}), ensure_ascii=False))
+        if "observations" not in existing_raw:
+            raise ValueError("当日记录不是形状 B（旧格式/模板格式），"
+                             "「补充未覆盖维度」不支持，请改用「重新分析」")
+        raw = json.loads(json.dumps(existing_raw, ensure_ascii=False))  # 深拷贝
+        observations = raw.setdefault("observations", {})
+    else:
+        raw = {}
+        observations = {}
 
+    skipped_declared, skipped_uncovered = [], []
     for p in PARTS:
         st = draft["parts"].get(p["part"], {})
         status = st.get("status")
@@ -198,6 +240,7 @@ def assemble_record(draft: dict, version: str,
                 else:
                     node[k] = v
         elif status == "skip_normal":
+            skipped_declared.append(dim_en)
             node = observations.setdefault(dim_en, {})
             from src.record import _DIMENSION_INDICATORS, _flatten_to_text
             if _flatten_to_text(node):
@@ -208,23 +251,43 @@ def assemble_record(draft: dict, version: str,
             for k in path[:-1]:
                 cur = cur.setdefault(k, {})
             cur[path[-1]] = DECLARED_NORMAL_PLACEHOLDER
-        # skip_uncovered：什么都不写（维度缺席 = 未覆盖）
+        elif status == "skip_uncovered":
+            skipped_uncovered.append(dim_en)
+            observations.setdefault(dim_en, {})  # 显式留空节点，区别于"未走该步"
 
-    raw = {
-        "record_id": f"{date_str}-web",
-        "date": date_str,
-        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
-        "version": version,
-        "photo_coverage": sorted({from_chinese(PART_BY_NAME[pt]["dim"]).english_name
-            for pt, st in draft["parts"].items() if st.get("status") == "observed"}),
-        "observations": observations,
-        "danger_flags": draft.get("danger_flags") or {
-            "triggered": [],
-            "not_triggered": ["daiyang", "skin_cold", "flesh_wasted",
-                              "tongue_rigid", "tongue_critical", "mirror_tongue",
-                              "acute_jaundice", "wind_stroke", "throat_erosion"],
-        },
+    # 双跳过都要在记录中显式标注（merge 时与既有标注并集）
+    prev_skipped = raw.get("skipped_dimensions", {}) if raw else {}
+    raw["skipped_dimensions"] = {
+        "declared_normal": sorted(set(
+            prev_skipped.get("declared_normal", []) + skipped_declared)),
+        "uncovered": sorted(set(
+            prev_skipped.get("uncovered", []) + skipped_uncovered)),
     }
+
+    if not raw.get("date"):
+        raw.update({
+            "record_id": f"{date_str}-web",
+            "date": date_str,
+            "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+            "version": version,
+        })
+    raw["photo_coverage"] = sorted(set(
+        (raw.get("photo_coverage") or []) +
+        [from_chinese(PART_BY_NAME[pt]["dim"]).english_name
+         for pt, st in draft["parts"].items() if st.get("status") == "observed"]))
+    raw["observations"] = observations
+
+    # danger_flags：草稿显式注入优先（测试/未来 LLM 步骤），否则词表探测
+    if "danger_flags" in draft:
+        raw["danger_flags"] = draft["danger_flags"]
+    else:
+        detected = detect_danger(observations)
+        prev_triggered = (raw.get("danger_flags") or {}).get("triggered", [])
+        triggered = sorted(set(prev_triggered) | set(detected))
+        raw["danger_flags"] = {
+            "triggered": triggered,
+            "not_triggered": [k for k in DANGER_PATTERNS if k not in triggered],
+        }
     covered = DailyRecord(raw).get_covered_dimension_count()
     raw["confidence"] = from_coverage(covered).value
     return raw

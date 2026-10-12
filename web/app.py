@@ -276,20 +276,26 @@ def create_app(env_file: str | None = None,
         existing_rec = records_store.load_record(daily_dir, today)
         with open(os.path.join(_REPO_ROOT, "VERSION"), encoding="utf-8") as vf:
             version = vf.read().strip()
-        raw = wizard_store.assemble_record(
-            draft, version,
-            existing_raw=existing_rec.raw if existing_rec else None,
-            merge_only_uncovered=(mode == "merge"))
+        try:
+            raw = wizard_store.assemble_record(
+                draft, version,
+                existing_raw=existing_rec.raw if existing_rec else None,
+                merge_only_uncovered=(mode == "merge"))
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+        # 「误判去修正」：用户判定红线为误判 → 移入 not_triggered 后落盘，
+        # 再去详情页修正底层观察值（与「保留警示」语义分岔）
+        if acknowledge == "fix":
+            df = raw.get("danger_flags", {})
+            raw["danger_flags"] = {
+                "triggered": [],
+                "not_triggered": sorted(set(
+                    df.get("not_triggered", [])) | set(df.get("triggered", []))),
+            }
 
         # 校验：先临时档过 validator，❌ 拦截
-        from input_validator import validate_record
-        target = records_store._select_daily_file(daily_dir, today) or \
-            os.path.join(daily_dir, f"{today}_analysis.json")
-        tmp = target + ".wizard-tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
-        _, errors, warnings = validate_record(tmp)
-        os.unlink(tmp)
+        errors, warnings = records_store.validate_candidate(raw, daily_dir)
         blocking = [e for e in errors if e.startswith("❌")]
         if blocking:
             return jsonify({"ok": False, "errors": blocking}), 400
@@ -300,17 +306,16 @@ def create_app(env_file: str | None = None,
             return jsonify({
                 "ok": False, "need_danger_ack": True,
                 "danger": [{"key": k,
-                            **records_store.DANGER_FLAGS.get(k, {"name": k, "note": ""})}
+                            **records_store.DANGER_FLAGS.get(
+                                k, {"name": k, "sign": "", "note": ""})}
                            for k in triggered]})
 
         # 落盘：覆盖旧档前备份（merge 与重新分析都动旧档）
         os.makedirs(daily_dir, exist_ok=True)
+        target = records_store.select_daily_file(daily_dir, today) or \
+            os.path.join(daily_dir, f"{today}_analysis.json")
         if os.path.exists(target):
-            os.makedirs(backup_dir, exist_ok=True)
-            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            import shutil
-            shutil.copyfile(target, os.path.join(
-                backup_dir, f"{os.path.basename(target)}.{stamp}.bak"))
+            records_store.backup_file(target, backup_dir)
         with open(target, "w", encoding="utf-8") as f:
             json.dump(raw, f, ensure_ascii=False, indent=2)
         wizard_store.discard_draft(daily_dir, today)
