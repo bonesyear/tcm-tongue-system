@@ -39,6 +39,16 @@
   .herb { display: flex; justify-content: space-between; background: var(--card-sunken); border-radius: 8px; padding: 6px 12px; font-size: 13.5px; }
   .herb b { font-family: var(--font-serif); }
   .herb span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  /* Markdown 报告 */
+  .mdreport h3 { font-size: 17px; margin: 16px 0 6px; }
+  .mdreport h4 { font-size: 15px; margin: 14px 0 5px; }
+  .mdreport h5 { font-size: 14px; margin: 12px 0 4px; }
+  .mdreport p { margin: 6px 0; font-size: 14px; }
+  .mdreport ul, .mdreport ol { margin: 6px 0; padding-left: 22px; font-size: 14px; }
+  .mdreport table { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; width: 100%; }
+  .mdreport th, .mdreport td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
+  .mdreport th { background: var(--card-sunken); font-family: var(--font-serif); }
+  .mdreport code { background: var(--card-sunken); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
 </style>
 
 <p style="margin: 0;"><a href="/">‹ 返回记录列表</a></p>
@@ -148,7 +158,11 @@
     <h2>辨证报告</h2>
     {% if r.template_version %}<span class="tag">模板 {{ r.template_version }}</span>{% endif %}
     <span class="spacer"></span>
-    <button class="btn btn-subtle btn-sm" disabled title="切片 5（辨证报告生成）实现">重新生成</button>
+    {% if llm_configured %}
+    <button class="btn btn-subtle btn-sm" id="btn-report">重新生成</button>
+    {% else %}
+    <button class="btn btn-subtle btn-sm" disabled title="请先在设置页配置辨证模型（LLM_*）">重新生成</button>
+    {% endif %}
   </div>
 
   {% if r.diagnosis %}
@@ -192,6 +206,17 @@
   <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
 </div>
+
+{% if report %}
+<div class="card">
+  <div class="card-head">
+    <h2>辨证报告（LLM 生成）</h2>
+    <span class="tag">模板 {{ report.prompt_template_version }}</span>
+    <span class="faint" style="font-size:12px;">{{ report.generated_at }}</span>
+  </div>
+  <div class="mdreport">{{ report.markdown | markdown | safe }}</div>
+</div>
+{% endif %}
 
 <script>
 (function () {
@@ -262,6 +287,26 @@
       });
     });
   });
+
+  /* 辨证报告生成（LLM 配置好后按钮才可用） */
+  var repBtn = document.getElementById("btn-report");
+  if (repBtn) {
+    repBtn.addEventListener("click", async function () {
+      document.getElementById("correction-alert").style.display = "none";
+      repBtn.disabled = true;
+      repBtn.textContent = "生成中（LLM 调用可能需数十秒）…";
+      try {
+        var resp = await fetch("/record/" + RECORD_DATE + "/report", {method: "POST"});
+        var data = await resp.json();
+        if (data.ok) { location.reload(); }
+        else { alertBox("<strong>报告生成失败：</strong>" + (data.error || "未知错误"), true); }
+      } catch (e) {
+        alertBox("<strong>报告生成失败：</strong>" + e, true);
+      }
+      repBtn.disabled = false;
+      repBtn.textContent = "重新生成";
+    });
+  }
 })();
 </script>
 {% endblock %}
