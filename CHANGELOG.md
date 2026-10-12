@@ -2,6 +2,29 @@
 
 > ⚠️ **SHA 引用说明（2026-09-28 追加）**：本文档引用的部分 commit SHA 因仓库历史重写（隐私清理与去名化）已失效，点击会 404；其中能对应到重写后提交的已同步更新。这是历史文档的固有情况，不影响正文内容。
 
+## v1.7.1（二轮双轴审查修复，2026-10-12）
+
+对 v1.7.0 的切片 5 代码做第二轮 Standards/Spec 双轴审查后的修复：
+
+### 修复
+
+- **辨证报告存储回归规格约定**：自创的顶层 `diagnosis_report` 键 →
+  形状 A 约定的 `diagnosis.report`（任务书 §3）
+- **`prompt_template_version` 语义纠正**：工程 VERSION → 模板内容哈希
+  （`adaptive_analysis_prompt.md@<sha1-8>`，模板无内嵌版本号，哈希可溯源）
+- **趋势图 x 轴连续 7 天**：无记录日 None 断线/留空，不再缺列
+- **趋势解读标签**：10 键映射收进 `week_payload` 装配层（与设计稿锁定表一致），
+  模板不再内联映射
+- **`llm_client.ping()` 连通性误判**：恢复独立实现（max_tokens 512 +
+  只查 choices），思考型模型不再因思考额度吃满被误报不连通；
+  移除 `_LAST_ELAPSED` 全局
+- **`build_report_input` 重复计算**：`score_indicators` 提出循环
+- **`record.html` alertBox 注入面**：innerHTML 直拼服务端错误串 → textContent
+
+### 测试
+
+342 全绿（含更新后的存储路径断言与连续周轴断言）。
+
 ## v1.7.0（Web 层五切片全部落地 + 使用前须知页，2026-10-12）
 
 > 实现规格：`docs/WEB_IMPLEMENTATION_TASK_2026-09-30.md`（Kimi Work 撰写）；
