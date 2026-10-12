@@ -71,8 +71,8 @@
 <div class="alert-danger">
   <div>
     <strong>⚠ 今日触发安全红线 {{ r.danger_triggered | length }} 项：</strong>
-    {% for d in r.danger_triggered %}{{ d.name }}（{{ d.note }}）{% if not loop.last %}；{% endif %}{% endfor %}
-    <div class="muted" style="font-size:12.5px; margin-top:4px;">请以线下就医为准，本系统不构成诊疗建议。</div>
+    {% for d in r.danger_triggered %}{{ d.name }}{% if d.sign %}（{{ d.sign }}）{% endif %}{% if not loop.last %}；{% endif %}{% endfor %}
+    <div class="muted" style="font-size:12.5px; margin-top:4px;">{% for d in r.danger_triggered %}{{ d.note }}{% if not loop.last %}；{% endif %}{% endfor %}。请以线下就医为准，本系统不构成诊疗建议。</div>
   </div>
 </div>
 {% else %}
