@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}{{ r.date }} · 六维望诊{% endblock %}
+{% block content %}
+<style>
+  /* ---- 详情页私有（与 web/design/pages/record.html 一致） ---- */
+  #dims { align-items: start; }
+  .dim-card h3 { font-size: 17px; letter-spacing: 0.06em; }
+  .group-name {
+    font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.14em;
+    margin: 12px 4px 4px; font-family: var(--font-serif);
+  }
+  .field-row .edit {
+    opacity: 0; border: none; background: none; color: var(--ink-3);
+    cursor: pointer; font-size: 13px; padding: 2px 6px;
+  }
+  .field-row:hover .edit { opacity: 1; }
+  .field-row .edit:hover { color: var(--cinnabar); }
+  .field-row .ref {
+    font-size: 12px; color: var(--ink-3); border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-pill); padding: 2px 9px; white-space: nowrap;
+  }
+  .photos-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .photos-row img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border-radius: var(--radius-inner); border: 1px solid var(--line-strong); display: block;
+  }
+  .photos-row .cap { font-size: 12px; color: var(--ink-3); text-align: center; margin-top: 4px; }
+  .diag-views { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .diag-view { background: var(--card-sunken); border-radius: var(--radius-inner); padding: 10px 14px; text-align: center; }
+  .diag-view .k { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.1em; }
+  .diag-view .v { font-family: var(--font-serif); font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .herbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; margin-top: 10px; }
+  .herb { display: flex; justify-content: space-between; background: var(--card-sunken); border-radius: 8px; padding: 6px 12px; font-size: 13.5px; }
+  .herb b { font-family: var(--font-serif); }
+  .herb span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+</style>
+
+<p style="margin: 0;"><a href="/">‹ 返回记录列表</a></p>
+
+<div class="card">
+  <div class="row wrap">
+    <div>
+      <h1 class="page-title num">{{ r.date[:4] }} 年 {{ r.date[5:7] | int }} 月 {{ r.date[8:10] | int }} 日
+        <span style="font-size:16px; color:var(--ink-2); font-weight:400;">{{ r.weekday }}</span></h1>
+      <div class="row wrap" style="margin-top: 8px; gap: 8px;">
+        <span class="tag{% if r.coverage == r.coverage_total %} ok{% endif %}">覆盖 {{ r.coverage }} / {{ r.coverage_total }} 维</span>
+        {% if r.confidence %}<span class="tag">置信度 {{ r.confidence }}</span>{% endif %}
+        {% if r.version %}<span class="tag">v{{ r.version }}</span>{% endif %}
+        {% if r.corrected %}<span class="tag cinnabar">含人工修正</span>{% endif %}
+      </div>
+    </div>
+    <span class="spacer"></span>
+    <div class="scoreline" style="min-width: 260px;">
+      <span class="muted" style="font-size:13px;">总偏离度</span>
+      <span class="badge lg {{ r.total_sev }} num">{{ "%.1f"|format(r.total) }} / 60</span>
+      <div class="scorebar"><i class="{{ r.total_sev }}" style="width:{{ (r.total / 60 * 100) | round(1) }}%"></i></div>
+    </div>
+    <button class="btn btn-ghost" disabled title="切片 3（修正流）实现">✎ 修正观察值</button>
+  </div>
+</div>
+
+{% if r.danger_triggered %}
+<div class="alert-danger">
+  <div>
+    <strong>⚠ 今日触发安全红线 {{ r.danger_triggered | length }} 项：</strong>
+    {% for d in r.danger_triggered %}{{ d.name }}（{{ d.note }}）{% if not loop.last %}；{% endif %}{% endfor %}
+    <div class="muted" style="font-size:12.5px; margin-top:4px;">请以线下就医为准，本系统不构成诊疗建议。</div>
+  </div>
+</div>
+{% else %}
+<div class="card" style="display:flex; align-items:center; gap:12px; padding:14px 22px;">
+  <i class="dot sev-0"></i>
+  <span>今日九项安全红线<strong style="color:var(--sev-0);">均未触发</strong></span>
+  <span class="faint" style="font-size:12.5px;">{{ r.danger_all | join(" · ") }}</span>
+</div>
+{% endif %}
+
+<div class="grid cols-2" id="dims">
+  {% for dim in r.dims %}
+  <section class="card dim-card">
+    <div class="row">
+      <h3>{{ dim.name }}</h3>
+      <span class="spacer"></span>
+      {% if dim.covered %}
+      <div class="scoreline" style="width: 180px;">
+        <span class="badge {{ sev(dim.score) }} num">{{ dim.score }}</span>
+        <div class="scorebar"><i class="{{ sev(dim.score) }}" style="width:{{ dim.score * 10 }}%"></i></div>
+      </div>
+      {% else %}
+      <span class="badge sev-none">未覆盖</span>
+      {% endif %}
+    </div>
+    {% if not dim.covered %}
+    <p class="faint" style="font-size:13px;">该维度未拍摄或无有效观测。</p>
+    {% endif %}
+    {% for g in dim.groups %}
+    <div class="group-name">{{ g.name }}</div>
+    <div class="fields">
+      {% for f in g.fields %}
+      <div class="field-row">
+        <span class="k">{{ f.k }}</span>
+        <span class="v">{{ f.v }}</span>
+        <span class="row" style="gap:2px;">
+          {% if f.ref %}
+          <span class="ref" title="{{ f.ref }}">参考项</span>
+          {% else %}
+          <span class="badge {{ sev(f.s) }} num">{{ f.s }}</span>
+          {% endif %}
+          <button class="edit" title="切片 3（修正流）实现" disabled>✎</button>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>原图对照</h2>
+    <span class="muted" style="font-size:13px;">识图结果需肉眼复核；点刺、腻腐两字段以肉眼为最终权威</span>
+  </div>
+  {% if photos %}
+  <div class="photos-row">
+    {% for p in photos %}
+    <div>
+      <img src="/photos/{{ r.date }}/{{ p }}" alt="{{ p }}" loading="lazy">
+      <div class="cap">{{ p }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="faint" style="font-size:13px;">该日无照片存档（records/photos/{{ r.date }}/）。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>辨证报告</h2>
+    {% if r.template_version %}<span class="tag">模板 {{ r.template_version }}</span>{% endif %}
+    <span class="spacer"></span>
+    <button class="btn btn-subtle btn-sm" disabled title="切片 5（辨证报告生成）实现">重新生成</button>
+  </div>
+
+  {% if r.diagnosis %}
+  {% if r.diagnosis.three_views %}
+  <div class="diag-views">
+    {% for v in r.diagnosis.three_views %}
+    <div class="diag-view"><div class="k">{{ v.k }}</div><div class="v">{{ v.v }}</div></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if r.diagnosis.four_patterns %}
+  <div class="row wrap" style="gap:8px; margin-bottom:14px;">
+    <span class="muted" style="font-size:13px; letter-spacing:0.1em;">四证</span>
+    {% for p in r.diagnosis.four_patterns %}<span class="tag">{{ p.k }} · {{ p.v }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="fields">
+    {% if r.diagnosis.six_diseases %}<div class="field-row"><span class="k">六经归属</span><span class="v">{{ r.diagnosis.six_diseases }}</span></div>{% endif %}
+    {% if r.diagnosis.pathomechanism %}<div class="field-row"><span class="k">核心病机</span><span class="v">{{ r.diagnosis.pathomechanism }}</span></div>{% endif %}
+  </div>
+
+  {% if r.diagnosis.formula and r.diagnosis.formula.name %}
+  <hr class="divider">
+  <div class="row">
+    <h3 style="font-size:16px;">{{ r.diagnosis.formula.name }}</h3>
+    <span class="spacer"></span>
+    {% if r.diagnosis.formula.note %}<span class="faint" style="font-size:12.5px;">{{ r.diagnosis.formula.note }}</span>{% endif %}
+  </div>
+  <div class="herbs">
+    {% for h in r.diagnosis.formula.ingredients %}
+    <div class="herb"><b>{{ h.herb }}</b><span>{{ h.dosage }}</span></div>
+    {% endfor %}
+  </div>
+  {% if r.diagnosis.formula.rationale %}
+  <p class="muted" style="margin:12px 0 0; font-size:13.5px;">方义：{{ r.diagnosis.formula.rationale }}</p>
+  {% endif %}
+  {% endif %}
+  {% else %}
+  <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
+  {% endif %}
+</div>
+{% endblock %}
