@@ -1,13 +1,114 @@
 {% extends "base.html" %}
 {% block title %}记录 · 六维望诊{% endblock %}
 {% block content %}
+<style>
+  /* ---- 首页私有：日历（与 web/design/pages/index.html 一致） ---- */
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal .wd { text-align: center; font-size: 12px; color: var(--ink-3); padding: 4px 0; letter-spacing: 0.1em; }
+  .cal .day {
+    min-height: 74px; border-radius: var(--radius-inner); border: 1px solid var(--line);
+    background: var(--card); padding: 6px 8px; display: flex; flex-direction: column;
+    gap: 4px; cursor: default; text-decoration: none; color: inherit;
+  }
+  .cal .day.out { background: transparent; border-color: transparent; }
+  .cal .day.has { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .cal .day.has:hover { border-color: var(--cinnabar); box-shadow: var(--shadow-card); }
+  .cal .day.today { border-color: var(--cinnabar); }
+  .cal .dnum { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .cal .day.today .dnum { color: var(--cinnabar-deep); font-weight: 700; }
+  .cal .ddots { display: flex; gap: 3px; flex-wrap: wrap; }
+  .cal .dscore { margin-top: auto; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---- 首页私有：记录行 ---- */
+  .rec-row {
+    display: grid; grid-template-columns: 132px 86px 1fr auto; align-items: center;
+    gap: 16px; padding: 13px 14px; border-radius: var(--radius-inner);
+    border: 1px solid transparent; text-decoration: none; color: inherit;
+  }
+  .rec-row:hover { background: var(--card); border-color: var(--line-strong); cursor: pointer; }
+  .rec-row + .rec-row { border-top: 1px solid var(--line); border-radius: 0; }
+  .rec-row .date { font-family: var(--font-serif); font-size: 16px; font-weight: 700; }
+  .rec-row .date small { font-family: var(--font-sans); font-weight: 400; color: var(--ink-3); margin-left: 6px; font-size: 12px; }
+  .rec-row .dimmini { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rec-row .dimmini span { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+  .stat { text-align: center; padding: 16px 10px; }
+  .stat .n { font-family: var(--font-serif); font-size: 28px; font-weight: 700; }
+  .stat .l { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.08em; margin-top: 2px; }
+</style>
+
+{% if empty %}
+<div class="alert-note" style="display:flex; align-items:center; gap:12px;">
+  <span>首次使用？数据库为空时可载入一份合成示例数据体验完整流程。</span>
+  <span class="spacer"></span>
+  <form method="post" action="/demo"><button class="btn btn-subtle btn-sm" type="submit">载入示例数据</button></form>
+</div>
+{% endif %}
+
 <div>
   <h1 class="page-title">记录</h1>
-  <p class="page-sub">逐日望诊记录一览</p>
+  <p class="page-sub">{{ cal.label }} · 当日覆盖维度与总分一览</p>
+</div>
+
+<div class="stat-strip">
+  <div class="card stat"><div class="n num">{{ stats.week_days }}</div><div class="l">本周记录天数</div></div>
+  <div class="card stat"><div class="n num">{{ stats.streak }}</div><div class="l">连续记录（天）</div></div>
+  <div class="card stat">
+    <div class="n num">{% if stats.week_avg is not none %}{{ stats.week_avg }}<span style="font-size:15px; color:var(--ink-3);"> / 60</span>{% else %}<span class="faint">—</span>{% endif %}</div>
+    <div class="l">本周平均总偏离度</div>
+  </div>
 </div>
 
 <div class="card">
-  <div class="card-head"><h2>记录列表</h2></div>
-  <p class="muted">本页在切片 2（feat/web-records）实现：日历总览 + 六维评分 + 单日详情入口。</p>
+  <div class="card-head">
+    <h2>日历</h2>
+    <span class="muted" style="font-size:13px;">圆点 = 当日六维等级色；数字 = 总偏离度</span>
+    <span class="spacer"></span>
+    <a class="btn btn-ghost btn-sm" href="/?m={{ cal.prev }}">‹ 上月</a>
+    <a class="btn btn-ghost btn-sm" href="/?m={{ cal.next }}">下月 ›</a>
+  </div>
+  <div class="cal">
+    {% for w in ["一","二","三","四","五","六","日"] %}<div class="wd">{{ w }}</div>{% endfor %}
+    {% for week in cal.weeks %}{% for cell in week %}
+      {% if cell.day is none %}
+      <div class="day out"></div>
+      {% elif cell.has %}
+      <a class="day has{% if cell.today %} today{% endif %}" href="/record/{{ cell.date }}">
+        <span class="dnum">{{ cell.day }}</span>
+        <span class="ddots">{% for d in cell.dots %}<i class="dot {{ d }}"></i>{% endfor %}</span>
+        <span class="dscore" style="color:var(--{{ cell.sev }});">{{ cell.total }}</span>
+      </a>
+      {% else %}
+      <div class="day{% if cell.today %} today{% endif %}"><span class="dnum">{{ cell.day }}</span></div>
+      {% endif %}
+    {% endfor %}{% endfor %}
+  </div>
+</div>
+
+<div class="card" style="padding: 10px 12px;">
+  <div class="card-head" style="margin: 8px 10px 6px;">
+    <h2>近七日</h2>
+    <span class="spacer"></span>
+    <span class="btn btn-primary btn-sm faint" title="切片 4（拍照向导）实现" style="cursor:not-allowed;">＋ 今日记录</span>
+  </div>
+  <div>
+    {% for s in summaries %}
+    <a class="rec-row" href="/record/{{ s.date }}">
+      <div class="date num">{{ s.date[5:].replace("-", " / ") }}<small>{{ s.weekday }}</small></div>
+      <span class="tag{% if s.coverage == s.coverage_total %} ok{% endif %}">覆盖 {{ s.coverage }} / {{ s.coverage_total }}</span>
+      <div class="dimmini">
+        {% for name, v in s.dims.items() %}
+        <span><i class="dot {{ sev(v) }}"></i>{{ name.replace("诊", "") }}</span>
+        {% endfor %}
+      </div>
+      <div class="scoreline" style="min-width: 200px;">
+        <span class="badge lg {{ s.total_sev }}">{{ "%.1f"|format(s.total) }}</span>
+        <div class="scorebar"><i class="{{ s.total_sev }}" style="width:{{ (s.total / 60 * 100) | round(1) }}%"></i></div>
+      </div>
+    </a>
+    {% else %}
+    <p class="muted" style="padding: 10px;">暂无记录。</p>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}

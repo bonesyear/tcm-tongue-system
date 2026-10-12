@@ -11,8 +11,10 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import importlib
 import os
+import re
 import secrets
 import sys
 import tempfile
@@ -23,10 +25,13 @@ for _p in (_REPO_ROOT, os.path.join(_REPO_ROOT, "scripts"),
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, abort, jsonify, redirect, render_template, request, \
+    send_from_directory
 
 import envfile
 import llm_client
+import records_store
+from src import paths
 
 # 设置页管理的键（顺序即页面展示顺序）
 VISION_KEYS = ["VISION_API_KEY", "VISION_MODEL", "VISION_BASE_URL",
@@ -41,9 +46,13 @@ _TINY_PNG_B64 = (
 )
 
 
-def create_app(env_file: str | None = None) -> Flask:
+def create_app(env_file: str | None = None,
+               data_root: str | None = None) -> Flask:
     app = Flask(__name__)
     env_path = env_file or os.path.join(_REPO_ROOT, ".env")
+    data_root = data_root or paths.DATA_ROOT
+    daily_dir = os.path.join(data_root, "records", "daily")
+    photos_dir = os.path.join(data_root, "records", "photos")
 
     def cfg(key: str, default: str = "") -> str:
         return envfile.effective(key, env_path, default)
@@ -103,9 +112,53 @@ def create_app(env_file: str | None = None) -> Flask:
         except OSError:
             return "LICENSE 文件缺失，见 https://www.gnu.org/licenses/gpl-3.0.txt", 404
 
+    _MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
+    _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
     @app.get("/")
     def index():
-        return render_template("index.html", page="index")
+        today = datetime.date.today().isoformat()
+        month = request.args.get("m", "")
+        if not _MONTH_RE.match(month):
+            month = today[:7]
+        summaries = records_store.list_summaries(daily_dir)
+        return render_template(
+            "index.html", page="index",
+            summaries=summaries[:7],
+            stats=records_store.week_stats(summaries, today),
+            cal=records_store.calendar_month(daily_dir, month, today),
+            empty=not summaries,
+            sev=records_store.sev_class,
+        )
+
+    @app.post("/demo")
+    def load_demo():
+        """空库引导：载入合成示例记录（fixture 自述为合成数据）。"""
+        if not admin_allowed():
+            return redirect("/")
+        date = records_store.load_demo(daily_dir)
+        return redirect(f"/record/{date}")
+
+    @app.get("/record/<date>")
+    def record_detail(date):
+        if not _DATE_RE.match(date):
+            abort(404)
+        rec = records_store.load_record(daily_dir, date)
+        if rec is None:
+            abort(404)
+        return render_template(
+            "record.html", page="index",
+            r=records_store.record_detail(rec),
+            photos=records_store.list_photos(photos_dir, date),
+            sev=records_store.sev_class,
+        )
+
+    @app.get("/photos/<date>/<path:filename>")
+    def photo(date, filename):
+        """原图对照：仅服务 records/photos/<date>/ 下的图片文件。"""
+        if not _DATE_RE.match(date):
+            abort(404)
+        return send_from_directory(os.path.join(photos_dir, date), filename)
 
     def settings_values() -> dict:
         values = {}
