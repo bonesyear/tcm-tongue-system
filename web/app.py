@@ -31,7 +31,9 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, \
 
 import envfile
 import llm_client
+import mdmini
 import records_store
+import trends_store
 import wizard_store
 from src import paths
 from src.record import DailyRecord
@@ -57,6 +59,7 @@ def create_app(env_file: str | None = None,
     daily_dir = os.path.join(data_root, "records", "daily")
     photos_dir = os.path.join(data_root, "records", "photos")
     backup_dir = os.path.join(data_root, "records", "_backup")
+    app.jinja_env.filters["markdown"] = mdmini.render
 
     def cfg(key: str, default: str = "") -> str:
         return envfile.effective(key, env_path, default)
@@ -153,8 +156,38 @@ def create_app(env_file: str | None = None,
         return render_template(
             "record.html", page="index",
             r=records_store.record_detail(rec),
+            report=(rec.raw.get("diagnosis_report") or None),
+            llm_configured=bool(cfg("LLM_API_KEY") and cfg("LLM_MODEL")
+                                and cfg("LLM_BASE_URL")),
             photos=records_store.list_photos(photos_dir, date),
             sev=records_store.sev_class,
+        )
+
+    @app.post("/record/<date>/report")
+    def record_report(date):
+        """生成/重新生成辨证报告（辨证 LLM → Markdown → 写回记录 JSON）。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        if not _DATE_RE.match(date):
+            abort(404)
+        result = trends_store.generate_and_store_report(
+            daily_dir, backup_dir, date,
+            lambda: (cfg("LLM_MODEL"), cfg("LLM_BASE_URL"), cfg("LLM_API_KEY")))
+        return jsonify(result), 200 if result["ok"] else 400
+
+    @app.get("/trends")
+    def trends():
+        today = datetime.date.today().isoformat()
+        target = request.args.get("week", "")
+        if not _DATE_RE.match(target):
+            target = today
+        payload = trends_store.week_payload(daily_dir, target)
+        t = datetime.date.fromisoformat(target)
+        return render_template(
+            "trends.html", page="trends", week=payload,
+            prev_week=(t - datetime.timedelta(days=7)).isoformat(),
+            next_week=(t + datetime.timedelta(days=7)).isoformat(),
+            is_current=target == today,
         )
 
     @app.post("/record/<date>/field")

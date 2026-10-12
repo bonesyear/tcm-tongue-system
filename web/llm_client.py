@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -17,13 +18,24 @@ WARN_PREFIX = "[web][llm_client][warn]"
 
 def ping(model: str, base_url: str, api_key: str, timeout: int = 30) -> float:
     """发一条最小对话验证连通性，返回耗时秒数。失败抛 RuntimeError。"""
+    chat("只回复两个字：正常", "", model, base_url, api_key,
+         timeout=timeout, max_tokens=16)
+    return _LAST_ELAPSED[0]
+
+
+_LAST_ELAPSED = [0.0]
+
+
+def chat(user: str, system: str, model: str, base_url: str, api_key: str,
+         timeout: int = 150, max_tokens: int = 4000) -> str:
+    """一次对话调用，返回正文文本。失败抛 RuntimeError。"""
     if not (model and base_url and api_key):
         raise RuntimeError("辨证模型未配置完整（LLM_MODEL / LLM_BASE_URL / LLM_API_KEY）")
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": "只回复两个字：正常"}],
-        "max_tokens": 16,
-    }
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": user})
+    payload = {"model": model, "messages": messages, "max_tokens": max_tokens}
     req = urllib.request.Request(
         base_url, data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json",
@@ -43,6 +55,14 @@ def ping(model: str, base_url: str, api_key: str, timeout: int = 30) -> float:
         raise RuntimeError(f"LLM API 请求失败: {e}") from e
     except json.JSONDecodeError as e:
         raise RuntimeError(f"LLM API 返回非 JSON: {e}") from e
-    if not data.get("choices"):
+    choices = data.get("choices")
+    if not choices:
         raise RuntimeError(f"LLM API 响应缺少 choices: {str(data)[:200]}")
-    return round(time.time() - t0, 1)
+    content = (choices[0].get("message", {}) or {}).get("content") or ""
+    if choices[0].get("finish_reason") == "length":
+        print(f"{WARN_PREFIX} 响应 finish_reason='length'：输出可能被截断，"
+              f"建议提高 max_tokens", file=sys.stderr)
+    if not content.strip():
+        raise RuntimeError("LLM 返回空内容（思考型模型可能吃满 max_tokens 额度）")
+    _LAST_ELAPSED[0] = round(time.time() - t0, 1)
+    return content
