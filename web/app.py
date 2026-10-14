@@ -372,6 +372,8 @@ def create_app(env_file: str | None = None,
     def settings():
         return render_template(
             "settings.html", page="settings", values=settings_values(),
+            env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
+                        if os.environ.get(k)],
             read_only=not admin_allowed(),
             token_arg=request.args.get("token", ""),
             welcome=request.args.get("welcome") == "1",
@@ -385,6 +387,8 @@ def create_app(env_file: str | None = None,
         if not admin_allowed():
             return render_template("settings.html", page="settings",
                                    values=settings_values(),
+            env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
+                        if os.environ.get(k)],
                                    read_only=True, token_arg="", welcome=False,
                                    saved=False,
                                    env_error="无权限：局域网访问需正确管理口令"), 403
