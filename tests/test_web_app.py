@@ -317,3 +317,28 @@ def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
     assert seen["url"] == "https://fresh.example.com/v1/chat/completions".replace(
         "/chat/completions", "/models")
     assert seen["auth"] == "Bearer sk-fresh"
+
+
+# ---------------- 使用手册入口（WEB_GUIDE_LINK_TASK_2026-10-14） ----------------
+
+def test_guide_serves_user_guide_html(client):
+    resp = client.get("/guide")
+    assert resp.status_code == 200
+    assert "part-tongue-bottom" in resp.get_data(as_text=True)  # 锚点存在
+
+
+def test_guide_reachable_without_boot_ack(env_path, monkeypatch):
+    """手册在 welcome 门禁之外（welcome 页本身就链它，否则死循环）。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    app = create_app(env_file=env_path)
+    app.config["TESTING"] = True
+    c = app.test_client()  # 不做 /welcome 确认
+    resp = c.get("/guide")
+    assert resp.status_code == 200
+
+
+def test_guide_link_in_nav_and_wizard(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'href="/guide"' in html and "手册" in html
+    wiz = client.get("/wizard").get_data(as_text=True)
+    assert "guide-link" in wiz and "part-tongue-surface" in wiz  # 深链锚点注入 STATE

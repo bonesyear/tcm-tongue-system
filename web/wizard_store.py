@@ -20,18 +20,25 @@ from src.record import DailyRecord
 # 七部位（顺序即向导步骤）；prompt_key 对齐 scripts/vision_client.py PROMPTS
 PARTS = [
     {"part": "舌面", "prompt_key": "舌面",   "dim": "舌诊",
+     "guide_anchor": "part-tongue-surface", "guide_label": "舌面照",
      "tips": ["自然光下拍摄，避开有色光源", "伸舌自然放松，勿用力前伸", "禁用闪光灯"]},
     {"part": "舌底", "prompt_key": "舌底",   "dim": "舌诊",
+     "guide_anchor": "part-tongue-bottom", "guide_label": "舌底照",
      "tips": ["舌尖抵上腭，露出舌下络脉", "⚠️ 严禁闪光灯（会加剧过度判读）", "对焦舌下两侧络脉"]},
     {"part": "头面", "prompt_key": "头面部", "dim": "头面诊",
+     "guide_anchor": "part-face", "guide_label": "头面部照",
      "tips": ["正面素颜，免冠", "面向自然光源，避免逆光", "包含完整面部与唇周"]},
     {"part": "目",   "prompt_key": "眼部",   "dim": "目诊",
+     "guide_anchor": "part-eyes", "guide_label": "目部照",
      "tips": ["睁眼平视镜头", "白睛清晰可见", "分别拍摄双眼"]},
     {"part": "耳",   "prompt_key": "耳部",   "dim": "耳诊",
+     "guide_anchor": "part-ear", "guide_label": "耳部照",
      "tips": ["侧对光源", "双耳各拍一张", "耳轮完整入镜"]},
     {"part": "手",   "prompt_key": "手掌",   "dim": "手诊",
+     "guide_anchor": "part-hands", "guide_label": "手掌照",
      "tips": ["掌心向上自然摊开", "五指微分，甲床清晰", "禁用闪光灯"]},
     {"part": "皮肤", "prompt_key": "皮肤",   "dim": "皮肤诊",
+     "guide_anchor": "part-skin", "guide_label": "皮肤照",
      "tips": ["前臂或小腿伸侧", "自然光下拍摄", "如有黄汗/甲错部位请特写"]},
 ]
 PART_BY_NAME = {p["part"]: p for p in PARTS}
