@@ -189,9 +189,15 @@ def create_app(env_file: str | None = None,
         if not _DATE_RE.match(target):
             target = today
         payload = trends_store.week_payload(daily_dir, target)
+        latest = None
+        if payload is None:
+            all_dates = records_store.list_dates(daily_dir)  # 降序
+            if all_dates:
+                latest = all_dates[0]  # 最近有记录的一天
         t = datetime.date.fromisoformat(target)
         return render_template(
             "trends.html", page="trends", week=payload,
+            latest_with_records=latest,
             prev_week=(t - datetime.timedelta(days=7)).isoformat(),
             next_week=(t + datetime.timedelta(days=7)).isoformat(),
             is_current=target == today,
