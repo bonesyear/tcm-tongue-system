@@ -322,7 +322,7 @@ def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
 # ---------------- 使用手册入口（WEB_GUIDE_LINK_TASK_2026-10-14） ----------------
 
 def test_guide_serves_user_guide_html(client):
-    resp = client.get("/guide")
+    resp = client.get("/guide/", follow_redirects=True)
     assert resp.status_code == 200
     assert "part-tongue-bottom" in resp.get_data(as_text=True)  # 锚点存在
 
@@ -333,7 +333,7 @@ def test_guide_reachable_without_boot_ack(env_path, monkeypatch):
     app = create_app(env_file=env_path)
     app.config["TESTING"] = True
     c = app.test_client()  # 不做 /welcome 确认
-    resp = c.get("/guide")
+    resp = c.get("/guide/", follow_redirects=True)
     assert resp.status_code == 200
 
 
@@ -342,3 +342,15 @@ def test_guide_link_in_nav_and_wizard(client):
     assert 'href="/guide"' in html and "手册" in html
     wiz = client.get("/wizard").get_data(as_text=True)
     assert "guide-link" in wiz and "part-tongue-surface" in wiz  # 深链锚点注入 STATE
+
+
+def test_guide_images_served(client):
+    """手册配图可访问（相对路径经 /guide/ 尾斜杠解析到 /guide/images/）。"""
+    resp = client.get("/guide/")  # 尾斜杠形态
+    assert resp.status_code == 200
+    assert "part-tongue-bottom" in resp.get_data(as_text=True)
+    img = client.get("/guide/images/tongue_surface.jpg")
+    assert img.status_code == 200
+    assert img.content_type.startswith("image/")
+    img404 = client.get("/guide/images/nope.jpg")
+    assert img404.status_code == 404
