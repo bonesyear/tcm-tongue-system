@@ -261,3 +261,30 @@ def test_models_endpoint_requires_admin(client):
     resp = client.post("/settings/models", json={"target": "vision"},
                        environ_overrides={"REMOTE_ADDR": "192.168.3.20"})
     assert resp.status_code == 403
+
+
+def test_vision_config_not_self_latching(client, env_path, monkeypatch):
+    """_configure_vision 把生效配置注入 os.environ 后，cfg() 仍读 .env 新值
+    （回归：进程内注入不得自我锁存，改配置后无需重启服务）。"""
+    import json as _json
+    import vision_client
+    seen = []
+
+    class Resp:
+        def read(self):
+            return _json.dumps({"choices": [{"message": {"content": "舌面"}}]}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    # reload 会重建 vision_client.call，只能钉在更底层 urlopen 上
+    def fake_urlopen(req, timeout=None):
+        seen.append(_json.loads(req.data.decode())["model"])
+        return Resp()
+    monkeypatch.setattr(vision_client.urllib.request, "urlopen", fake_urlopen)
+    envfile.write_env(env_path, {
+        "VISION_API_KEY": "sk-x", "VISION_MODEL": "model-a",
+        "VISION_BASE_URL": "https://x.com/v1/chat/completions"})
+    client.post("/settings/test", json={"target": "vision"})
+    envfile.write_env(env_path, {"VISION_MODEL": "model-b"})
+    client.post("/settings/test", json={"target": "vision"})
+    assert seen == ["model-a", "model-b"]
