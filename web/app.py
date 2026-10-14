@@ -426,12 +426,19 @@ def create_app(env_file: str | None = None,
         if not admin_allowed():
             return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
         target = (request.json or {}).get("target")
+        body = request.json or {}
+        # 表单里未保存的值优先（先填端点→拉列表→再保存的引导顺序）；
+        # 机密 key 未输入新值时回落到已保存配置
+        url_override = (body.get("base_url") or "").strip()
+        key_override = (body.get("api_key") or "").strip()
         if target == "vision":
             url, key = cfg("VISION_BASE_URL"), cfg("VISION_API_KEY")
         elif target == "llm":
             url, key = cfg("LLM_BASE_URL"), cfg("LLM_API_KEY")
         else:
             return jsonify({"ok": False, "error": f"未知目标 {target!r}"}), 400
+        url = url_override or url
+        key = key_override or key
         try:
             return jsonify({"ok": True, "models": llm_client.list_models(url, key)})
         except RuntimeError as e:

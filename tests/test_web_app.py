@@ -288,3 +288,32 @@ def test_vision_config_not_self_latching(client, env_path, monkeypatch):
     envfile.write_env(env_path, {"VISION_MODEL": "model-b"})
     client.post("/settings/test", json={"target": "vision"})
     assert seen == ["model-a", "model-b"]
+
+
+def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
+    """拉模型列表优先用表单里未保存的端点/Key（先填后拉再存的引导序）。"""
+    import io as _io
+    import json as _json
+    import llm_client
+    seen = {}
+
+    class Resp:
+        def read(self):
+            return _json.dumps({"data": [{"id": "m1"}]}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def capture(req, timeout=None):
+        seen["url"] = req.full_url
+        seen["auth"] = req.headers.get("Authorization")
+        return Resp()
+
+    monkeypatch.setattr(llm_client.urllib.request, "urlopen", capture)
+    resp = client.post("/settings/models", json={
+        "target": "vision",
+        "base_url": "https://fresh.example.com/v1",
+        "api_key": "sk-fresh"})
+    assert resp.status_code == 200
+    assert seen["url"] == "https://fresh.example.com/v1/chat/completions".replace(
+        "/chat/completions", "/models")
+    assert seen["auth"] == "Bearer sk-fresh"

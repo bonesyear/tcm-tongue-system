@@ -83,18 +83,18 @@
       {{ secret_input("VISION_API_KEY", "sk-…") }}
       <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span> · 当前来源：{{ values["VISION_API_KEY"].source }}</div>
 
+      <label>端点</label>
+      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；只填到 /v1 会 404{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+
       <label>模型</label>
       <div class="row" style="gap:8px;">
         <input class="input" name="VISION_MODEL" list="models-vision" value="{{ values['VISION_MODEL'].value }}" {% if read_only or 'VISION_MODEL' in env_locked %}disabled{% endif %}>
         <datalist id="models-vision"></datalist>
-        <button class="btn btn-ghost btn-sm" type="button" data-models="vision"
+        <button class="btn btn-ghost btn-sm" type="button" data-models="vision" style="white-space:nowrap;"
                 {% if read_only %}disabled{% endif %}>获取列表</button>
       </div>
-      <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；点「获取列表」从端点拉取可选模型；换模型后需重新标定封闭词表<span id="models-vision-hint"></span></div>
-
-      <label>端点</label>
-      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；只填到 /v1 会 404{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+      <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；先填端点再点「获取列表」从端点拉取可选模型；换模型后需重新标定封闭词表<span id="models-vision-hint"></span></div>
 
       <label>温度</label>
       <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TEMPERATURE' in env_locked %}disabled{% endif %}>
@@ -126,18 +126,18 @@
       {{ secret_input("LLM_API_KEY", "sk-…") }}
       <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span> · 当前来源：{{ values["LLM_API_KEY"].source }}</div>
 
+      <label>端点</label>
+      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+
       <label>模型</label>
       <div class="row" style="gap:8px;">
         <input class="input" name="LLM_MODEL" list="models-llm" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only or 'LLM_MODEL' in env_locked %}disabled{% endif %}>
         <datalist id="models-llm"></datalist>
-        <button class="btn btn-ghost btn-sm" type="button" data-models="llm"
+        <button class="btn btn-ghost btn-sm" type="button" data-models="llm" style="white-space:nowrap;"
                 {% if read_only %}disabled{% endif %}>获取列表</button>
       </div>
-      <div class="form-hint"><span class="env-note">LLM_MODEL</span> · 点「获取列表」从端点拉取可选模型<span id="models-llm-hint"></span></div>
-
-      <label>端点</label>
-      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+      <div class="form-hint"><span class="env-note">LLM_MODEL</span> · 先填端点再点「获取列表」从端点拉取可选模型<span id="models-llm-hint"></span></div>
     </div>
     <hr class="divider">
     <div class="row">
@@ -189,11 +189,17 @@ document.querySelectorAll("[data-models]").forEach(function (btn) {
     var hint = document.getElementById("models-" + target + "-hint");
     btn.disabled = true;
     hint.textContent = "（拉取中…）";
+    /* 把表单里未保存的端点/Key 一并带上：先填端点→拉列表→再保存 */
+    var prefix = target === "vision" ? "VISION" : "LLM";
+    var urlInput = document.querySelector('input[name="' + prefix + '_BASE_URL"]');
+    var keyInput = document.querySelector('input[name="' + prefix + '_API_KEY"]');
     try {
       var resp = await fetch("/settings/models", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({target: target, admin_token: "{{ token_arg }}"})
+        body: JSON.stringify({target: target, admin_token: "{{ token_arg }}",
+                              base_url: urlInput ? urlInput.value : "",
+                              api_key: keyInput ? keyInput.value : ""})
       });
       var data = await resp.json();
       if (data.ok) {
