@@ -99,7 +99,7 @@ def create_app(env_file: str | None = None,
     def require_boot_ack():
         # guide 是只读公开文档且被 welcome 页引用，必须在门禁之外
         if request.endpoint in ("welcome", "welcome_ack", "license_text",
-                                "guide", "static"):
+                                "guide", "guide_doc", "guide_images", "static"):
             return None
         if request.cookies.get("boot_ack") != boot_token:
             return redirect("/welcome")
@@ -129,11 +129,23 @@ def create_app(env_file: str | None = None,
 
     @app.get("/guide")
     def guide():
+        """/guide → /guide/（尾斜杠让手册里的相对图片路径 images/xxx.jpg
+        解析到 /guide/images/xxx.jpg；浏览器在重定向后保留 #锚点）。"""
+        return redirect("/guide/")
+
+    @app.get("/guide/")
+    def guide_doc():
         """使用手册（独立静态页，自包含暖纸主题；新标签打开，不包外壳）。"""
         path = os.path.join(_REPO_ROOT, "docs", "user-guide.html")
         if not os.path.exists(path):
             return "使用手册缺失：docs/user-guide.html 不存在", 404
         return send_file(path, mimetype="text/html")
+
+    @app.get("/guide/images/<path:filename>")
+    def guide_images(filename):
+        """手册配图（docs/images/ 下的静态资源）。"""
+        return send_from_directory(os.path.join(_REPO_ROOT, "docs", "images"),
+                                   filename)
 
     _MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
     _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
