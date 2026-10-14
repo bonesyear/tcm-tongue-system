@@ -412,6 +412,23 @@ def create_app(env_file: str | None = None,
         suffix = f"&token={f.get('admin_token')}" if f.get("admin_token") else ""
         return redirect(f"/settings?saved=1{suffix}")
 
+    @app.post("/settings/models")
+    def settings_models():
+        """从配置的端点拉取可用模型列表（供设置页下拉选择）。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        target = (request.json or {}).get("target")
+        if target == "vision":
+            url, key = cfg("VISION_BASE_URL"), cfg("VISION_API_KEY")
+        elif target == "llm":
+            url, key = cfg("LLM_BASE_URL"), cfg("LLM_API_KEY")
+        else:
+            return jsonify({"ok": False, "error": f"未知目标 {target!r}"}), 400
+        try:
+            return jsonify({"ok": True, "models": llm_client.list_models(url, key)})
+        except RuntimeError as e:
+            return jsonify({"ok": False, "error": str(e)})
+
     @app.post("/settings/test")
     def settings_test():
         if not admin_allowed():

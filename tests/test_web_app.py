@@ -193,3 +193,37 @@ def test_env_var_sourced_fields_locked(env_path, monkeypatch):
     assert resp.status_code == 302
     import envfile
     assert envfile.read_env(env_path)["VISION_MODEL"] == "m1"
+
+
+# ---------------- 模型列表（settings/models） ----------------
+
+def test_list_models_url_derivation():
+    sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import llm_client
+    assert llm_client._models_url(
+        "https://x.com/compatible-mode/v1/chat/completions") == \
+        "https://x.com/compatible-mode/v1/models"
+    assert llm_client._models_url("https://x.com/v1/") == "https://x.com/v1/models"
+
+
+def test_settings_models_endpoint(client, env_path, monkeypatch):
+    """拉模型列表：mock urlopen，验证解析与排序。"""
+    import io as _io
+    import json as _json
+    sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import llm_client
+
+    class Resp:
+        def read(self):
+            return _json.dumps({"data": [{"id": "qwen3.8-max"}, {"id": "glm-5.3"}]}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(llm_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: Resp())
+    envfile.write_env(env_path, {
+        "VISION_API_KEY": "sk-x",
+        "VISION_BASE_URL": "https://x.com/v1/chat/completions"})
+    resp = client.post("/settings/models", json={"target": "vision"})
+    assert resp.status_code == 200
+    assert resp.get_json()["models"] == ["glm-5.3", "qwen3.8-max"]
