@@ -36,6 +36,13 @@
 {% if env_error %}
 <div class="alert-danger"><strong>保存失败</strong>：{{ env_error }}</div>
 {% endif %}
+{% if env_locked %}
+<div class="alert-note">
+  <strong>{{ env_locked | length }} 项配置来自系统环境变量</strong>（{{ env_locked | join("、") }}）：
+  环境变量优先级高于 .env，这些字段已锁定，页面修改不会生效。
+  如需修改请调整系统环境变量（或在系统中删除后由 .env 接管）。
+</div>
+{% endif %}
 {% if read_only %}
 <div class="alert-note">
   <strong>只读态：</strong>当前以局域网访客身份访问且未通过管理口令验证 —— 设置页为只读，无法修改或测试连通性。
@@ -45,7 +52,7 @@
 {% macro secret_input(key, placeholder) -%}
 <input class="input" type="password" name="{{ key }}" autocomplete="off"
        placeholder="{{ '已保存（留空则不修改）' if values[key].set else placeholder }}"
-       {% if read_only %}disabled{% endif %}>
+       {% if read_only or key in env_locked %}disabled{% endif %}>
 {%- endmacro %}
 
 {% macro test_button(target) -%}
@@ -70,19 +77,19 @@
       <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span> · 当前来源：{{ values["VISION_API_KEY"].source }}</div>
 
       <label>模型</label>
-      <input class="input" name="VISION_MODEL" value="{{ values['VISION_MODEL'].value }}" {% if read_only %}disabled{% endif %}>
+      <input class="input" name="VISION_MODEL" value="{{ values['VISION_MODEL'].value }}" {% if read_only or 'VISION_MODEL' in env_locked %}disabled{% endif %}>
       <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；换模型后需重新标定封闭词表</div>
 
       <label>端点</label>
-      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 完整的 chat/completions 端点地址</div>
+      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；只填到 /v1 会 404{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
 
       <label>温度</label>
-      <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only %}disabled{% endif %}>
+      <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TEMPERATURE' in env_locked %}disabled{% endif %}>
       <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 留空则不发送；注意部分端点有服务端下限（如 DashScope 钳制到 0.6）</div>
 
       <label>超时（秒）</label>
-      <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only %}disabled{% endif %}>
+      <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TIMEOUT' in env_locked %}disabled{% endif %}>
       <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span></div>
     </div>
     <hr class="divider">
@@ -108,12 +115,12 @@
       <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span> · 当前来源：{{ values["LLM_API_KEY"].source }}</div>
 
       <label>模型</label>
-      <input class="input" name="LLM_MODEL" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only %}disabled{% endif %}>
+      <input class="input" name="LLM_MODEL" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only or 'LLM_MODEL' in env_locked %}disabled{% endif %}>
       <div class="form-hint"><span class="env-note">LLM_MODEL</span></div>
 
       <label>端点</label>
-      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…" {% if read_only %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 完整的 chat/completions 端点地址</div>
+      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
+      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
     </div>
     <hr class="divider">
     <div class="row">
@@ -134,10 +141,10 @@
       <div class="radio-row">
         <label><input type="radio" name="WEB_HOST" value="127.0.0.1"
                {% if values["WEB_HOST"].value != "0.0.0.0" %}checked{% endif %}
-               {% if read_only %}disabled{% endif %}>仅本机（127.0.0.1，默认）</label>
+               {% if read_only or 'WEB_HOST' in env_locked %}disabled{% endif %}>仅本机（127.0.0.1，默认）</label>
         <label><input type="radio" name="WEB_HOST" value="0.0.0.0"
                {% if values["WEB_HOST"].value == "0.0.0.0" %}checked{% endif %}
-               {% if read_only %}disabled{% endif %}>局域网（0.0.0.0）</label>
+               {% if read_only or 'WEB_HOST' in env_locked %}disabled{% endif %}>局域网（0.0.0.0）</label>
       </div>
       <div class="form-hint">开启局域网访问需先设置管理口令，否则局域网设备对设置页只读；保存后重启服务生效</div>
       {% if lan_ip %}

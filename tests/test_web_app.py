@@ -173,3 +173,23 @@ def test_lan_wrong_token_rejected(client, env_path):
 def test_test_endpoint_rejects_unknown_target(client):
     resp = client.post("/settings/test", json={"target": "bogus"})
     assert resp.status_code == 400
+
+
+def test_env_var_sourced_fields_locked(env_path, monkeypatch):
+    """环境变量来源的字段：页面锁定 + 醒目提示（防止「保存了又变回」的困惑）。"""
+    monkeypatch.setenv("VISION_BASE_URL", "https://env-var.example.com/v1/chat/completions")
+    app = create_app(env_file=env_path)
+    app.config["TESTING"] = True
+    c = app.test_client()
+    c.post("/welcome")
+    html = c.get("/settings").get_data(as_text=True)
+    assert "来自系统环境变量" in html
+    assert "VISION_BASE_URL" in html
+    assert "来自环境变量，页面不可改" in html
+    # 被锁字段带 disabled
+    assert 'name="VISION_BASE_URL" value="https://env-var.example.com/v1/chat/completions" disabled' in html
+    # 但保存 .env 中自己设置的值不受影响（.env 优先于页面，环境变量优先于 .env）
+    resp = c.post("/settings", data={"VISION_MODEL": "m1"})
+    assert resp.status_code == 302
+    import envfile
+    assert envfile.read_env(env_path)["VISION_MODEL"] == "m1"
