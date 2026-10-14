@@ -27,7 +27,7 @@ for _p in (_REPO_ROOT, os.path.join(_REPO_ROOT, "scripts"),
         sys.path.insert(0, _p)
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, \
-    send_from_directory
+    send_file, send_from_directory
 
 import envfile
 import llm_client
@@ -97,7 +97,9 @@ def create_app(env_file: str | None = None,
 
     @app.before_request
     def require_boot_ack():
-        if request.endpoint in ("welcome", "welcome_ack", "license_text", "static"):
+        # guide 是只读公开文档且被 welcome 页引用，必须在门禁之外
+        if request.endpoint in ("welcome", "welcome_ack", "license_text",
+                                "guide", "static"):
             return None
         if request.cookies.get("boot_ack") != boot_token:
             return redirect("/welcome")
@@ -124,6 +126,14 @@ def create_app(env_file: str | None = None,
                 return app.response_class(f.read(), mimetype="text/plain; charset=utf-8")
         except OSError:
             return "LICENSE 文件缺失，见 https://www.gnu.org/licenses/gpl-3.0.txt", 404
+
+    @app.get("/guide")
+    def guide():
+        """使用手册（独立静态页，自包含暖纸主题；新标签打开，不包外壳）。"""
+        path = os.path.join(_REPO_ROOT, "docs", "user-guide.html")
+        if not os.path.exists(path):
+            return "使用手册缺失：docs/user-guide.html 不存在", 404
+        return send_file(path, mimetype="text/html")
 
     _MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
     _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

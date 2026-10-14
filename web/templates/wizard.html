@@ -73,6 +73,8 @@
     <div>
       <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:8px; font-family:var(--font-serif);">拍摄纪律</div>
       <ul class="tips" id="tips"></ul>
+      <a id="guide-link" target="_blank" rel="noopener"
+         style="font-size:13px; color:var(--cinnabar); display:inline-block; margin-top:10px;"></a>
     </div>
   </div>
 
@@ -157,6 +159,9 @@ function render() {
   document.getElementById("tips").innerHTML = p.tips.map(function (t) {
     return '<li class="' + (isWarnTip(t) ? "warn" : "") + '">' + t.replace("⚠️ ", "") + "</li>";
   }).join("");
+  var gl = document.getElementById("guide-link");
+  gl.href = "/guide#" + p.guide_anchor;
+  gl.textContent = "《" + p.guide_label + "》完整指南与示例图 ↗";
   var obsBox = document.getElementById("obs-box");
   if (p.observation) {
     obsBox.style.display = "";
