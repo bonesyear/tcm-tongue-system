@@ -1,172 +1,76 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="pandoc" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>中医望诊系统使用手册</title>
-  <style>
-    html {
-      color: #1a1a1a;
-      background-color: #fdfdfd;
-    }
-    body {
-      margin: 0 auto;
-      max-width: 36em;
-      padding-left: 50px;
-      padding-right: 50px;
-      padding-top: 50px;
-      padding-bottom: 50px;
-      hyphens: auto;
-      overflow-wrap: break-word;
-      text-rendering: optimizeLegibility;
-      font-kerning: normal;
-    }
-    @media (max-width: 600px) {
-      body {
-        font-size: 0.9em;
-        padding: 12px;
-      }
-      h1 {
-        font-size: 1.8em;
-      }
-    }
-    @media print {
-      html {
-        background-color: white;
-      }
-      body {
-        background-color: transparent;
-        color: black;
-        font-size: 12pt;
-      }
-      p, h2, h3 {
-        orphans: 3;
-        widows: 3;
-      }
-      h2, h3, h4 {
-        page-break-after: avoid;
-      }
-    }
-    p {
-      margin: 1em 0;
-    }
-    a {
-      color: #1a1a1a;
-    }
-    a:visited {
-      color: #1a1a1a;
-    }
-    img {
-      max-width: 100%;
-    }
-    svg {
-      height: auto;
-      max-width: 100%;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.4em;
-    }
-    h5, h6 {
-      font-size: 1em;
-      font-style: italic;
-    }
-    h6 {
-      font-weight: normal;
-    }
-    ol, ul {
-      padding-left: 1.7em;
-      margin-top: 1em;
-    }
-    li > ol, li > ul {
-      margin-top: 0;
-    }
-    blockquote {
-      margin: 1em 0 1em 1.7em;
-      padding-left: 1em;
-      border-left: 2px solid #e6e6e6;
-      color: #606060;
-    }
-    code {
-      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
-      font-size: 85%;
-      margin: 0;
-      hyphens: manual;
-    }
-    pre {
-      margin: 1em 0;
-      overflow: auto;
-    }
-    pre code {
-      padding: 0;
-      overflow: visible;
-      overflow-wrap: normal;
-    }
-    .sourceCode {
-     background-color: transparent;
-     overflow: visible;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid #1a1a1a;
-      height: 1px;
-      margin: 1em 0;
-    }
-    table {
-      margin: 1em 0;
-      border-collapse: collapse;
-      width: 100%;
-      overflow-x: auto;
-      display: block;
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-    table caption {
-      margin-bottom: 0.75em;
-    }
-    tbody {
-      margin-top: 0.5em;
-      border-top: 1px solid #1a1a1a;
-      border-bottom: 1px solid #1a1a1a;
-    }
-    th {
-      border-top: 1px solid #1a1a1a;
-      padding: 0.25em 0.5em 0.25em 0.5em;
-    }
-    td {
-      padding: 0.125em 0.5em 0.25em 0.5em;
-    }
-    header {
-      margin-bottom: 4em;
-      text-align: center;
-    }
-    #TOC li {
-      list-style: none;
-    }
-    #TOC ul {
-      padding-left: 1.3em;
-    }
-    #TOC > ul {
-      padding-left: 0;
-    }
-    #TOC a:not(:hover) {
-      text-decoration: none;
-    }
-    code{white-space: pre-wrap;}
-    span.smallcaps{font-variant: small-caps;}
-    div.columns{display: flex; gap: min(4vw, 1.5em);}
-    div.column{flex: auto; overflow-x: auto;}
-    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-    /* The extra [class] is a hack that increases specificity enough to
-       override a similar rule in reveal.js */
-    ul.task-list[class]{list-style: none;}
-    ul.task-list li input[type="checkbox"] {
-      font-size: inherit;
-      width: 0.8em;
-      margin: 0 0.8em 0.2em -1.6em;
-      vertical-align: middle;
-    }
-    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>中医望诊系统使用手册</title>
+<style>
+:root{
+  --paper:#faf7f1; --card:#ffffff; --ink:#2f2a26; --ink-2:#5c554c; --ink-3:#8a8177;
+  --cinnabar:#b0442a; --cinnabar-deep:#8f3722; --line:#e6ded2; --line-strong:#d8cdbd;
+  --serif:'Songti SC','STSong','SimSun',serif;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0 auto; max-width:860px; padding:32px 22px 64px;
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:15.5px; line-height:1.85;
+}
+header#title-block-header{
+  border-bottom:3px double var(--line-strong); margin-bottom:28px; padding-bottom:18px;
+}
+header#title-block-header .title{
+  font-family:var(--serif); font-size:30px; letter-spacing:.14em;
+  color:var(--cinnabar-deep); margin:0; text-align:center;
+}
+h1{font-family:var(--serif); font-size:24px; margin:0 0 14px; letter-spacing:.06em;}
+h2{
+  font-family:var(--serif); font-size:20.5px; letter-spacing:.08em; margin:40px 0 14px;
+  padding-left:12px; border-left:4px solid var(--cinnabar); color:var(--cinnabar-deep);
+}
+h3{font-family:var(--serif); font-size:17px; letter-spacing:.05em; margin:26px 0 10px;}
+h2[id],h3[id]{scroll-margin-top:18px;}
+a{color:var(--cinnabar); text-decoration:none; border-bottom:1px dotted var(--cinnabar);}
+a:hover{color:var(--cinnabar-deep); border-bottom-style:solid;}
+hr{border:none; border-top:1px solid var(--line); margin:30px 0;}
+blockquote{
+  margin:16px 0; padding:12px 18px; background:#f6efe4;
+  border-left:4px solid var(--cinnabar); border-radius:0 10px 10px 0; color:var(--ink-2);
+}
+blockquote p{margin:4px 0;}
+code{
+  background:#f3ecdf; border:1px solid var(--line); border-radius:5px;
+  padding:1px 6px; font-size:13.5px; color:var(--cinnabar-deep);
+}
+pre{
+  background:#2f2a26; color:#f2ede6; border-radius:12px; padding:16px 20px;
+  overflow:auto; line-height:1.7; font-size:13.5px;
+}
+pre code{background:none; border:none; padding:0; color:inherit;}
+table{
+  width:100%; border-collapse:separate; border-spacing:0; margin:14px 0;
+  background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  font-size:14.5px;
+}
+th,td{padding:9px 13px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top;}
+th{background:#f6efe4; font-family:var(--serif); letter-spacing:.05em; white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tbody tr:nth-child(even){background:#fbf8f2;}
+img{
+  display:block; max-width:min(560px,100%); margin:14px auto; border-radius:14px;
+  border:1px solid var(--line); box-shadow:0 2px 10px rgba(90,70,50,.10);
+}
+ul,ol{padding-left:24px;}
+li{margin:3px 0;}
+strong{color:var(--ink);}
+@media (max-width:640px){
+  body{padding:20px 14px 48px; font-size:15px;}
+  header#title-block-header .title{font-size:24px;}
+  table{font-size:13.5px;}
+  th,td{padding:7px 9px;}
+}
+</style>
 </head>
 <body>
 <header id="title-block-header">
@@ -178,7 +82,7 @@
 <strong>识图模型</strong> 支持任意 OpenAI 兼容多模态模型；默认配置见 <code>.env.example</code>，切换与重新标定方法见 README「配置自己的视觉模型」</p>
 </blockquote>
 <hr />
-<h2>一、系统简介</h2>
+<h2 id="sec-intro">一、系统简介</h2>
 <p>本系统将传统中医&quot;望诊&quot;与现代 AI 视觉技术结合。你在浏览器里打开拍照向导（电脑或手机均可），按步骤拍摄身体七个部位的照片，视觉模型会自动识别部位、提取望诊信息，按照经典经方体系（三观→四证→六经）进行辨证分析，评分与报告全部在本机生成、本机保存。</p>
 <h3>核心理念</h3>
 <blockquote>
@@ -192,7 +96,7 @@
 <li>问诊数据可在同一置信度内提升辨证精度，全部可跳过</li>
 </ul>
 <hr />
-<h2>二、六大拍照维度</h2>
+<h2 id="sec-dimensions">二、六大拍照维度</h2>
 <p>每天你可以拍摄任意数量的照片。系统会根据你上传的内容自动覆盖对应维度。</p>
 <h3>📸 拍照总览</h3>
 <table>
@@ -258,8 +162,8 @@
 </tbody>
 </table>
 <hr />
-<h2>三、各维度拍摄指南</h2>
-<h3>1. 舌面照</h3>
+<h2 id="sec-parts">三、各维度拍摄指南</h2>
+<h3 id="part-tongue-surface">1. 舌面照</h3>
 <blockquote>
 <p><strong>「伸舌自然，光线均匀，对焦清晰」</strong></p>
 </blockquote>
@@ -279,7 +183,7 @@
 </ul>
 <p><img src="images/tongue_surface.jpg" alt="" /></p>
 <hr />
-<h3>2. 舌底照</h3>
+<h3 id="part-tongue-bottom">2. 舌底照</h3>
 <blockquote>
 <p><strong>「舌尖顶上颚，充分暴露舌下」</strong></p>
 </blockquote>
@@ -293,7 +197,7 @@
 <p><strong>关键观察：</strong> 络脉颜色（淡紫/青紫/紫黑）、粗细（怒张/细涩）、有无瘀点</p>
 <p><img src="images/tongue_bottom.jpg" alt="" /></p>
 <hr />
-<h3>3. 头面部照</h3>
+<h3 id="part-face">3. 头面部照</h3>
 <blockquote>
 <p><strong>「正面平视，素颜自然光，拍到完整面部+嘴唇+鼻子」</strong></p>
 </blockquote>
@@ -314,7 +218,7 @@
 </ul>
 <p><img src="images/face.jpg" alt="" /></p>
 <hr />
-<h3>4. 目部照</h3>
+<h3 id="part-eyes">4. 目部照</h3>
 <blockquote>
 <p><strong>「睁大双眼，拍清白睛和下眼睑」</strong></p>
 </blockquote>
@@ -328,7 +232,7 @@
 <p><strong>关键观察：</strong> 白睛颜色（目赤程度）、眼睑浮肿（如卧蚕）、目眶暗沉、巩膜黄染</p>
 <p><img src="images/eyes.jpg" alt="" /></p>
 <hr />
-<h3>5. 耳部照</h3>
+<h3 id="part-ear">5. 耳部照</h3>
 <blockquote>
 <p><strong>「侧面拍摄，耳朵完整入镜」</strong></p>
 </blockquote>
@@ -343,7 +247,7 @@
 <p><strong>关键观察：</strong> 耳色（淡白/红赤/青黑）、耳轮润枯（润泽/干枯）</p>
 <p><img src="images/ear.jpg" alt="" /></p>
 <hr />
-<h3>6. 手掌照</h3>
+<h3 id="part-hands">6. 手掌照</h3>
 <blockquote>
 <p><strong>「掌面朝镜头，手指自然微屈，甲床可见」</strong></p>
 </blockquote>
@@ -358,7 +262,7 @@
 <p><strong>关键观察：</strong> 手掌颜色（淡白/红/暗红）、手掌温度（由问诊获取）、甲床颜色（淡白/红润/暗紫）、甲床形态（光滑/粗糙/甲错）</p>
 <p><img src="images/hands.jpg" alt="" /></p>
 <hr />
-<h3>7. 皮肤照</h3>
+<h3 id="part-skin">7. 皮肤照</h3>
 <blockquote>
 <p><strong>「前臂内侧或小腿，非暴露部位最佳」</strong></p>
 </blockquote>
@@ -372,7 +276,7 @@
 <p><strong>关键观察：</strong> 肤色、有无甲错（干燥粗糙脱屑）、黄汗痕迹、水肿、皮疹</p>
 <p><img src="images/skin.jpg" alt="" /></p>
 <hr />
-<h2>四、十五项问诊（全部可跳过）</h2>
+<h2 id="sec-inquiry">四、十五项问诊（全部可跳过）</h2>
 <p>以下是体系设计的 15 项问诊（<strong>全部可跳过</strong>）。<strong>当前 Web 向导暂不采集问诊</strong>——辨证仅基于六维望诊；问诊数据不改变置信度等级，只在同一等级内提升辨证精度（记录模型仍支持问诊覆盖统计，趋势页会显示）。后续版本若开放采集，以下项目即问卷内容。</p>
 <table>
 <thead>
@@ -464,7 +368,7 @@
 <p>💡 <strong>提示</strong>：问诊回答越多，辨证越精准。但完全不回答也完全可以——系统只会基于拍照信息做判断。</p>
 </blockquote>
 <hr />
-<h2>五、每日拍照建议</h2>
+<h2 id="sec-combos">五、每日拍照建议</h2>
 <h3>🏆 最佳组合（7 张，完整覆盖）</h3>
 <table>
 <thead>
@@ -578,7 +482,7 @@
 <p>⚠️ 仅覆盖 2 维度 → MEDIUM 置信度 → 仅给方剂类别方向，不给具体剂量</p>
 </blockquote>
 <hr />
-<h2>六、使用方式（拍照向导）</h2>
+<h2 id="sec-usage">六、使用方式（拍照向导）</h2>
 <ol>
 <li>启动服务：在项目根目录运行 <code>python web/app.py</code>（依赖安装与初始配置见 <a href="web-quickstart.md">web-quickstart</a>）</li>
 <li>浏览器打开 http://127.0.0.1:8600 （手机与电脑连同一 WiFi 时的用法见 <a href="web-quickstart.md">web-quickstart</a> 第六章）</li>
@@ -597,7 +501,7 @@
 <p>💡 辨证报告在「单日详情」页底部的辨证报告卡片中查看，可点击「重新生成」按当前模板重出；更完整的启动与局域网配置说明见 <a href="web-quickstart.md">web-quickstart</a>。</p>
 </blockquote>
 <hr />
-<h2>七、报告示例</h2>
+<h2 id="sec-report">七、报告示例</h2>
 <p>辨证报告在「单日详情」页底部的辨证报告卡片中展示。以下示例取自示例记录 <code>tests/fixtures/2026-06-25_analysis.json</code>（<strong>合成数据，无临床含义</strong>）：</p>
 <pre><code>🏥 中医望诊辨证报告 — 2026-06-25（合成数据示例）
 
@@ -619,7 +523,7 @@
 </code></pre>
 <p>报告随记录一同保存在当日 JSON 中，并记录生成所用的 <code>prompt_template_version</code>；在详情页点击「重新生成」可按当前模板重出一份。</p>
 <hr />
-<h2>八、注意事项</h2>
+<h2 id="sec-notes">八、注意事项</h2>
 <p>⚠️ <strong>安全提示：</strong></p>
 <ul>
 <li>本系统为辅助参考工具，不构成医疗诊断</li>
