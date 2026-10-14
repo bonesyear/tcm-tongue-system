@@ -218,9 +218,9 @@ def create_app(env_file: str | None = None,
     def _configure_vision():
         """把当前生效的视觉配置注入环境变量（vision_client 模块级读取）。"""
         os.environ["VISION_MODEL"] = cfg("VISION_MODEL", "qwen3.8-max")
-        os.environ["VISION_BASE_URL"] = cfg(
-            "VISION_BASE_URL",
-            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
+        os.environ["VISION_BASE_URL"] = llm_client.normalize_chat_url(
+            cfg("VISION_BASE_URL",
+                "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"))
         os.environ["VISION_API_KEY"] = cfg("VISION_API_KEY")
 
     @app.get("/wizard")
@@ -394,9 +394,11 @@ def create_app(env_file: str | None = None,
                                    env_error="无权限：局域网访问需正确管理口令"), 403
         f = request.form
         updates = {}
-        # 机密键：留空 = 不修改
+        # 机密键：留空 = 不修改；勾选「清除」= 显式删除
         for k in ("VISION_API_KEY", "LLM_API_KEY", "WEB_ADMIN_TOKEN"):
-            if f.get(k):
+            if f.get("CLEAR_" + k):
+                updates[k] = ""
+            elif f.get(k):
                 updates[k] = f[k]
         # 普通键：只更新本表单实际提交的键（缺席 = 不碰，空串 = 显式置空）
         for k in ("VISION_MODEL", "VISION_BASE_URL", "VISION_TEMPERATURE",
@@ -438,13 +440,8 @@ def create_app(env_file: str | None = None,
             if target == "vision":
                 import base64
                 import vision_client
-                # 注入当前生效配置并 reload（模块级 MODEL/URL 在 import 时读取）
-                os.environ["VISION_MODEL"] = cfg("VISION_MODEL", "qwen3.8-max")
-                os.environ["VISION_BASE_URL"] = cfg(
-                    "VISION_BASE_URL",
-                    "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
-                os.environ["VISION_API_KEY"] = cfg("VISION_API_KEY")
-                importlib.reload(vision_client)
+                _configure_vision()  # 注入生效配置（含端点规整）
+                importlib.reload(vision_client)  # 模块级 MODEL/URL 在 import 时读取
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
                     tf.write(base64.b64decode(_TINY_PNG_B64))
                     tmp = tf.name
