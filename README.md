@@ -185,7 +185,6 @@ src/
 scripts/
   input_validator.py       # 记录校验（安全边界违反=退出码 1）
   generate_weekly_report.py # 周报生成
-  draw_hand_diagram.py     # 手部解剖示意图
   vision_client.py         # 识图统一入口（OpenAI 兼容视觉模型，可用环境变量插拔）
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
