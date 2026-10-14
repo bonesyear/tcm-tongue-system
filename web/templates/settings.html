@@ -50,9 +50,16 @@
 {% endif %}
 
 {% macro secret_input(key, placeholder) -%}
-<input class="input" type="password" name="{{ key }}" autocomplete="off"
-       placeholder="{{ '已保存（留空则不修改）' if values[key].set else placeholder }}"
-       {% if read_only or key in env_locked %}disabled{% endif %}>
+<div class="row" style="gap:10px;">
+  <input class="input" type="password" name="{{ key }}" autocomplete="off"
+         placeholder="{{ '已保存（输入新值即覆盖）' if values[key].set else placeholder }}"
+         {% if read_only or key in env_locked %}disabled{% endif %}>
+  {% if values[key].set and not read_only and key not in env_locked %}
+  <label class="row" style="gap:4px; font-size:12px; color:var(--ink-3); white-space:nowrap;">
+    <input type="checkbox" name="CLEAR_{{ key }}"> 清除
+  </label>
+  {% endif %}
+</div>
 {%- endmacro %}
 
 {% macro test_button(target) -%}
@@ -91,11 +98,11 @@
 
       <label>温度</label>
       <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TEMPERATURE' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 留空则不发送；注意部分端点有服务端下限（如 DashScope 钳制到 0.6）</div>
+      <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 控制模型输出的随机性：越低措辞越稳定，越高越发散。<strong>推荐留空</strong>（不发送该参数，由模型默认值生效）；注意部分端点有服务端下限（如 DashScope 钳制到 0.6，设 0 也按 0.6 算）</div>
 
       <label>超时（秒）</label>
       <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TIMEOUT' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span></div>
+      <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span> · <strong>推荐 150–300</strong>：识图是大请求（照片 base64 + 结构化输出），过短会中途超时失败；思考型模型取大些。留空则用代码默认 150</div>
     </div>
     <hr class="divider">
     <div class="row">
@@ -174,7 +181,7 @@
 </div>
 
 <script>
-/* 模型列表：从端点拉取，填入 datalist（可点选也可手输） */
+/* 模型列表：从端点拉取，填入 datalist 并换成真正的下拉框（可选可手输） */
 document.querySelectorAll("[data-models]").forEach(function (btn) {
   btn.addEventListener("click", async function () {
     var target = btn.dataset.models;
@@ -194,6 +201,29 @@ document.querySelectorAll("[data-models]").forEach(function (btn) {
           return '<option value="' + m + '"></option>';
         }).join("");
         hint.textContent = "（已载入 " + data.models.length + " 个模型）";
+
+        /* 换成真正的 <select> 下拉框（datalist 不会主动弹出） */
+        var inputName = target === "vision" ? "VISION_MODEL" : "LLM_MODEL";
+        var input = document.querySelector('input[name="' + inputName + '"]');
+        if (input) {
+          var cur = input.value;
+          var opts = data.models.slice();
+          if (cur && opts.indexOf(cur) < 0) opts.unshift(cur);
+          var select = document.createElement("select");
+          select.className = "input select";
+          select.name = inputName;
+          select.innerHTML = opts.map(function (m) {
+            return '<option value="' + m + '">' + m + "</option>";
+          }).join("") + '<option value="__custom__">✎ 手输其他…</option>';
+          select.value = cur;
+          select.addEventListener("change", function () {
+            if (select.value === "__custom__") {
+              select.replaceWith(input);
+              input.focus();
+            }
+          });
+          input.replaceWith(select);
+        }
       } else {
         hint.textContent = "（拉取失败：" + (data.error || "未知错误") + "）";
       }

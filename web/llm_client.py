@@ -16,6 +16,20 @@ import urllib.request
 WARN_PREFIX = "[web][llm_client][warn]"
 
 
+def normalize_chat_url(url: str) -> str:
+    """规整为 chat/completions 完整地址。
+
+    只填到 /v1（或带尾斜杠）是常见误填（实测 404），此处自动补上
+    /chat/completions 并打 stderr 提示——可诊断，不静默。
+    """
+    u = (url or "").strip().rstrip("/")
+    if u and not u.endswith("/chat/completions"):
+        print(f"{WARN_PREFIX} 端点 {u!r} 缺少 /chat/completions 后缀，"
+              f"已自动补齐；建议把配置改全", file=sys.stderr)
+        u += "/chat/completions"
+    return u
+
+
 def _models_url(base_url: str) -> str:
     """从 chat/completions 完整地址推导 /models 地址。"""
     u = base_url.rstrip("/")
@@ -58,6 +72,7 @@ def ping(model: str, base_url: str, api_key: str, timeout: int = 30) -> float:
     """
     if not (model and base_url and api_key):
         raise RuntimeError("辨证模型未配置完整（LLM_MODEL / LLM_BASE_URL / LLM_API_KEY）")
+    base_url = normalize_chat_url(base_url)
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "只回复两个字：正常"}],
@@ -92,6 +107,7 @@ def chat(user: str, system: str, model: str, base_url: str, api_key: str,
     """一次对话调用，返回正文文本。失败抛 RuntimeError。"""
     if not (model and base_url and api_key):
         raise RuntimeError("辨证模型未配置完整（LLM_MODEL / LLM_BASE_URL / LLM_API_KEY）")
+    base_url = normalize_chat_url(base_url)
     messages = []
     if system:
         messages.append({"role": "system", "content": system})

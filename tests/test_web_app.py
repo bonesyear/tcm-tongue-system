@@ -227,3 +227,37 @@ def test_settings_models_endpoint(client, env_path, monkeypatch):
     resp = client.post("/settings/models", json={"target": "vision"})
     assert resp.status_code == 200
     assert resp.get_json()["models"] == ["glm-5.3", "qwen3.8-max"]
+
+
+def test_normalize_chat_url_appends_suffix(capsys):
+    """端点缺 /chat/completions 时自动补齐并告警（不静默）。"""
+    import llm_client
+    assert llm_client.normalize_chat_url("https://x.com/v1") == \
+        "https://x.com/v1/chat/completions"
+    assert "补齐" in capsys.readouterr().err
+    assert llm_client.normalize_chat_url(
+        "https://x.com/v1/chat/completions") == "https://x.com/v1/chat/completions"
+
+
+# ---------------- 设置页 UX 修正（2026-10-14） ----------------
+
+def test_clear_secret_via_checkbox(client, env_path):
+    """机密键勾选「清除」→ 显式置空（留空=不修改的语义不变）。"""
+    envfile.write_env(env_path, {"VISION_API_KEY": "sk-old"})
+    resp = client.post("/settings", data={"CLEAR_VISION_API_KEY": "on"})
+    assert resp.status_code == 302
+    env = envfile.read_env(env_path)
+    assert env.get("VISION_API_KEY", None) in (None, "")
+
+
+def test_settings_hints_temperature_and_timeout(client):
+    html = client.get("/settings").get_data(as_text=True)
+    assert "随机性" in html and "推荐留空" in html      # 温度说明
+    assert "推荐 150–300" in html                        # 超时推荐值
+    assert "获取列表" in html and "datalist" in html     # 模型下拉
+
+
+def test_models_endpoint_requires_admin(client):
+    resp = client.post("/settings/models", json={"target": "vision"},
+                       environ_overrides={"REMOTE_ADDR": "192.168.3.20"})
+    assert resp.status_code == 403
