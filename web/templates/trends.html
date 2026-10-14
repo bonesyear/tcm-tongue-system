@@ -30,7 +30,15 @@
 </div>
 
 {% if not week %}
-<div class="card"><p class="muted" style="margin:0;">该周没有任何记录。先从「拍照」页完成一天的望诊记录。</p></div>
+<div class="card">
+  <p class="muted" style="margin:0;">该周没有任何记录。先从「拍照」页完成一天的望诊记录。</p>
+  {% if latest_with_records %}
+  <p style="margin:10px 0 0; font-size:14px;">
+    最近一次记录在 <span class="num">{{ latest_with_records }}</span> 所在周 ——
+    <a href="/trends?week={{ latest_with_records }}">去看看 →</a>
+  </p>
+  {% endif %}
+</div>
 {% else %}
 
 <div class="card">
