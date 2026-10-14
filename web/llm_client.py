@@ -16,6 +16,40 @@ import urllib.request
 WARN_PREFIX = "[web][llm_client][warn]"
 
 
+def _models_url(base_url: str) -> str:
+    """从 chat/completions 完整地址推导 /models 地址。"""
+    u = base_url.rstrip("/")
+    if u.endswith("/chat/completions"):
+        u = u[: -len("/chat/completions")]
+    return u + "/models"
+
+
+def list_models(base_url: str, api_key: str, timeout: int = 30) -> list:
+    """GET <base>/models，返回模型 id 列表（OpenAI 兼容）。失败抛 RuntimeError。"""
+    if not (base_url and api_key):
+        raise RuntimeError("端点或 API Key 未配置")
+    req = urllib.request.Request(_models_url(base_url),
+                                 headers={"Authorization": f"Bearer {api_key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode(errors="replace")[:200]
+        except Exception:
+            pass
+        raise RuntimeError(f"模型列表 HTTP {e.code}: {body}") from e
+    except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
+        raise RuntimeError(f"模型列表请求失败: {e}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"模型列表返回非 JSON: {e}") from e
+    ids = [m.get("id") for m in data.get("data", []) if m.get("id")]
+    if not ids:
+        raise RuntimeError(f"端点未返回模型列表: {str(data)[:200]}")
+    return sorted(ids)
+
+
 def ping(model: str, base_url: str, api_key: str, timeout: int = 30) -> float:
     """发一条最小对话验证连通性，返回耗时秒数。失败抛 RuntimeError。
 
