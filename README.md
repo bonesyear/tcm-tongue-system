@@ -67,6 +67,15 @@
 pip install -r requirements.txt   # matplotlib numpy（周报画图）+ Pillow（示意图）；核心 src/ 零依赖
 ```
 
+### Web 界面（推荐）
+
+```bash
+pip install -r web/requirements.txt   # Flask（独立声明，不污染核心依赖）
+python web/app.py                     # http://127.0.0.1:8600
+```
+
+完整操作指引（首次配置、拍照向导、修正、趋势、局域网手机访问）见 [docs/web-quickstart.md](docs/web-quickstart.md)。
+
 ### 跑测试
 
 ```bash
