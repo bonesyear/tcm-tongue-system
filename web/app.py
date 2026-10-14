@@ -55,6 +55,10 @@ def create_app(env_file: str | None = None,
                data_root: str | None = None) -> Flask:
     app = Flask(__name__)
     env_path = env_file or os.path.join(_REPO_ROOT, ".env")
+    # 进程启动时的环境变量快照：_configure_vision() 会把生效配置注入
+    # os.environ 供 vision_client 读取；若 cfg() 读 live os.environ，
+    # 注入值会反过来压住 .env 的后续修改（自我锁存——改了配置却不生效）。
+    boot_env = dict(os.environ)
     data_root = data_root or paths.DATA_ROOT
     daily_dir = os.path.join(data_root, "records", "daily")
     photos_dir = os.path.join(data_root, "records", "photos")
@@ -62,7 +66,9 @@ def create_app(env_file: str | None = None,
     app.jinja_env.filters["markdown"] = mdmini.render
 
     def cfg(key: str, default: str = "") -> str:
-        return envfile.effective(key, env_path, default)
+        """生效值：启动时的环境变量快照优先，其次 .env（不读 live os.environ，
+        防 _configure_vision 的注入自我锁存）。"""
+        return boot_env.get(key) or envfile.read_env(env_path).get(key) or default
 
     def is_local() -> bool:
         return request.remote_addr in ("127.0.0.1", "::1", "localhost")
@@ -364,7 +370,7 @@ def create_app(env_file: str | None = None,
             values[k] = {
                 "set": bool(v),
                 "value": "" if k in SECRET_KEYS else v,
-                "source": "环境变量" if os.environ.get(k) else (".env" if v else "未设置"),
+                "source": "环境变量" if boot_env.get(k) else (".env" if v else "未设置"),
             }
         return values
 
@@ -373,7 +379,7 @@ def create_app(env_file: str | None = None,
         return render_template(
             "settings.html", page="settings", values=settings_values(),
             env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
-                        if os.environ.get(k)],
+                        if boot_env.get(k)],
             read_only=not admin_allowed(),
             token_arg=request.args.get("token", ""),
             welcome=request.args.get("welcome") == "1",
@@ -388,7 +394,7 @@ def create_app(env_file: str | None = None,
             return render_template("settings.html", page="settings",
                                    values=settings_values(),
             env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
-                        if os.environ.get(k)],
+                        if boot_env.get(k)],
                                    read_only=True, token_arg="", welcome=False,
                                    saved=False,
                                    env_error="无权限：局域网访问需正确管理口令"), 403
