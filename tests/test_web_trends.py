@@ -113,3 +113,24 @@ def test_mdmini_renders_and_escapes():
     assert "<li>甲</li>" in html
     assert "<th>A</th>" in html and "<td>2</td>" in html
     assert "<script>" not in html  # 先转义，XSS 不过堂
+
+
+def test_trends_empty_week_offers_latest_link(client):
+    """空周且库内有历史记录 → 显示「去看看」跳转链接，落在最近记录日所在周。"""
+    import datetime as _dt
+    html = client.get("/trends?week=2025-01-01").get_data(as_text=True)
+    assert "没有任何记录" in html
+    assert "/trends?week=2026-06-25" in html  # fixture 最近记录日
+
+
+def test_trends_all_empty_keeps_original_guidance(tmp_path, monkeypatch):
+    """全库无记录 → 维持原文案，无跳转链接。"""
+    d = tmp_path / "empty_data"
+    (d / "records" / "daily").mkdir(parents=True)
+    app = create_app(env_file=str(tmp_path / ".env"), data_root=str(d))
+    app.config["TESTING"] = True
+    c = app.test_client()
+    c.post("/welcome")
+    html = c.get("/trends?week=2025-01-01").get_data(as_text=True)
+    assert "没有任何记录" in html
+    assert "去看看" not in html
