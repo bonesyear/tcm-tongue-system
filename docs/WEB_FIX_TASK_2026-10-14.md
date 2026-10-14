@@ -22,6 +22,12 @@
 - **不要动 `:88` 视觉模型的 hint**——`scripts/vision_client.py:110-111` 对 `VISION_BASE_URL` 不做规整、原样使用，「只填到 /v1 会 404」对视觉侧属实。
 - `:130` 输入框 placeholder 已是完整地址示例，无需改。
 
+> ⚠ 待裁决（Kimi Code 2026-10-14 注）：本任务书对视觉侧的前提已过时——
+> 自 `108a99f` 起 web 层视觉路径（`web/app.py` `_configure_vision`）也走
+> `llm_client.normalize_chat_url()` 自动补齐了；只有命令行脚本
+> `vision_client.py` 仍原样使用。实际执行：两侧 hint 都按真实行为写明
+> 「Web 层自动补齐、脚本请填全」，而非「不要动」。
+
 **验收**：页面渲染无破版；`pytest tests/ -q` 全绿。
 
 ---

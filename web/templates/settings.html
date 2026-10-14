@@ -85,7 +85,7 @@
 
       <label>端点</label>
       <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；只填到 /v1 会 404{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；缺 <span class="env-note">/chat/completions</span> 后缀时 Web 层会自动补齐（命令行脚本 vision_client.py 不规整，直接用脚本时请填全）{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
 
       <label>模型</label>
       <div class="row" style="gap:8px;">
@@ -128,7 +128,7 @@
 
       <label>端点</label>
       <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 地址；缺 <span class="env-note">/chat/completions</span> 后缀时会自动补齐并在服务日志告警，建议填全（形如 https://…/v1/chat/completions）{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
 
       <label>模型</label>
       <div class="row" style="gap:8px;">
