@@ -402,12 +402,15 @@ def create_app(env_file: str | None = None,
             }
         return values
 
+    def _env_locked():
+        return [k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
+                if boot_env.get(k)]
+
     @app.get("/settings")
     def settings():
         return render_template(
             "settings.html", page="settings", values=settings_values(),
-            env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
-                        if boot_env.get(k)],
+            env_locked=_env_locked(),
             read_only=not admin_allowed(),
             token_arg=request.args.get("token", ""),
             welcome=request.args.get("welcome") == "1",
@@ -421,8 +424,7 @@ def create_app(env_file: str | None = None,
         if not admin_allowed():
             return render_template("settings.html", page="settings",
                                    values=settings_values(),
-            env_locked=[k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
-                        if boot_env.get(k)],
+                                   env_locked=_env_locked(),
                                    read_only=True, token_arg="", welcome=False,
                                    saved=False,
                                    env_error="无权限：局域网访问需正确管理口令"), 403
@@ -453,8 +455,8 @@ def create_app(env_file: str | None = None,
         """从配置的端点拉取可用模型列表（供设置页下拉选择）。"""
         if not admin_allowed():
             return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
-        target = (request.json or {}).get("target")
         body = request.json or {}
+        target = body.get("target")
         # 表单里未保存的值优先（先填端点→拉列表→再保存的引导顺序）；
         # 机密 key 未输入新值时回落到已保存配置
         url_override = (body.get("base_url") or "").strip()

@@ -203,32 +203,44 @@ document.querySelectorAll("[data-models]").forEach(function (btn) {
       });
       var data = await resp.json();
       if (data.ok) {
-        list.innerHTML = data.models.map(function (m) {
-          return '<option value="' + m + '"></option>';
-        }).join("");
         hint.textContent = "（已载入 " + data.models.length + " 个模型）";
 
-        /* 换成真正的 <select> 下拉框（datalist 不会主动弹出） */
+        /* 换成真正的 <select> 下拉框（datalist 不会主动弹出）；
+           已是 select 时重建选项（不换元素、保留选中值） */
         var inputName = target === "vision" ? "VISION_MODEL" : "LLM_MODEL";
         var input = document.querySelector('input[name="' + inputName + '"]');
+        var existing = document.querySelector('select[name="' + inputName + '"]');
+        if (existing) input = existing;
         if (input) {
           var cur = input.value;
           var opts = data.models.slice();
           if (cur && opts.indexOf(cur) < 0) opts.unshift(cur);
-          var select = document.createElement("select");
+          var select = existing || document.createElement("select");
           select.className = "input select";
           select.name = inputName;
-          select.innerHTML = opts.map(function (m) {
-            return '<option value="' + m + '">' + m + "</option>";
-          }).join("") + '<option value="__custom__">✎ 手输其他…</option>';
-          select.value = cur;
-          select.addEventListener("change", function () {
-            if (select.value === "__custom__") {
-              select.replaceWith(input);
-              input.focus();
-            }
+          select.innerHTML = "";
+          if (!cur) {
+            /* 空值占位：防止浏览器默认选中首项导致保存时静默改模型 */
+            var emptyOpt = new Option("（请选择模型）", "");
+            select.appendChild(emptyOpt);
+          }
+          opts.forEach(function (m) {
+            select.appendChild(new Option(m, m));
           });
-          input.replaceWith(select);
+          select.appendChild(new Option("✎ 手输其他…", "__custom__"));
+          select.value = cur;
+          list.innerHTML = opts.map(function (m) {
+            return '<option value="' + m + '"></option>';
+          }).join("");
+          if (!existing) {
+            select.addEventListener("change", function () {
+              if (select.value === "__custom__") {
+                select.replaceWith(input);
+                input.focus();
+              }
+            });
+            input.replaceWith(select);
+          }
         }
       } else {
         hint.textContent = "（拉取失败：" + (data.error || "未知错误") + "）";
