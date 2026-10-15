@@ -35,3 +35,6 @@ records/_backup/
 
 # Web 层上传的原始照片（健康数据，永不上传）
 records/photos/
+
+# 一日任务书（跨 Agent 派工单）：仅本地使用，不入库（AGENTS.md §2 约定）
+docs/*_TASK_*.md
