@@ -319,7 +319,7 @@ def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
     assert seen["auth"] == "Bearer sk-fresh"
 
 
-# ---------------- 使用手册入口（WEB_GUIDE_LINK_TASK_2026-10-14） ----------------
+# ---------------- 使用手册入口（2026-10-14 手册入口任务书，完成后已移除） ----------------
 
 def test_guide_serves_user_guide_html(client):
     resp = client.get("/guide/", follow_redirects=True)
@@ -354,3 +354,24 @@ def test_guide_images_served(client):
     assert img.content_type.startswith("image/")
     img404 = client.get("/guide/images/nope.jpg")
     assert img404.status_code == 404
+
+
+def test_wizard_tips_consistent_with_design_mock():
+    """口径漂移守卫：wizard_store.PARTS 的 tips 与设计稿 mock-data.js
+    WIZARD_STEPS 必须一致（四轮审查发现的双副本漂移风险）。"""
+    import io
+    import re
+    mock_js = io.open(os.path.join(
+        _ROOT, "web", "design", "assets", "mock-data.js"),
+        encoding="utf-8").read()
+    # 只取 WIZARD_STEPS 段（文件里还有 photos 等同名 part 块）
+    mock_js = mock_js[mock_js.index("const WIZARD_STEPS"):]
+    sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import wizard_store
+    for p in wizard_store.PARTS:
+        m = re.search(r'\{ part: "%s".*?tips: \[(.*?)\]' % re.escape(p["part"]),
+                      mock_js, re.S)
+        assert m, f"mock-data.js 缺 {p['part']}"
+        # JS 字符串数组粗略还原为 Python 列表比对
+        js_tips = re.findall(r'"(.*?)"', m.group(1))
+        assert js_tips == p["tips"], f"{p['part']} 提示语与手册口径不一致"
