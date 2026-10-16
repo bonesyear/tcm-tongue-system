@@ -226,3 +226,30 @@ def test_new_danger_patterns_detected():
     assert got == ["yangming_critical"]
     got = wizard_store.detect_danger({"skin": {"sweat": "冷汗如油"}})
     assert got == ["collapse_yang"]
+
+
+def test_inquiry_multiple_questions_written(client, data_root, monkeypatch):
+    """15 项问诊放开：多问多答按模板契约写入（含手足温凉）。"""
+    _finish_all_parts(client, monkeypatch)
+    client.post("/wizard/inquiry", json={"question": "手足温凉", "answer": "厥冷（冰冷）"})
+    client.post("/wizard/inquiry", json={"question": "大便如何？", "answer": "便溏"})
+    client.post("/wizard/inquiry", json={"question": "口苦吗？", "answer": "无"})
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    assert resp.get_json()["ok"] is True
+    import records_store
+    raw = records_store.load_record(
+        os.path.join(data_root, "records", "daily"),
+        resp.get_json()["date"]).raw
+    assert raw["inquiry"]["手足温凉"]["answer"] == "厥冷（冰冷）"
+    assert raw["inquiry"]["大便如何？"] == {"asked": True, "answer": "便溏"}
+    assert raw["inquiry"]["口苦吗？"]["answer"] == "无"
+    # 未答项不得出现（不编造）
+    assert "目眩吗？" not in raw["inquiry"]
+
+
+def test_tongue_score_max_dominant():
+    """v1.7.21 舌诊口径：最重单项主导，不被多项正常稀释（原著审查 P1）。"""
+    from src.scoring import score
+    from src.dimensions import VisionDimension
+    obs = {"body_color": "青紫", "coating_thickness": "略厚", "coating_greasy": "微腻"}
+    assert score(VisionDimension.TONGUE, obs) == 10.0  # 旧均值口径为 5.0

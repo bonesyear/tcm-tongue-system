@@ -41,14 +41,34 @@ PARTS = [
      "guide_anchor": "part-skin", "guide_label": "皮肤照",
      "tips": ["前臂或小腿伸侧", "自然光下拍摄", "如有黄汗/甲错部位请特写"]},
 ]
-# 向导问诊步（2026-10-16 P1 原著审查）：手足温厥是原著三阴三阳最快捷鉴别
-# （L6143），照片判不了，必须问。跳过不答也可（不编造）。
+# 向导问诊步（2026-10-16 原著审查 P1 + 主人批准开放 15 项）：
+# 第 0 项「手足温凉」是原著三阴三阳最快捷鉴别（L6143），照片判不了，必答推荐；
+# 其余 15 项为模板既定问诊骨架（全部可跳过）。
 INQUIRY_SPEC = {
     "key": "手足温凉",
     "title": "手足温度如何？（问诊 · 必答推荐）",
     "hint": "手足厥冷=病在阴（太阴/少阴/厥阴）；手足温+渴=少阳；手足自温不排除太阴。原著三阴三阳最快捷鉴别。",
     "options": ["温", "偏凉", "凉", "厥冷（冰冷）"],
 }
+
+# 15 项问诊骨架（与 templates/adaptive_analysis_prompt.md §2.1.2 逐项一致）
+INQUIRY_ITEMS = [
+    {"q": "恶寒还是恶热？", "options": ["恶寒", "恶热", "往来寒热", "都不明显"]},
+    {"q": "有汗还是无汗？", "options": ["有汗", "无汗"]},
+    {"q": "头痛或身痛？", "options": ["无", "头痛", "身痛", "头项强痛"]},
+    {"q": "口苦吗？", "options": ["无", "晨起口苦", "全天口苦"]},
+    {"q": "咽干吗？", "options": ["无", "轻微", "明显", "咽干欲饮"]},
+    {"q": "目眩吗？", "options": ["无", "头晕", "目眩（天旋地转）"]},
+    {"q": "口渴吗？", "options": ["口不渴", "口渴欲饮", "渴不欲饮", "口燥但欲漱水不欲咽"]},
+    {"q": "食欲如何？", "options": ["正常", "纳呆不食", "饥不欲食", "消谷善饥"]},
+    {"q": "大便如何？", "options": ["正常", "便溏", "便硬", "便燥", "下利"]},
+    {"q": "小便如何？", "options": ["正常", "小便清长", "小便黄赤", "小便白", "小便不利"]},
+    {"q": "睡眠如何？", "options": ["正常", "失眠烦躁", "嗜睡多寐"]},
+    {"q": "胸胁有不适吗？", "options": ["无不适", "胸胁苦满", "胸闷"]},
+    {"q": "腹部有不适吗？", "options": ["无不适", "腹满", "腹痛", "心下痞"]},
+    {"q": "听力如何？", "options": ["正常", "耳鸣", "听力下降", "耳无所闻"]},
+    {"q": "鼻部如何？", "options": ["正常", "鼻塞", "鼻鸣", "鼻衄"]},
+]
 
 PART_BY_NAME = {p["part"]: p for p in PARTS}
 
@@ -298,14 +318,13 @@ def assemble_record(draft: dict, version: str,
          for pt, st in draft["parts"].items() if st.get("status") == "observed"]))
     raw["observations"] = observations
 
-    # 问诊步答案（手足温凉）：模板 inquiry 契约 {问题: {asked, answer}}
+    # 问诊步答案：模板 inquiry 契约 {问题: {asked, answer}}
     if merge_only_uncovered and existing_raw and isinstance(
             existing_raw.get("inquiry"), dict):
         raw["inquiry"] = dict(existing_raw["inquiry"])
-    answer = (draft.get("inquiry") or {}).get(INQUIRY_SPEC["key"])
-    if answer:
-        raw.setdefault("inquiry", {})[INQUIRY_SPEC["key"]] = {
-            "asked": True, "answer": answer}
+    for q, answer in (draft.get("inquiry") or {}).items():
+        if answer:
+            raw.setdefault("inquiry", {})[q] = {"asked": True, "answer": answer}
 
     # danger_flags：草稿显式注入优先（测试/未来 LLM 步骤），否则词表探测
     if "danger_flags" in draft:

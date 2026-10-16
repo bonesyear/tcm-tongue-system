@@ -683,17 +683,17 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         tongue_phrase = "舌诊本周无有效观测（未拍到或未解析到有分指标），偏离度不予计值"
     elif last_td["n"] == 0:
         tongue_phrase = (
-            f"舌诊综合偏离度均值周初为 {first_td['score']:.1f}"
+            f"舌诊综合偏离度周初为 {first_td['score']:.1f}"
             f"（共 {first_td['n']} 项异常），周末无有效观测"
         )
     elif first_td["n"] == 0:
         tongue_phrase = (
-            f"舌诊综合偏离度均值周初无有效观测，周末为 {last_td['score']:.1f}"
+            f"舌诊综合偏离度周初无有效观测，周末为 {last_td['score']:.1f}"
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
     else:
         tongue_phrase = (
-            f"舌诊综合偏离度均值由 {first_td['score']:.1f} 变化至 {last_td['score']:.1f}"
+            f"舌诊综合偏离度由 {first_td['score']:.1f} 变化至 {last_td['score']:.1f}"
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
 
