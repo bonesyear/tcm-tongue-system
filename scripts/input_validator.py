@@ -321,7 +321,7 @@ def _validate_scoring_vocab_coverage(record: DailyRecord) -> List[str]:
         第 2 类）：同一值不重复告警。
     只查 DIMENSION_RULES 收录的封闭词表指标；自由文本指标
     （body_luster / body_dynamics / coating_distribution / prickles /
-    palm_temp / lip_around / nose_color / nose_bleeding 等无词表指标）
+    palm_temp / nose_color / nose_bleeding 等无词表指标）
     不适用本检查。
 
     告警文案按「正常描述可忽略 / 异常描述改用规范词」两分支给出处置
