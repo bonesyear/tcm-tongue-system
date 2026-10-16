@@ -12,7 +12,8 @@ knowledge_base/
 ├── diagnostics/
 │   ├── diagnostic-framework.md                  ← 经典经方三观/四证/六病完整辨证框架
 │   ├── smartphone-visual-diagnostics.md          ← 六大拍照维度+十五项问诊→经典经方框架映射
-│   └── constitution-types.md                    ← 九种体质分类与判定标准
+│   ├── constitution-types.md                    ← 九种体质分类与判定标准
+│   └── tongue-diagnostics-textbook.md           ← 舌诊知识拆解（《中医诊断学》整理笔记）
 ├── formulas/
 │   └── formula-system.md                         ← 方机体系/治法法则/药证/选方逻辑
 ├── diet-lifestyle/
