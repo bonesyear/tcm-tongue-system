@@ -480,10 +480,11 @@ def score_indicators(dimension: VisionDimension,
 def score(dimension: VisionDimension, observation) -> float:
     """维度综合偏离度（0-10）。
 
-    舌诊取「已覆盖指标」均值 —— 分母用有分的指标数而非固定 8，
-    避免稀疏记录（只描述了舌质颜色等少数指标）被未提及的指标稀释；
-    至少 1 项有分才计算均值，全无分则返回 0。
-    其余维度取各项指标之和并封顶 10（与原 compute_dimension_deviation 一致）。
+    舌诊取**最重单项**（2026-10-16 v1.7.21 口径变更，原著审查 P1）：
+    经方「一证定方」——单项危证（如青紫 10）不应被多项正常稀释；
+    此前 sparse 均值会把 青紫10+略厚3+微腻2 压成 5.0。
+    其余维度取各项指标之和并封顶 10（与原 compute_dimension_deviation 一致，
+    非舌维度指标少、多项轻度异常按累积负荷计）。
 
     注意：observation 传**纯文本**时，同一段话会对每个指标分别匹配，
     可能重复计分（如"黄染明显"同时命中 jaundice 与 sclera_color）；
@@ -495,11 +496,7 @@ def score(dimension: VisionDimension, observation) -> float:
         return 0.0
 
     if dim == VisionDimension.TONGUE:
-        total = sum(indicators.values())
-        covered = sum(1 for v in indicators.values() if v > 0)
-        if covered == 0:
-            return 0.0
-        return round(total / covered, 1)
+        return round(float(max(indicators.values())), 1)
 
     # 其余维度：累加并封顶；float() 统一返回类型——round(int, 1) 在
     # Python 3 返回 int，会让 mean 出现 0（int）与 max 0.0（float）并列

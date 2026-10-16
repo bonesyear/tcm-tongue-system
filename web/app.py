@@ -272,6 +272,7 @@ def create_app(env_file: str | None = None,
             "wizard.html", page="wizard",
             state=wizard_store.wizard_state(daily_dir, today, existing),
             inquiry_spec=wizard_store.INQUIRY_SPEC,
+            inquiry_items=wizard_store.INQUIRY_ITEMS,
             danger_flags=records_store.DANGER_FLAGS,
         )
 
@@ -282,13 +283,14 @@ def create_app(env_file: str | None = None,
             return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
         body = request.json or {}
         answer = (body.get("answer") or "").strip()
+        question = (body.get("question") or wizard_store.INQUIRY_SPEC["key"]).strip()
         today = datetime.date.today().isoformat()
         draft = wizard_store.load_draft(daily_dir, today)
         draft.setdefault("inquiry", {})
         if answer:
-            draft["inquiry"][wizard_store.INQUIRY_SPEC["key"]] = answer
+            draft["inquiry"][question] = answer
         else:
-            draft["inquiry"].pop(wizard_store.INQUIRY_SPEC["key"], None)
+            draft["inquiry"].pop(question, None)
         wizard_store.save_draft(daily_dir, draft)
         return jsonify({"ok": True})
 

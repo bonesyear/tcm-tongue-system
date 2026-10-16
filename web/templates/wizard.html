@@ -189,38 +189,56 @@ function render() {
 
 var inquiryAnswered = {{ (state.inquiry | length > 0) | tojson }};
 var INQUIRY = {{ inquiry_spec | tojson }};
+var INQUIRY_ITEMS = {{ inquiry_items | tojson }};
+var ANSWERS = {{ state.inquiry | tojson }};
 
 function renderInquiry() {
-  document.getElementById("inquiry-title").textContent = "第 8 / 8 步 · " + INQUIRY.key;
+  document.getElementById("inquiry-title").textContent = "第 8 / 8 步 · 问诊（" + Object.keys(ANSWERS).length + " / " + (INQUIRY_ITEMS.length + 1) + " 已答）";
   document.getElementById("inquiry-hint").textContent = INQUIRY.hint;
   var box = document.getElementById("inquiry-options");
   box.innerHTML = "";
-  INQUIRY.options.forEach(function (opt) {
-    var b = document.createElement("button");
-    b.className = "btn btn-ghost";
-    b.textContent = opt;
-    b.addEventListener("click", function () {
-      postJSON("/wizard/inquiry", {answer: opt}).then(function (d) {
-        if (d.ok) { inquiryAnswered = true; render(); }
+
+  function mkRow(q, options, highlight) {
+    var row = document.createElement("div");
+    row.style.cssText = "padding:8px 0; border-bottom:1px dashed var(--line);";
+    var label = document.createElement("div");
+    label.style.cssText = "font-size:14px; margin-bottom:6px;" + (highlight ? "font-weight:600;" : "");
+    label.textContent = q;
+    row.appendChild(label);
+    var chips = document.createElement("div");
+    chips.className = "row wrap";
+    chips.style.gap = "6px";
+    options.forEach(function (opt) {
+      var b = document.createElement("button");
+      var on = ANSWERS[q] === opt;
+      b.className = "btn btn-sm " + (on ? "btn-primary" : "btn-ghost");
+      b.textContent = opt;
+      b.addEventListener("click", function () {
+        postJSON("/wizard/inquiry", {question: q, answer: opt}).then(function (d) {
+          if (d.ok) { ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
+        });
       });
+      chips.appendChild(b);
     });
-    box.appendChild(b);
-  });
-  var skip = document.createElement("button");
-  skip.className = "btn btn-subtle btn-sm";
-  skip.textContent = "跳过（不答）";
-  skip.addEventListener("click", function () {
-    postJSON("/wizard/inquiry", {answer: ""}).then(function (d) {
-      if (d.ok) { inquiryAnswered = true; render(); }
-    });
-  });
-  box.appendChild(skip);
-  if (inquiryAnswered) {
-    var done = document.createElement("span");
-    done.className = "tag ok";
-    done.textContent = "✓ 已回答";
-    box.appendChild(done);
+    row.appendChild(chips);
+    box.appendChild(row);
   }
+
+  /* 第 0 项：手足温凉（必答推荐，置顶高亮） */
+  mkRow(INQUIRY.key, INQUIRY.options, true);
+  /* 其余 15 项（全部可跳过） */
+  INQUIRY_ITEMS.forEach(function (item) { mkRow(item.q, item.options, false); });
+
+  var skipAll = document.createElement("button");
+  skipAll.className = "btn btn-subtle btn-sm";
+  skipAll.textContent = "全部跳过（不答）";
+  skipAll.style.marginTop = "10px";
+  skipAll.addEventListener("click", function () {
+    inquiryAnswered = true;
+    renderInquiry();
+    updateNav();
+  });
+  box.appendChild(skipAll);
 }
 
 function updateNav() {
