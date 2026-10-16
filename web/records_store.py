@@ -18,7 +18,7 @@ import sys
 from src import paths
 from src.dimensions import DIMENSIONS
 from src.record import DailyRecord
-from src.scoring import score, score_indicators
+from src.scoring import DIMENSION_RULES, score, score_indicators
 
 # 与 generate_weekly_report._SUSPECT_ARCHIVE_RE 同口径：备份/临时快照不参与选档
 _SUSPECT_ARCHIVE_RE = re.compile(r"\.bak|copy|tmp|_旧格式", re.IGNORECASE)
@@ -29,6 +29,37 @@ REF_FIELDS = {
     "prickles": "退出评分层，仅供辨证（需肉眼确认）",
     "palm_temp": "照片不可判，已降级为参考项",
 }
+
+# 修正选项（web 层 UI 数据，不进 src 核心库契约）：
+# 有评分词表的字段直接用 DIMENSION_RULES 的 key 作选项（选中即得分，消灭
+# 「词表外措辞静默读 0 分」）；无评分词表的字段（照片不可判、降级到辨证层）
+# 用下方人工词表——用户肉眼/触诊给出权威值，只入档案供辨证，不参与评分。
+FIELD_OPTIONS = {
+    "body_luster":          ["荣润", "少华", "枯"],
+    "prickles":             ["无", "少量", "点刺", "芒刺"],  # 留存词表复活
+    "body_dynamics":        ["正常", "颤动", "歪斜", "痿软", "强硬"],
+    "coating_distribution": ["满布", "偏布一侧", "苔少"],
+    "lip_around":           ["正常", "发暗", "红肿", "疱疹"],
+    "nose_color":           ["正常", "红赤", "青黑", "枯槁"],
+    "nose_bleeding":        ["无", "少量", "较多"],
+    "palm_temp":            ["温", "凉", "不温", "厥冷"],     # 留存词表复活
+}
+
+# 词表无 0 分基线词时给修正 UI 补的「正常」选项：措辞落在 validator 的
+# 正常/否定语义豁免区（input_validator 对「未见」类描述不做词表覆盖告警），
+# 且不命中任何评分关键词 → 0 分 = 正常，方向正确。
+NORMAL_OPTION = "未见异常"
+
+
+def _field_options(dim, indicator: str):
+    """修正 UI 的封闭选项；无词表且未人工指定时返回 None（回落自由文本）。"""
+    rules = DIMENSION_RULES.get(dim, {}).get(indicator)
+    if rules:
+        opts = list(rules.keys())
+        if not any(v == 0 for v in rules.values()):
+            opts.insert(0, NORMAL_OPTION)
+        return opts
+    return FIELD_OPTIONS.get(indicator)
 
 # 待复核字段：照常评分，但需肉眼签认（2026-10-16 P1 原著审查；
 # 手册 user-guide.md「识图结果需肉眼确认的体征」清单 + 原著危重鉴别点）
@@ -441,7 +472,8 @@ def record_detail(rec: DailyRecord) -> dict:
             fields = []
             for ind in indicators:
                 v = obs.get(ind, "")
-                base = {"k": INDICATOR_LABELS.get(ind, ind), "v": v, "ind": ind}
+                base = {"k": INDICATOR_LABELS.get(ind, ind), "v": v, "ind": ind,
+                        "opts": _field_options(dim, ind)}
                 if ind in REF_FIELDS:
                     fields.append({**base, "s": None, "ref": REF_FIELDS[ind]})
                 elif ind in scored:
