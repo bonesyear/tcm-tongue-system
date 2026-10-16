@@ -8,274 +8,235 @@
 :root{
   --paper:#faf7f1; --card:#ffffff; --ink:#2f2a26; --ink-2:#5c554c; --ink-3:#8a8177;
   --cinnabar:#b0442a; --cinnabar-deep:#8f3722; --line:#e6ded2; --line-strong:#d8cdbd;
+  --green:#4d7c58; --amber:#9a7b2d;
   --serif:'Songti SC','STSong','SimSun',serif;
   --sans:-apple-system,'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif;
 }
 *{box-sizing:border-box;}
 body{
-  margin:0 auto; max-width:860px; padding:32px 22px 64px;
-  background:var(--paper); color:var(--ink); font-family:var(--sans);
-  font-size:15.5px; line-height:1.85;
+  margin:0 auto; max-width:880px; padding:36px 24px 72px;
+  background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.47 0 0 0 0 0.38 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23p)'/%3E%3C/svg%3E");
+  color:var(--ink); font-family:var(--sans); font-size:15.5px; line-height:1.85;
 }
-header#title-block-header{
-  border-bottom:3px double var(--line-strong); margin-bottom:28px; padding-bottom:18px;
+/* 页眉：印章 + 标题 */
+header.top{text-align:center; border-bottom:3px double var(--line-strong); padding-bottom:22px; margin-bottom:20px;}
+.seal{
+  display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+  width:52px; height:52px; margin-bottom:12px; border-radius:9px;
+  background:var(--cinnabar); color:#fff; font-family:var(--serif);
+  font-size:19px; line-height:1.15; letter-spacing:0;
+  box-shadow:0 2px 6px rgba(143,55,34,.30);
 }
-header#title-block-header .title{
-  font-family:var(--serif); font-size:30px; letter-spacing:.14em;
-  color:var(--cinnabar-deep); margin:0; text-align:center;
+header.top h1{
+  font-family:var(--serif); font-size:29px; letter-spacing:.14em;
+  color:var(--cinnabar-deep); margin:0 0 8px;
 }
-h1{font-family:var(--serif); font-size:24px; margin:0 0 14px; letter-spacing:.06em;}
+header.top .subtitle{font-size:13px; color:var(--ink-3); letter-spacing:.12em;}
+/* 目录 */
+nav.toc{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:13px 18px; margin:0 0 10px; box-shadow:0 1px 6px rgba(90,70,50,.06);
+}
+nav.toc .toc-row{display:flex; flex-wrap:wrap; align-items:center; gap:6px;}
+nav.toc .toc-row + .toc-row{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);}
+nav.toc .toc-label{font-family:var(--serif); font-size:13px; color:var(--ink-3); letter-spacing:.15em; margin-right:4px;}
+nav.toc a{
+  color:var(--ink-2); text-decoration:none; border:none;
+  padding:2px 11px; border-radius:999px; background:#f6efe4; font-size:13.5px;
+  transition:background .15s,color .15s;
+}
+nav.toc a:hover{background:var(--cinnabar); color:#fff;}
+/* 正文标题 */
 h2{
-  font-family:var(--serif); font-size:20.5px; letter-spacing:.08em; margin:40px 0 14px;
-  padding-left:12px; border-left:4px solid var(--cinnabar); color:var(--cinnabar-deep);
+  font-family:var(--serif); font-size:21px; letter-spacing:.08em; margin:46px 0 14px;
+  padding-left:13px; border-left:4px solid var(--cinnabar); color:var(--cinnabar-deep);
 }
-h3{font-family:var(--serif); font-size:17px; letter-spacing:.05em; margin:26px 0 10px;}
-h2[id],h3[id]{scroll-margin-top:18px;}
+h3.part{display:flex; align-items:center; gap:11px; margin:30px 0 10px;}
+.part-num{
+  flex:none; width:26px; height:26px; border-radius:7px;
+  background:var(--cinnabar); color:#fff;
+  font-family:var(--serif); font-size:14.5px;
+  display:inline-flex; align-items:center; justify-content:center;
+  box-shadow:0 1px 3px rgba(143,55,34,.25);
+}
+.part-name{font-family:var(--serif); font-size:18px; letter-spacing:.06em;}
+h2[id],h3[id]{scroll-margin-top:20px;}
+/* 首段 meta */
+p.meta{font-size:13px; color:var(--ink-3); line-height:1.7;}
+p.meta code{font-size:12.5px;}
+/* 口诀行 */
+p.koujie{
+  margin:6px 0 14px; font-family:var(--serif); font-size:16.5px;
+  letter-spacing:.06em; color:var(--cinnabar-deep);
+}
+p.koujie::before{content:"「";}
+p.koujie::after{content:"」";}
+.koujie-tag{display:none;}
+/* 置信度徽章 */
+.badge{display:inline-block; color:#fff; border-radius:5px; padding:0 7px; font-size:12px; letter-spacing:.04em;}
+.badge-low{background:#8a8177;}
+.badge-medium{background:var(--amber);}
+.badge-high{background:var(--green);}
+/* 组合卡片 */
+p.combo{
+  background:var(--card); border:1px solid var(--line); border-left:4px solid var(--cinnabar);
+  border-radius:10px; padding:11px 16px; margin:10px 0;
+  box-shadow:0 1px 4px rgba(90,70,50,.05);
+}
+/* 注意事项色块 */
+p.callout{border-radius:10px; padding:10px 16px; border:1px solid var(--line); margin:14px 0 8px;}
+p.callout-danger{background:#f9ece7; border-color:#e3b7a8;}
+p.callout-tip{background:#f0f4ec; border-color:#c6d3ba;}
+p.callout-warn{background:#f7f0dd; border-color:#ddcba0;}
+/* 通用元素 */
 a{color:var(--cinnabar); text-decoration:none; border-bottom:1px dotted var(--cinnabar);}
 a:hover{color:var(--cinnabar-deep); border-bottom-style:solid;}
-hr{border:none; border-top:1px solid var(--line); margin:30px 0;}
-blockquote{
-  margin:16px 0; padding:12px 18px; background:#f6efe4;
-  border-left:4px solid var(--cinnabar); border-radius:0 10px 10px 0; color:var(--ink-2);
-}
-blockquote p{margin:4px 0;}
+hr{border:none; border-top:1px solid var(--line); margin:34px 0 0;}
 code{
   background:#f3ecdf; border:1px solid var(--line); border-radius:5px;
   padding:1px 6px; font-size:13.5px; color:var(--cinnabar-deep);
 }
 pre{
-  background:#2f2a26; color:#f2ede6; border-radius:12px; padding:16px 20px;
-  overflow:auto; line-height:1.7; font-size:13.5px;
+  background:#332e28; color:#f2ede6; border-radius:12px; padding:16px 20px;
+  overflow:auto; line-height:1.75; font-size:13.5px; border:1px solid #46403a;
 }
 pre code{background:none; border:none; padding:0; color:inherit;}
 table{
   width:100%; border-collapse:separate; border-spacing:0; margin:14px 0;
   background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden;
-  font-size:14.5px;
+  font-size:14.5px; box-shadow:0 1px 4px rgba(90,70,50,.05);
 }
 th,td{padding:9px 13px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top;}
+td:first-child{white-space:nowrap; font-weight:600;}
 th{background:#f6efe4; font-family:var(--serif); letter-spacing:.05em; white-space:nowrap;}
 tr:last-child td{border-bottom:none;}
 tbody tr:nth-child(even){background:#fbf8f2;}
 img{
-  display:block; max-width:min(560px,100%); height:auto; margin:14px auto; border-radius:14px;
-  border:1px solid var(--line); box-shadow:0 2px 10px rgba(90,70,50,.10);
+  display:block; max-width:min(540px,100%); height:auto; margin:16px auto 20px; border-radius:14px;
+  border:1px solid var(--line); box-shadow:0 3px 12px rgba(90,70,50,.12);
 }
 ul,ol{padding-left:24px;}
 li{margin:3px 0;}
 strong{color:var(--ink);}
+/* 卷尾引文 */
+blockquote{
+  margin:40px 0 0; padding:0; text-align:center; background:none; border:none;
+  font-family:var(--serif); font-size:17.5px; letter-spacing:.08em; color:var(--cinnabar-deep);
+}
+/* 返回链接 */
+.back{text-align:center; margin-top:36px;}
+.back a{border:none; font-size:13.5px; color:var(--ink-3);}
+.back a:hover{color:var(--cinnabar);}
 @media (max-width:640px){
-  body{padding:20px 14px 48px; font-size:15px;}
-  header#title-block-header .title{font-size:24px;}
+  body{padding:22px 14px 52px; font-size:15px;}
+  header.top h1{font-size:23px;}
+  h2{font-size:19px;}
+  .part-name{font-size:16.5px;}
   table{font-size:13.5px;}
   th,td{padding:7px 9px;}
 }
 </style>
 </head>
 <body>
-<header id="title-block-header">
-<h1 class="title">中医望诊系统使用手册</h1>
+<header class="top">
+  <div class="seal"><span>望</span><span>诊</span></div>
+  <h1>中医望诊系统使用手册</h1>
+  <div class="subtitle">七步影像采集 · 本机辨证 · 数据不出机</div>
 </header>
-<h1>多维度中医望诊系统 · 使用手册</h1>
-<blockquote>
-<p><strong>版本与变更</strong> 见根目录 <code>VERSION</code> 与 <code>CHANGELOG.md</code>（本文不重复标注，避免漂移）<br />
-<strong>识图模型</strong> 支持任意 OpenAI 兼容多模态模型；默认配置见 <code>.env.example</code>，切换与重新标定方法见 README「配置自己的视觉模型」</p>
-</blockquote>
+<nav class="toc">
+  <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十五项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
+  <div class="toc-row toc-parts"><span class="toc-label">部位</span><a href="#part-tongue-surface">舌面</a><a href="#part-tongue-bottom">舌底</a><a href="#part-face">头面</a><a href="#part-eyes">目</a><a href="#part-ear">耳</a><a href="#part-hands">手掌</a><a href="#part-skin">皮肤</a></div>
+</nav>
+<p class="meta">版本与变更记录见根目录的 <code>VERSION</code> 和 <code>CHANGELOG.md</code>。识图模型支持任意 OpenAI 兼容的多模态模型，默认配置在 <code>.env.example</code>，更换模型与重新标定的方法见 README 的「配置自己的视觉模型」一节。</p>
 <hr />
-<h2 id="sec-intro">一、系统简介</h2>
-<p>本系统将传统中医&quot;望诊&quot;与现代 AI 视觉技术结合。你在浏览器里打开拍照向导（电脑或手机均可），按步骤拍摄身体七个部位的照片，视觉模型会自动识别部位、提取望诊信息，按照经典经方体系（三观→四证→六经）进行辨证分析，评分与报告全部在本机生成、本机保存。</p>
-<h3>核心理念</h3>
-<blockquote>
-<p><strong>辨证如断案，一份证据说一分话。</strong>
-<strong>拍得到的拍照，拍不到的问诊，都不强求。</strong></p>
-</blockquote>
+<h2 id="sec-intro">系统简介</h2>
+<p>本系统以手机摄像头采集望诊影像：按向导依次拍摄舌面、舌底、头面、目、耳、手掌、皮肤七个部位，由视觉模型识别照片中的体征，依据经方体系（三观→四证→六经）完成辨证，输出评分与报告。全部数据仅保存在本机，不上传。</p>
+<p>拍摄覆盖的维度数决定辨证输出的置信度等级：</p>
 <ul>
-<li>拍 1 张照片 → 给出鉴别诊断方向（LOW，不给方剂）</li>
-<li>拍 2-3 张 → 给出方剂类别建议（MEDIUM）</li>
-<li>拍 4-6 张 → 给出具体方剂和剂量（HIGH）</li>
-<li>问诊数据可在同一置信度内提升辨证精度，全部可跳过</li>
+<li>仅 1 个部位：只给鉴别方向，不出方（<span class="badge badge-low">LOW</span>）</li>
+<li>2~3 个部位：给方剂类别（<span class="badge badge-medium">MEDIUM</span>）</li>
+<li>4 个及以上：给出具体方剂与剂量（<span class="badge badge-high">HIGH</span>）</li>
+<li>问诊为可选补充，在同一置信度等级内提高判断精度；不填写亦可正常运行</li>
 </ul>
+<p>总体原则：能拍的部位拍照，拍不了的部位以问诊补充，均不强制。</p>
 <hr />
-<h2 id="sec-dimensions">二、六大拍照维度</h2>
-<p>每天你可以拍摄任意数量的照片。系统会根据你上传的内容自动覆盖对应维度。</p>
-<h3>📸 拍照总览</h3>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>维度</th>
-<th>照片</th>
-<th>诊断价值</th>
-<th>优先度</th>
-<th>拍摄难度</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>舌诊</td>
-<td>舌面+舌底(2张)</td>
-<td>四证全覆盖</td>
-<td>⭐⭐⭐ 核心</td>
-<td>简单</td>
-</tr>
-<tr>
-<td>2</td>
-<td>头面诊</td>
-<td>正面1张</td>
-<td>表里观第一关+唇诊+鼻诊</td>
-<td>⭐⭐⭐ 极高</td>
-<td>简单</td>
-</tr>
-<tr>
-<td>3</td>
-<td>目诊</td>
-<td>眼部特写1张</td>
-<td>少阳病核心</td>
-<td>⭐⭐⭐ 极高</td>
-<td>中等</td>
-</tr>
-<tr>
-<td>4</td>
-<td>耳诊</td>
-<td>侧面1张</td>
-<td>少阳中风定向</td>
-<td>⭐⭐ 高</td>
-<td>简单</td>
-</tr>
-<tr>
-<td>5</td>
-<td>手诊</td>
-<td>双手掌面1张</td>
-<td>阴阳快速筛选</td>
-<td>⭐⭐⭐ 极高</td>
-<td>简单</td>
-</tr>
-<tr>
-<td>6</td>
-<td>皮肤诊</td>
-<td>前臂内侧/小腿1张</td>
-<td>太阴中风标志</td>
-<td>⭐⭐⭐ 极高</td>
-<td>简单</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="sec-parts">三、各维度拍摄指南</h2>
-<h3 id="part-tongue-surface">1. 舌面照</h3>
-<blockquote>
-<p><strong>「伸舌自然，光线均匀，对焦清晰」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
+<h2 id="sec-parts">各部位拍摄规范</h2>
+<h3 id="part-tongue-surface" class="part"><span class="part-num">1</span><span class="part-name">舌面照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>伸舌自然，光线均匀，对焦清晰。</p>
 <ul>
-<li>面对自然光或白色灯光，下巴微抬</li>
-<li>舌头自然平伸出，不要用力过度（避免舌色变红失真）</li>
-<li>舌尖抵下唇，舌面平整可见</li>
-<li>手机距离约 20cm，用主摄像头对焦舌面中央</li>
-<li>拍摄前 15 分钟内不吃东西、不喝咖啡茶（避免染色）</li>
+<li>面对自然光或白光，下巴微抬</li>
+<li>舌头自然伸出，避免用力——用力伸舌会使舌色偏红，影像失真</li>
+<li>舌尖抵住下唇，舌面摊平</li>
+<li>手机距口约 20cm，对焦舌面中央</li>
+<li>拍摄前 15 分钟内勿进食，勿饮咖啡或茶（易染色）</li>
 </ul>
-<p><strong>常见错误：</strong></p>
+<p>常见拍摄失误有三：伸舌用力过度（舌色偏红绛）、逆光（舌色发暗）、刚饮过热茶（苔被冲刷）。</p>
+<p><img width="1024" height="1024" src="images/tongue_surface.jpg?v=20261016f" alt="舌面照示例" /></p>
+<h3 id="part-tongue-bottom" class="part"><span class="part-num">2</span><span class="part-name">舌底照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>舌尖轻点上颚，充分暴露舌下。</p>
 <ul>
-<li>❌ 舌伸太用力 → 舌色变红绛失真</li>
-<li>❌ 逆光拍摄 → 舌色偏暗无法判断</li>
-<li>❌ 刚喝完热茶 → 舌苔被冲刷</li>
+<li>头稍后仰，口张开</li>
+<li>舌尖轻触上颚（上门牙后方），使舌下自然暴露，不必用力顶压</li>
+<li>手机自下颌下方仰拍，对焦舌下络脉</li>
 </ul>
-<p><img width="1024" height="1024" src="images/tongue_surface.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-tongue-bottom">2. 舌底照</h3>
-<blockquote>
-<p><strong>「舌尖轻点上颚，充分暴露舌下」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
+<p>舌下主要观察络脉：颜色（淡紫/青紫/紫黑）、形态（怒张/细涩）、有无瘀点。</p>
+<p><img width="1024" height="1024" src="images/tongue_bottom.jpg?v=20261016f" alt="舌底照示例" /></p>
+<h3 id="part-face" class="part"><span class="part-num">3</span><span class="part-name">头面部照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>正面平视，素颜，自然光。</p>
+<p>一张正面照同时覆盖面色、唇、鼻三个观察区域。</p>
 <ul>
-<li>头后仰，嘴巴张大</li>
-<li>舌尖轻点上颚（上门牙后方），充分暴露舌下</li>
-<li>手机从下往上拍，对焦舌下络脉</li>
+<li>正对镜头，双眼平视</li>
+<li>在自然光下拍摄，关闭美颜与滤镜</li>
+<li>前额、口唇、鼻部须完整入镜</li>
+<li>请勿化妆——口红与粉底会遮盖真实面色与唇色</li>
+<li>表情放松，口唇自然闭合</li>
 </ul>
-<p><strong>关键观察：</strong> 络脉颜色（淡紫/青紫/紫黑）、粗细（怒张/细涩）、有无瘀点</p>
-<p><img width="1024" height="1024" src="images/tongue_bottom.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-face">3. 头面部照</h3>
-<blockquote>
-<p><strong>「正面平视，素颜自然光，拍到完整面部+嘴唇+鼻子」</strong></p>
-</blockquote>
-<p>一张正面照同时覆盖三个子区域——面域、唇域、鼻域。</p>
-<p><strong>拍摄要点：</strong></p>
+<p>观察内容：面色的寒热倾向（红赤/萎黄/晦暗/黧黑）与光泽、有无浮肿；唇色（淡白/红/深红/紫暗）与润燥；鼻色及鼻翼是否煽动。</p>
+<p><img width="1024" height="1024" src="images/face.jpg?v=20261016f" alt="头面部照示例" /></p>
+<h3 id="part-eyes" class="part"><span class="part-num">4</span><span class="part-name">目部照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>睁大双眼，拍清白睛和下眼睑。</p>
 <ul>
-<li>正面面对相机，平视镜头</li>
-<li>自然光下拍摄，不用美颜滤镜</li>
-<li>露出完整面部、前额、口唇和鼻部</li>
-<li>不化妆（口红、粉底遮盖真实面色和唇色）</li>
-<li>表情自然放松，嘴唇自然闭合</li>
+<li>双眼正视镜头，自然睁大，不眯不瞪</li>
+<li>光线均匀落于双眼</li>
+<li>可用手指轻拉下眼睑，暴露睑结膜颜色</li>
+<li>手机使用微距模式，或近距离拍摄</li>
 </ul>
-<p><strong>关键观察：</strong></p>
+<p>观察内容：白睛颜色（目赤程度）、眼睑浮肿、目眶晦暗、巩膜黄染。</p>
+<p><img width="1024" height="1024" src="images/eyes.jpg?v=20261016f" alt="目部照示例" /></p>
+<h3 id="part-ear" class="part"><span class="part-num">5</span><span class="part-name">耳部照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>侧面拍，耳朵完整入镜。</p>
 <ul>
-<li>面域：面色寒热（红赤/萎黄/晦暗/黧黑）、有无浮肿、光泽度</li>
-<li>唇域：唇色（淡白/红/深红/紫暗）、润燥（干裂/润泽）、口周暗沉</li>
-<li>鼻域：鼻色（淡白/红赤/青黑）、鼻翼煽动</li>
+<li>头向一侧转约 90°，完整暴露外耳</li>
+<li>手机自正侧面拍摄，对焦耳廓</li>
+<li>光线均匀落于耳部，避免头发或阴影遮挡</li>
+<li>拍清耳廓颜色、耳轮形态与耳垂</li>
 </ul>
-<p><img width="1024" height="1024" src="images/face.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-eyes">4. 目部照</h3>
-<blockquote>
-<p><strong>「睁大双眼，拍清白睛和下眼睑」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
+<p>观察内容：耳色（淡白/红赤/青黑）、耳廓润泽或干枯。</p>
+<p><img width="1024" height="1024" src="images/ear.jpg?v=20261016f" alt="耳部照示例" /></p>
+<h3 id="part-hands" class="part"><span class="part-num">6</span><span class="part-name">手掌照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>掌面朝镜头，手指自然微屈，露出指甲。</p>
 <ul>
-<li>双眼正视镜头，自然睁大（不要眯眼或瞪眼）</li>
-<li>光线均匀照射双眼</li>
-<li>可辅助用手指轻拉下眼睑，暴露结膜颜色</li>
-<li>手机使用微距模式或靠近拍摄</li>
+<li>双手并拢举于胸前，掌心朝向镜头</li>
+<li>手指自然微屈，指尖朝向镜头，不要绷直</li>
+<li>此角度可同时看清掌心与甲床</li>
+<li>光线自正上方照射</li>
+<li>双手同拍，便于左右对照</li>
 </ul>
-<p><strong>关键观察：</strong> 白睛颜色（目赤程度）、眼睑浮肿（如卧蚕）、目眶暗沉、巩膜黄染</p>
-<p><img width="1024" height="1024" src="images/eyes.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-ear">5. 耳部照</h3>
-<blockquote>
-<p><strong>「侧面拍摄，耳朵完整入镜」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
+<p>观察内容：掌色（淡白/红/暗红）、甲床颜色（淡白/红润/暗紫）与形态（光滑/粗糙/甲错）。手的温度无法从影像判读，以问诊补充。</p>
+<p><img width="1024" height="1024" src="images/hands.jpg?v=20261016f" alt="手掌照示例" /></p>
+<h3 id="part-skin" class="part"><span class="part-num">7</span><span class="part-name">皮肤照</span></h3>
+<p class="koujie"><span class="koujie-tag">口诀</span>拍前臂内侧或小腿，这些部位少见太阳。</p>
 <ul>
-<li>头部转向一侧约 90°，露出完整外耳</li>
-<li>手机从正侧面拍摄，对焦耳廓</li>
-<li>光线均匀照射耳部，不要有阴影遮挡</li>
-<li>拍清耳廓颜色、耳轮形态、耳垂</li>
-</ul>
-<p><strong>关键观察：</strong> 耳色（淡白/红赤/青黑）、耳轮润枯（润泽/干枯）</p>
-<p><img width="1024" height="1024" src="images/ear.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-hands">6. 手掌照</h3>
-<blockquote>
-<p><strong>「掌面朝镜头，手指自然微屈，甲床可见」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
-<ul>
-<li>双手并排举在胸前，掌面朝向镜头</li>
-<li>手指自然微屈（不要用力绷直），指尖朝向镜头方向</li>
-<li>这个角度掌面和指甲甲床同时可见</li>
-<li>光线从正上方照射，拍清手掌颜色和甲床颜色</li>
-<li>最好双手一起拍（便于左右对比色泽）</li>
-</ul>
-<p><strong>关键观察：</strong> 手掌颜色（淡白/红/暗红）、手掌温度（由问诊获取）、甲床颜色（淡白/红润/暗紫）、甲床形态（光滑/粗糙/甲错）</p>
-<p><img width="1024" height="1024" src="images/hands.jpg?v=20261015" alt="" /></p>
-<hr />
-<h3 id="part-skin">7. 皮肤照</h3>
-<blockquote>
-<p><strong>「前臂内侧或小腿，非暴露部位最佳」</strong></p>
-</blockquote>
-<p><strong>拍摄要点：</strong></p>
-<ul>
-<li>拍摄前臂内侧或小腿前侧（这些部位较少受日晒影响）</li>
-<li>如有皮肤病灶或异常区域，单独特写</li>
+<li>选取前臂内侧或小腿前侧</li>
+<li>如有病灶或异常部位，单独补拍特写</li>
 <li>光线充足，避免阴影</li>
-<li>可以掀起袖子/裤腿拍摄</li>
+<li>挽起衣袖、裤腿拍摄</li>
 </ul>
-<p><strong>关键观察：</strong> 肤色、有无甲错（干燥粗糙脱屑）、黄汗痕迹、水肿、皮疹</p>
-<p><img width="1024" height="1024" src="images/skin.jpg?v=20261015" alt="" /></p>
+<p>观察内容：肤色、有无甲错（干燥粗糙脱屑）、黄汗痕迹、水肿、皮疹。</p>
+<p><img width="1024" height="1024" src="images/skin.jpg?v=20261016f" alt="皮肤照示例" /></p>
 <hr />
-<h2 id="sec-inquiry">四、十五项问诊（全部可跳过）</h2>
-<p>以下是体系设计的 15 项问诊（<strong>全部可跳过</strong>）。<strong>当前 Web 向导暂不采集问诊</strong>——辨证仅基于六维望诊；问诊数据不改变置信度等级，只在同一等级内提升辨证精度（记录模型仍支持问诊覆盖统计，趋势页会显示）。后续版本若开放采集，以下项目即问卷内容。</p>
+<h2 id="sec-inquiry">问诊十五项</h2>
+<p>体系设计了 15 项问诊，<strong>目前 Web 向导暂不采集</strong>，辨证仅基于六维望诊。问诊不改变置信度等级，只在同一等级内提高判断精度（记录模型仍会统计问诊覆盖，趋势页可见）。后续版本若开放采集，问卷内容如下：</p>
 <table>
 <thead>
 <tr>
@@ -287,17 +248,17 @@ strong{color:var(--ink);}
 <tbody>
 <tr>
 <td>1</td>
-<td>恶寒or恶热？</td>
+<td>恶寒还是恶热？</td>
 <td>恶寒 / 恶热 / 往来寒热 / 都不明显</td>
 </tr>
 <tr>
 <td>2</td>
-<td>有汗or无汗？</td>
+<td>有汗无汗？</td>
 <td>有汗 / 无汗</td>
 </tr>
 <tr>
 <td>3</td>
-<td>头痛or身痛？</td>
+<td>头痛身痛？</td>
 <td>无 / 头痛 / 身痛 / 头项强痛</td>
 </tr>
 <tr>
@@ -313,7 +274,7 @@ strong{color:var(--ink);}
 <tr>
 <td>6</td>
 <td>目眩？</td>
-<td>无 / 头晕 / 目眩(天旋地转)</td>
+<td>无 / 头晕 / 目眩（天旋地转）</td>
 </tr>
 <tr>
 <td>7</td>
@@ -362,145 +323,25 @@ strong{color:var(--ink);}
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p>💡 <strong>提示</strong>：问诊回答越多，辨证越精准。但完全不回答也完全可以——系统只会基于拍照信息做判断。</p>
-</blockquote>
+<p>填写项越多，判断越准；一项不答系统亦可仅凭影像工作。</p>
 <hr />
-<h2 id="sec-combos">五、每日拍照建议</h2>
-<h3>🏆 最佳组合（7 张，完整覆盖）</h3>
-<table>
-<thead>
-<tr>
-<th>顺序</th>
-<th>维度</th>
-<th>为什么重要</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>舌面照</td>
-<td>四证（水火气血）全覆盖</td>
-</tr>
-<tr>
-<td>2</td>
-<td>舌底照</td>
-<td>瘀血第一窗口</td>
-</tr>
-<tr>
-<td>3</td>
-<td>头面部照</td>
-<td>表里观第一关（面+唇+鼻）</td>
-</tr>
-<tr>
-<td>4</td>
-<td>目部照</td>
-<td>少阳病核心窗口</td>
-</tr>
-<tr>
-<td>5</td>
-<td>耳部照</td>
-<td>少阳中风定向 + 津液辅助</td>
-</tr>
-<tr>
-<td>6</td>
-<td>手掌照</td>
-<td>阴阳最快筛选器</td>
-</tr>
-<tr>
-<td>7</td>
-<td>皮肤照</td>
-<td>太阴中风特异性标志</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>💡 <strong>以上 7 张覆盖全部 6 个维度 → 达到 HIGH 置信度 → 可输出具体方剂和剂量</strong></p>
-</blockquote>
-<h3>⚡ 基础套餐（5 张，达 HIGH）</h3>
-<table>
-<thead>
-<tr>
-<th>顺序</th>
-<th>维度</th>
-<th>为什么重要</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>舌面照</td>
-<td>四证全覆盖</td>
-</tr>
-<tr>
-<td>2</td>
-<td>舌底照</td>
-<td>瘀血窗口</td>
-</tr>
-<tr>
-<td>3</td>
-<td>头面部照</td>
-<td>表里观第一关</td>
-</tr>
-<tr>
-<td>4</td>
-<td>手掌照</td>
-<td>阴阳筛选器</td>
-</tr>
-<tr>
-<td>5</td>
-<td>皮肤照</td>
-<td>太阴中风标志</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>💡 <strong>以上 5 张覆盖 4 个维度 → HIGH 置信度 → 可输出具体方剂和剂量</strong></p>
-</blockquote>
-<h3>⚡ 快速套餐（2 张）</h3>
-<table>
-<thead>
-<tr>
-<th>顺序</th>
-<th>维度</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>舌面照</td>
-</tr>
-<tr>
-<td>2</td>
-<td>头面部照</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>⚠️ 仅覆盖 2 维度 → MEDIUM 置信度 → 仅给方剂类别方向，不给具体剂量</p>
-</blockquote>
+<h2 id="sec-combo">拍摄组合建议</h2>
+<p class="combo"><strong>七张全拍（推荐）</strong>：舌面、舌底、头面、目、耳、手掌、皮肤。六维全覆盖，可达 HIGH，输出具体方剂与剂量。</p>
+<p class="combo"><strong>拍五张</strong>：舌面、舌底、头面、手掌、皮肤。覆盖四个维度，亦可达 HIGH。</p>
+<p class="combo"><strong>只拍两张</strong>：舌面加头面。仅覆盖两个维度，系统为 MEDIUM，只给方剂类别方向，不出剂量。</p>
 <hr />
-<h2 id="sec-usage">六、使用方式（拍照向导）</h2>
+<h2 id="sec-flow">完整工作流程</h2>
 <ol>
-<li>启动服务：在项目根目录运行 <code>python web/app.py</code>（依赖安装与初始配置见 <a href="web-quickstart.md">web-quickstart</a>）</li>
-<li>浏览器打开 http://127.0.0.1:8600 （手机与电脑连同一 WiFi 时的用法见 <a href="web-quickstart.md">web-quickstart</a> 第六章）</li>
-<li>点击顶栏「拍照」进入向导，按 <strong>舌面 → 舌底 → 头面 → 目 → 耳 → 手 → 皮肤</strong> 七步逐一拍摄或上传</li>
-<li>无法拍摄的部位可选择「跳过（声明正常）」或「跳过（未覆盖）」</li>
-<li>提交分析后，系统自动识图、评分并生成当日记录；若触发危险信号，会先弹出复核提示再入库</li>
+<li>在项目根目录运行 <code>python web/app.py</code> 启动（依赖安装与初始配置见 <a href="web-quickstart.md">web-quickstart</a>）</li>
+<li>浏览器打开 http://127.0.0.1:8600（手机连接同一 WiFi 的方法见 <a href="web-quickstart.md">web-quickstart</a> 第六章）</li>
+<li>点击顶栏「拍照」进入向导，按舌面→舌底→头面→目→耳→手→皮肤七步逐张拍摄或上传</li>
+<li>无法拍摄的部位可选「跳过（声明正常）」或「跳过（未覆盖）」</li>
+<li>提交后系统自动完成识图、评分并生成当日记录；若触发危险信号，会先弹出复核提示再入库</li>
 </ol>
-<p>提交后系统会自动：</p>
-<ul>
-<li>识别每张照片的部位</li>
-<li>提取望诊信息</li>
-<li>构建证据矩阵并评分</li>
-<li>按置信度生成记录，详情页可查看与修正</li>
-</ul>
-<blockquote>
-<p>💡 辨证报告在「单日详情」页底部的辨证报告卡片中查看，可点击「重新生成」按当前模板重出；更完整的启动与局域网配置说明见 <a href="web-quickstart.md">web-quickstart</a>。</p>
-</blockquote>
+<p>辨证报告位于「单日详情」页底部的报告卡片，点「重新生成」可按当前模板重新输出。报告随当日 JSON 一并保存，并记录生成时使用的 <code>prompt_template_version</code>。</p>
 <hr />
-<h2 id="sec-report">七、报告示例</h2>
-<p>辨证报告在「单日详情」页底部的辨证报告卡片中展示。以下示例取自示例记录 <code>tests/fixtures/2026-06-25_analysis.json</code>（<strong>合成数据，无临床含义</strong>）：</p>
+<h2 id="sec-report">辨证报告示例</h2>
+<p>以下示例取自示例记录 <code>tests/fixtures/2026-06-25_analysis.json</code>，为合成数据，无临床含义：</p>
 <pre><code>🏥 中医望诊辨证报告 — 2026-06-25（合成数据示例）
 
 📊 置信度：🟢 HIGH（照片覆盖 6/6）
@@ -519,72 +360,62 @@ strong{color:var(--ink);}
    - 方义：健脾化湿、和中养胃（合成数据，无临床含义）
    - ⚠️ 剂量仅供参考，请在执业中医师指导下使用
 </code></pre>
-<p>报告随记录一同保存在当日 JSON 中，并记录生成所用的 <code>prompt_template_version</code>；在详情页点击「重新生成」可按当前模板重出一份。</p>
 <hr />
-<h2 id="sec-notes">八、注意事项</h2>
-<p>⚠️ <strong>安全提示：</strong></p>
-<ul>
-<li>本系统为辅助参考工具，不构成医疗诊断</li>
-<li>所有方剂建议请咨询执业中医师后使用</li>
-<li>如出现以下体征，请立即就医：
+<h2 id="sec-notes">注意事项</h2>
+<p class="callout callout-danger"><strong>安全提示。</strong> 本系统为辅助参考工具，不构成医疗诊断，所有方剂建议须经执业中医师审核后方可使用。出现以下体征请直接就医，不必拍照：</p>
 <ul>
 <li>面色红如妆 + 手脚冰凉（戴阳危症）</li>
 <li>舌体短缩强硬 + 言语不利（中风先兆）</li>
 <li>极度消瘦 + 舌面光滑无苔（重症消耗）</li>
 <li>巩膜黄染 + 皮肤黄如橘皮（急性肝胆重症）</li>
 </ul>
-</li>
-</ul>
-<p>💡 <strong>拍摄技巧：</strong></p>
-<ul>
-<li>所有照片请用后置主摄像头拍摄</li>
-<li>关闭美颜、滤镜功能</li>
-<li>尽量在自然光下拍摄，避免强光直射</li>
-<li>保持手机稳定，避免模糊</li>
-</ul>
-<p>👁️ <strong>识图结果需肉眼确认的体征（望诊流程必做）：</strong></p>
-<p>模型识图值不能直接采信，以下体征请<strong>当场用肉眼复核后再签认</strong>：</p>
+<p class="callout callout-tip"><strong>拍摄习惯。</strong> 使用后置主摄；关闭美颜滤镜；尽量采用自然光、避免强光直射；持机保持稳定。</p>
+<p class="callout callout-warn"><strong>以下体征的模型识图结果不可直接采信，须当场肉眼复核后再签认：</strong></p>
 <table>
 <thead>
 <tr>
 <th>体征</th>
-<th>为什么必须肉眼确认</th>
-<th>肉眼判断难度</th>
+<th>须肉眼复核的原因</th>
+<th>复核难度</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>点刺/芒刺</strong></td>
-<td>凸起度在二维照片上判不准，模型实测系统性偏向判「有」（同一舌照 9/9 误判）→ 已退出评分层，档案值仅供辨证参考</td>
-<td>中（需凑近看舌尖舌边是否有凸起的红色颗粒）</td>
+<td>点刺/芒刺</td>
+<td>凸起度在平面照片上难以判定，实测模型系统性偏向判「有」（同一张舌照 9/9 误判），已退出评分层，档案值仅供辨证参考</td>
+<td>中——近看舌尖舌边有无凸起的红色颗粒</td>
 </tr>
 <tr>
-<td><strong>腻腐（腻苔）</strong></td>
-<td>模型在「无/微腻/腻」之间判断层面抖动（实测三组全抖），直接影响「湿」的辨证方向</td>
-<td><strong>易</strong>（苔面是否黏腻、能否刮下，肉眼/刮苔即可判）</td>
+<td>腻腐（腻苔）</td>
+<td>模型在「无/微腻/腻」之间抖动（实测三组全抖），直接影响「湿」的方向</td>
+<td>易——苔面是否黏腻、能否刮下，肉眼或刮苔即判</td>
 </tr>
 <tr>
-<td><strong>齿痕</strong></td>
-<td>实测抖动（2026-09-18 实验 1 的 temp=0 组：10 次中 7 次「无」、3 次「轻度」，评分 0/4 摆动；temp=1.0 组 10 次全「无」）</td>
-<td><strong>易</strong>（对镜张口即见舌边压痕）</td>
+<td>齿痕</td>
+<td>实测抖动（2026-09-18 实验 1：temp=0 组 10 次中 7 次「无」3 次「轻度」，评分在 0/4 之间摆动；temp=1.0 组 10 次全「无」）</td>
+<td>易——对镜张口看舌边压痕</td>
 </tr>
 <tr>
-<td><strong>厚薄</strong></td>
-<td>实测抖动（同实验 temp=0 组：10 次中 8 次「稍厚」、2 次「薄」，评分 3/0 摆动；temp=1.0 组评分层稳定）</td>
-<td><strong>易</strong>（苔的厚薄肉眼直观）</td>
+<td>厚薄</td>
+<td>实测抖动（同实验 temp=0 组 10 次中 8 次「稍厚」2 次「薄」，评分 3/0 摆动；temp=1.0 组评分层稳定）</td>
+<td>易——苔厚苔薄肉眼直观</td>
 </tr>
 </tbody>
 </table>
-<p>以下字段识图较<strong>稳定</strong>，肉眼抽查即可：<strong>舌色、苔色、剥落、裂纹、舌下络脉</strong>（实验 1 两组共 20 次均一致）。</p>
-<p>⚠️ <strong>润燥</strong>属「<strong>措辞抖动</strong>」（<code>润</code> / <code>润泽</code> 随机出现，另偶见 1 次 <code>偏干</code>），但三者评分层<strong>同为 0 分</strong>，<strong>不影响评分</strong>，故不必列入清单。</p>
-<p>📌 <strong>关于「点刺依据」键：</strong> 舌面识图现在会额外输出一个 <code>点刺依据</code> 字段（一句话说明凸起程度与分布），这是<strong>给复核用的辅助信息</strong>。按档案写法铁律「<strong>值禁判读注记</strong>」，该键<strong>不写入档案的体征值</strong>；如需保留，写入 <code>lessons</code> 或 <code>*_note</code> 注记字段。</p>
-<p>⚠️ <strong>点刺已退出评分层</strong>（<code>prickles</code> 不参与偏离度计算），档案中的 <code>prickles</code> 字段仅作<strong>辨证参考</strong>。评分口径变更导致<strong>历史偏离度不可直接比较</strong>（历史不追溯原则）。</p>
-<p>🚫 <strong>备份目录不入版本库</strong>：<code>records/_backup/</code> 含真实病案与姓名，已在 <code>.gitignore</code> 中排除。切勿用 <code>git add -A</code> 全量暂存（pre-push 守卫会拦截，但最好别依赖它兜底）。</p>
+<p>以下几项识图较为稳定，抽查即可：舌色、苔色、剥落、裂纹、舌下络脉（实验 1 两组共 20 次全部一致）。</p>
+<p>「润燥」属措辞抖动（<code>润</code> / <code>润泽</code> 随机出现，偶见一次 <code>偏干</code>），但这几种措辞在评分层同为 0 分，不影响评分，无须复核。</p>
+<p>另有三点说明：</p>
+<ul>
+<li>舌面识图会额外输出 <code>点刺依据</code> 字段（一句话说明凸起程度与分布），供肉眼复核参考。按「值禁判读注记」的档案铁律，该字段不写入档案体征值；如需保留，请写入 <code>lessons</code> 或 <code>*_note</code> 字段。</li>
+<li>点刺已退出评分层（<code>prickles</code> 不参与偏离度计算），因此历史记录的偏离度与当前版本不可直接比较（历史不追溯）。</li>
+<li><code>records/_backup/</code> 内含真实病案与姓名，已在 <code>.gitignore</code> 排除。请勿使用 <code>git add -A</code> 全量暂存——pre-push 守卫会拦截，但不应依赖其兜底。</li>
+</ul>
 <hr />
 <blockquote>
-<p><strong>「病随机转，方从法出；以法统方，以平为期。」</strong> —— 经方经典</p>
+<p>「病随机转，方从法出；以法统方，以平为期。」——经方经典</p>
 </blockquote>
 
+<div class="back"><a href="/">← 返回望诊系统</a></div>
 <script>
 window.addEventListener("load", function () {
   if (location.hash) {
