@@ -123,7 +123,8 @@
     <div class="fields">
       {% for f in g.fields %}
       <div class="field-row" data-dim="{{ dim.key }}" data-ind="{{ f.ind }}"
-           {% if f.opts %}data-opts='{{ f.opts | tojson }}'{% endif %}>
+           {% if f.opts %}data-opts='{{ f.opts | tojson }}'{% endif %}
+           {% if f.gloss %}data-gloss='{{ f.gloss | tojson }}'{% endif %}>
         <span class="k">{{ f.k }}</span>
         <span class="v">{{ f.v }}</span>
         <span class="row" style="gap:2px;">
@@ -261,6 +262,7 @@
       vSpan.innerHTML = "";
       actionCell.innerHTML = "";
       var opts = row.dataset.opts ? JSON.parse(row.dataset.opts) : null;
+      var gloss = row.dataset.gloss ? JSON.parse(row.dataset.gloss) : {};
       var selected = null;
       var input = null;
       if (opts) {
@@ -272,6 +274,7 @@
           c.type = "button";
           c.className = "btn btn-sm " + (opt === old.trim() ? "btn-primary" : "btn-ghost");
           c.textContent = opt;
+          if (gloss[opt]) c.title = gloss[opt];
           c.addEventListener("click", function () {
             selected = opt;
             chipBox.querySelectorAll("button").forEach(function (b) {
