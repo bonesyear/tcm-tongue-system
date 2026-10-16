@@ -166,3 +166,24 @@ def test_glossary_shipped_with_options(client, data_root):
     assert "无" not in fields["prickles"]["gloss"]
     html = client.get("/record/2026-06-25").get_data(as_text=True)
     assert "data-gloss" in html
+
+
+def test_legacy_lip_around_record_still_loads(client, data_root):
+    """口周指标已废弃：含 lips.around 的遗留档案照常加载/渲染/校验，
+    观测视图不再出现该字段（docs/architecture/drop-lip-around-2026-10-16.md）。"""
+    import records_store
+    raw = _read_raw(data_root)
+    assert raw["observations"].get("head_face", {}).get("lips", {}).get(
+        "around") == "口周轻度暗沉"  # 遗留键原样保留在档案里
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    detail = records_store.record_detail(rec)
+    face = next(d for d in detail["dims"] if d["key"] == "head_face")
+    inds = [f["ind"] for g in face["groups"] for f in g["fields"]]
+    assert "lip_around" not in inds and "lip_color" in inds
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "口周轻度暗沉" not in html  # 观测视图不再渲染该字段
+    # 修正流（内含 validator 全档校验）在遗留档案上照常工作
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "head_face", "indicator": "lip_color", "value": "红润"})
+    assert resp.status_code == 200, resp.get_json()

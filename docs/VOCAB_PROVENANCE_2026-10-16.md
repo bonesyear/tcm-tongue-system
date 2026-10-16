@@ -95,7 +95,7 @@
 | nose_flare 鼻翼煽动 | 煽动 | 【诊 p072】「也称鼻扇」；明显/轻度【验】 |
 | nose_color 鼻色（不评分） | 红赤 / 青黑 | 【诊 p072】鼻端色赤主肺脾蕴热、色青主阴寒腹痛 |
 | nose_bleeding 鼻衄（不评分） | 鼻衄 | 【诊 p073】 |
-| lip_around 口周（不评分） | — | 【验】教材无对应节 |
+| lip_around 口周（不评分） | — | 【验】教材无对应节 → **已废弃**（`docs/architecture/drop-lip-around-2026-10-16.md`） |
 
 ## 三、目（eye）
 
