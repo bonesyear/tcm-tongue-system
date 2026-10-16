@@ -162,10 +162,24 @@ def test_glossary_shipped_with_options(client, data_root):
     fields = {f["ind"]: f for g in tongue["groups"] for f in g["fields"]}
     assert "中风" in fields["body_dynamics"]["gloss"]["强硬"]
     assert "痿软" in fields["body_dynamics"]["gloss"]
-    # 常用词（如「无」）不注解，避免噪音
-    assert "无" not in fields["prickles"]["gloss"]
+    # 全量覆盖：常用词也有简注（2026-10-16 统一注解口径）
+    assert fields["prickles"]["gloss"]["无"] == "没有该项表现"
     html = client.get("/record/2026-06-25").get_data(as_text=True)
     assert "data-gloss" in html
+
+
+def test_glossary_covers_every_option_term():
+    """所有修正选项词（评分词表 + 人工词表 + 兜底正常项）都必须有注解。"""
+    import records_store
+    from src.scoring import DIMENSION_RULES
+    terms = {records_store.NORMAL_OPTION}
+    for inds in DIMENSION_RULES.values():
+        for rules in inds.values():
+            terms.update(rules.keys())
+    for opts in records_store.FIELD_OPTIONS.values():
+        terms.update(opts)
+    missing = terms - set(records_store.GLOSSARY)
+    assert not missing, f"未注解的选项词: {sorted(missing)}"
 
 
 def test_legacy_lip_around_record_still_loads(client, data_root):
