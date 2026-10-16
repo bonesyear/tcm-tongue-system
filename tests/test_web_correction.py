@@ -50,7 +50,7 @@ def test_correction_full_flow(client, data_root):
     assert data["field_score"] == 10          # 重度=10（评分词表真实输出）
     # 总分 = 原总分 − 舌诊旧分 + 舌诊新分（sparse 均值口径，不手算硬编码）
     assert data["summary"]["total"] == pytest.approx(
-        24.7 - 5.7 + data["dim_score"], abs=0.05)
+        26.7 - 5.7 + data["dim_score"], abs=0.05)
 
     raw = _read_raw(data_root)
     # 形状感知：fixture 是形状 B → observations.tongue.body.tooth_marks

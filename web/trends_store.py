@@ -85,6 +85,12 @@ _TREND_LABELS = {
 }
 
 
+def _all_obs_values(rec):
+    """全部维度的观察值文本（禁忌核对扫描用）。"""
+    for dim in DIMENSIONS:
+        yield from rec.get_observation(dim).values()
+
+
 def build_report_input(rec) -> str:
     """辨证 LLM 的用户输入：观察值 + 评分 + 危险信号 + 置信度。"""
     from src.scoring import score, score_indicators
@@ -105,6 +111,21 @@ def build_report_input(rec) -> str:
     triggered = rec.get_triggered_danger_flags()
     lines.append("")
     lines.append("危险信号：" + ("、".join(triggered) if triggered else "九项均未触发"))
+    # 禁忌反向核对（P0 原著审查）：把出方禁忌的关键体征显式列给 LLM，
+    # 避免「未观测」被误读为「已排除」
+    lines.append("禁忌反向核对（出辛温解表剂前必须逐项回应）：")
+    for label, keys in [
+        ("戴阳/真寒假热（面红如妆、厥逆不温、脉暴出）",
+         ["面红如妆", "厥逆", "厥冷", "脉暴"]),
+        ("阳明热盛（大热、大汗、大渴、燥矢内结）",
+         ["大热", "洪大", "燥矢", "大渴"]),
+        ("亡血/伤精（苍白㿠白、唇甲淡白、肌肤甲错）",
+         ["苍白", "㿠白", "甲错"]),
+        ("黄疸（巩膜黄染、黄如橘皮）", ["黄染", "橘皮"]),
+    ]:
+        hits = [k for k in keys if any(k in (v or "") for v in _all_obs_values(rec))]
+        lines.append(f"  - {label}：" + ("已观测：" + "、".join(hits)
+                                      if hits else "未观测（≠已排除）"))
     lines.append(f"置信度：{rec.get_confidence() or '未知'}")
     asked, total = rec.get_inquiry_coverage()
     lines.append(f"问诊覆盖：{asked}/{total}")

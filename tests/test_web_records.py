@@ -59,12 +59,12 @@ def test_load_demo_creates_record(demo_client, data_root):
 
 
 def test_record_detail_renders_engine_scores(demo_client):
-    """详情页数字来自真实评分引擎（fixture 合成记录：总分 24.7）。"""
+    """详情页数字来自真实评分引擎（fixture 合成记录：总分 26.7）。"""
     resp = demo_client.get("/record/2026-06-25")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert "舌诊" in html and "头面诊" in html
-    assert "24.7 / 60" in html           # 六维之和 5.7+7+3+3+4+2
+    assert "26.7 / 60" in html           # 六维之和 5.7+7+3+3+6+2（甲床淡白 2→4，P0 修正）
     assert "均未触发" in html              # danger_flags 未触发横幅
     assert "示例方" in html                # 辨证报告卡（合成标注保留）
     assert "参考项" in html                # 点刺/掌温降级字段
@@ -80,7 +80,7 @@ def test_calendar_marks_record_days(demo_client):
     html = demo_client.get("/?m=2026-06").get_data(as_text=True)
     assert "2026 年 6 月" in html
     assert 'href="/record/2026-06-25"' in html  # 有记录的日子可点
-    assert "24.7" in html                        # 日历格总偏离度
+    assert "26.7" in html                        # 日历格总偏离度
 
 
 def test_index_keeps_only_seven_recent_rows(demo_client, data_root):
@@ -105,4 +105,4 @@ def test_uncovered_dim_does_not_count_as_zero(demo_client, data_root):
         json.dump(raw, f, ensure_ascii=False)
     html = demo_client.get("/record/2026-06-26").get_data(as_text=True)
     assert "未覆盖" in html
-    assert "22.7 / 60" in html  # 24.7 - 皮肤 2.0
+    assert "24.7 / 60" in html  # 26.7 - 皮肤 2.0
