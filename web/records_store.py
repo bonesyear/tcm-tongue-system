@@ -39,7 +39,6 @@ FIELD_OPTIONS = {
     "prickles":             ["无", "少量", "点刺", "芒刺"],  # 留存词表复活
     "body_dynamics":        ["正常", "颤动", "歪斜", "痿软", "强硬"],
     "coating_distribution": ["满布", "偏布一侧", "苔少"],
-    "lip_around":           ["正常", "发暗", "红肿", "疱疹"],
     "nose_color":           ["正常", "红赤", "青黑", "枯槁"],
     "nose_bleeding":        ["无", "少量", "较多"],
     "palm_temp":            ["温", "凉", "不温", "厥冷"],     # 留存词表复活
@@ -91,7 +90,6 @@ GLOSSARY = {
     "枯槁": "干枯无光泽",
     "枯": "干枯无光泽",
     "鼻衄": "鼻出血",
-    "疱疹": "口周簇集小水疱",
     "怒张": "络脉粗胀凸起",
 }
 
@@ -131,7 +129,7 @@ INDICATOR_LABELS = {
     "sublingual_color": "颜色", "sublingual_thickness": "粗细",
     "sublingual_varicosity": "迂曲", "sublingual_petechiae": "瘀点",
     "face_color": "面色", "face_edema": "浮肿", "face_luster": "光泽",
-    "lip_color": "唇色", "lip_moisture": "润燥", "lip_around": "口周",
+    "lip_color": "唇色", "lip_moisture": "润燥",
     "nose_color": "鼻色", "nose_flare": "煽动", "nose_bleeding": "出血",
     "redness": "目赤", "jaundice": "巩膜黄染", "edema": "浮肿",
     "dark_orbit": "目眶黯黑", "sclera_color": "巩膜颜色",
@@ -155,7 +153,7 @@ DIM_GROUPS = {
     ],
     "head_face": [
         ("面域", ["face_color", "face_edema", "face_luster"]),
-        ("唇域", ["lip_color", "lip_moisture", "lip_around"]),
+        ("唇域", ["lip_color", "lip_moisture"]),
         ("鼻域", ["nose_color", "nose_flare", "nose_bleeding"]),
     ],
     "eye": [("目", ["redness", "jaundice", "edema", "dark_orbit", "sclera_color",
