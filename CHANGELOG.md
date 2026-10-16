@@ -46,6 +46,7 @@
 
 - `knowledge_base/diagnostics/smartphone-visual-diagnostics.md` 两处仍是旧口径
   措辞（舌尖用力顶上颚 / 两侧耳朵各拍一张）——任务书范围限定 web/，此处待裁决
+  （2026-10-16 已派单：本地任务书，按惯例未入库）
 
 ## v1.7.11（向导拍摄提示语与手册口径同步，2026-10-15）
 
