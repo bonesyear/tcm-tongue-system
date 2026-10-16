@@ -150,3 +150,19 @@ def test_normal_option_scores_zero_and_passes(client, data_root):
     data = resp.get_json()
     assert data["ok"] is True
     assert data["field_score"] == 0
+
+
+def test_glossary_shipped_with_options(client, data_root):
+    """术语白话注解随选项下发：舌体动态的「强硬」「痿软」带悬浮注解。"""
+    import records_store
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    detail = records_store.record_detail(rec)
+    tongue = next(d for d in detail["dims"] if d["key"] == "tongue")
+    fields = {f["ind"]: f for g in tongue["groups"] for f in g["fields"]}
+    assert "中风" in fields["body_dynamics"]["gloss"]["强硬"]
+    assert "痿软" in fields["body_dynamics"]["gloss"]
+    # 常用词（如「无」）不注解，避免噪音
+    assert "无" not in fields["prickles"]["gloss"]
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "data-gloss" in html
