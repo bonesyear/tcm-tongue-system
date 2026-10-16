@@ -44,3 +44,7 @@ docs/*_TASK_*.md
 
 # 版权 PDF 电子书（同 epub 约定）
 *.pdf
+# 原书电子版（版权所有，永不提交；仅本机检索用）
+knowledge_base/*.pdf
+knowledge_base/*.epub
+knowledge_base/zhongyi_zhenduanxue_full.txt
