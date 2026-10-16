@@ -52,8 +52,9 @@ INQUIRY_SPEC = {
     "options": ["温", "偏凉", "凉", "厥冷（冰冷）"],
 }
 
-# 15 项问诊骨架（问题文本与 templates/adaptive_analysis_prompt.md §2.1.2 逐字一致，
-# 保证报告输入符合模板证据矩阵契约）
+# 16 项问诊骨架（问题文本与 templates/adaptive_analysis_prompt.md §2.1.2 逐字一致，
+# 保证报告输入符合模板证据矩阵契约；第 16 项汗出时间特征出自
+# 《中医诊断学》p149 特殊汗出，非经方骨架）
 INQUIRY_ITEMS = [
     {"q": "恶寒or恶热？", "options": ["恶寒", "恶热", "往来寒热", "都不明显"]},
     {"q": "有汗or无汗？", "options": ["有汗", "无汗"]},
@@ -252,24 +253,45 @@ DANGER_PATTERNS = {
 }
 
 
+def _leaf_texts(obj):
+    """递归产出对象内所有非空字符串叶子（generator）。
+
+    探测按叶子逐个扫描、否定窗口限制在叶子内部——拼接整串会让窗口
+    吃进前一字段的结尾字（「无汗」+「绝汗」跨字段误抑制红线漏报）。
+    """
+    if isinstance(obj, dict):
+        for v in obj.values():
+            yield from _leaf_texts(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _leaf_texts(v)
+    elif obj is not None:
+        s = str(obj).strip()
+        if s:
+            yield s
+
+
 def detect_danger(observations: dict) -> list:
     """扫描观察值文本，返回命中的危险信号键列表（无命中返回 []）。
 
     带否定守卫（与评分层同原则）：「无苔」不命中「局部无苔」前的「无」，
     「冷汗」不命中「无冷汗」——匹配位置前 4 字内含否定词即跳过。"""
-    from src.record import _flatten_to_text
-    text = _flatten_to_text(observations)
     out = []
     for key, pats in DANGER_PATTERNS.items():
         for pat in (pats if isinstance(pats, tuple) else (pats,)):
-            idx = text.find(pat)
-            while idx != -1:
-                window = text[max(0, idx - 4):idx]
-                if not any(n in window for n in ("无", "不", "未", "没")):
-                    out.append(key)
+            hit = False
+            for text in _leaf_texts(observations):
+                idx = text.find(pat)
+                while idx != -1:
+                    window = text[max(0, idx - 4):idx]
+                    if not any(n in window for n in ("无", "不", "未", "没")):
+                        hit = True
+                        break
+                    idx = text.find(pat, idx + 1)
+                if hit:
                     break
-                idx = text.find(pat, idx + 1)
-            if key in out:
+            if hit:
+                out.append(key)
                 break
     return out
 
