@@ -366,12 +366,27 @@ def test_wizard_tips_consistent_with_design_mock():
         encoding="utf-8").read()
     # 只取 WIZARD_STEPS 段（文件里还有 photos 等同名 part 块）
     mock_js = mock_js[mock_js.index("const WIZARD_STEPS"):]
-    sys.path.insert(0, os.path.join(_ROOT, "web"))
-    import wizard_store
+    import wizard_store  # noqa: E402（模块顶部已 insert web 路径，此处仅引入）
     for p in wizard_store.PARTS:
-        m = re.search(r'\{ part: "%s".*?tips: \[(.*?)\]' % re.escape(p["part"]),
+        # [^}]*? 限定在条目内，防止跨条目抓到下一 part 的 tips
+        m = re.search(r'\{ part: "%s"[^}]*?tips: \[(.*?)\]' % re.escape(p["part"]),
                       mock_js, re.S)
         assert m, f"mock-data.js 缺 {p['part']}"
         # JS 字符串数组粗略还原为 Python 列表比对
         js_tips = re.findall(r'"(.*?)"', m.group(1))
-        assert js_tips == p["tips"], f"{p['part']} 提示语与手册口径不一致"
+        assert js_tips == p["tips"], f"{p['part']} 提示语与设计稿 mock 数据不一致"
+
+
+def test_guide_anchors_match_wizard_parts():
+    """锚点映射守卫：wizard_store.PARTS 的 guide_anchor 与手册 html 的
+    part-* id 必须一一对应（五轮审查指出的未守护映射）。"""
+    import io
+    import re
+    html = io.open(os.path.join(_ROOT, "docs", "user-guide.html"),
+                   encoding="utf-8").read()
+    html_anchors = set(re.findall(r'id="(part-[^"]+)"', html))
+    sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import wizard_store
+    wizard_anchors = {p["guide_anchor"] for p in wizard_store.PARTS}
+    assert wizard_anchors == html_anchors
+
