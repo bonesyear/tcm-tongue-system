@@ -123,9 +123,9 @@
     <div class="fields">
       {% for f in g.fields %}
       <div class="field-row" data-dim="{{ dim.key }}" data-ind="{{ f.ind }}"
-           {% if f.opts %}data-opts='{{ f.opts | tojson }}'{% endif %}
-           {% if f.gloss %}data-gloss='{{ f.gloss | tojson }}'{% endif %}>
-        <span class="k">{{ f.k }}</span>
+           {% if f.opts %}data-opts='{{ f.opts | tojson | forceescape }}'{% endif %}
+           {% if f.gloss %}data-gloss='{{ f.gloss | tojson | forceescape }}'{% endif %}>
+        <span class="k"{% if f.kgloss %} title="{{ f.kgloss }}"{% endif %}>{{ f.k }}</span>
         <span class="v">{{ f.v }}</span>
         <span class="row" style="gap:2px;">
           {% if f.ref %}
@@ -261,8 +261,13 @@
       var actionCell = btn.parentElement;
       vSpan.innerHTML = "";
       actionCell.innerHTML = "";
-      var opts = row.dataset.opts ? JSON.parse(row.dataset.opts) : null;
-      var gloss = row.dataset.gloss ? JSON.parse(row.dataset.gloss) : {};
+      var opts = null, gloss = {};
+      try {
+        opts = row.dataset.opts ? JSON.parse(row.dataset.opts) : null;
+        gloss = row.dataset.gloss ? JSON.parse(row.dataset.gloss) : {};
+      } catch (e) {
+        opts = null;  // 属性损坏时回落自由文本，不卡在清空态
+      }
       var selected = null;
       var input = null;
       if (opts) {
@@ -297,6 +302,7 @@
       saveBtn.className = "btn btn-primary btn-sm";
       saveBtn.textContent = "保存";
       saveBtn.disabled = !!opts && selected === null;
+      if (saveBtn.disabled) saveBtn.title = "当前值不在词表内，请重新选择";
       var cancelBtn = document.createElement("button");
       cancelBtn.className = "btn btn-subtle btn-sm";
       cancelBtn.textContent = "取消";

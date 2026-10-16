@@ -343,3 +343,15 @@ def test_inquiry_juehan_triggers_danger_on_submit(client, data_root, monkeypatch
         resp.get_json()["date"]).raw
     assert raw["inquiry"]["汗出时间特征？"]["answer"] == "绝汗(大汗淋漓如油)"
     assert "collapse_yang" in raw["danger_flags"]["triggered"]
+
+
+def test_detect_danger_no_cross_field_negation_bleed():
+    """审查高危修复：否定窗口不再跨字段出血（无汗+绝汗 → 绝汗仍触发）。"""
+    assert wizard_store.detect_danger({
+        "inquiry": {"有汗or无汗？": "无汗", "汗出时间特征？": "绝汗(大汗淋漓如油)"}
+    }) == ["collapse_yang"]
+    # 观察值侧同样：前字段以「无」结尾不抑制后字段红线词
+    assert "tongue_rigid" in wizard_store.detect_danger(
+        {"tongue": {"prickles": "无", "dynamics": "强硬"}})
+    # 字段内否定语义保持抑制
+    assert wizard_store.detect_danger({"skin": {"sweat": "无冷汗"}}) == []

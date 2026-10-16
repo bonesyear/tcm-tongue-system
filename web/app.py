@@ -274,6 +274,7 @@ def create_app(env_file: str | None = None,
             inquiry_spec=wizard_store.INQUIRY_SPEC,
             inquiry_items=wizard_store.INQUIRY_ITEMS,
             danger_flags=records_store.DANGER_FLAGS,
+            glossary=records_store.GLOSSARY,
         )
 
     @app.post("/wizard/inquiry")
