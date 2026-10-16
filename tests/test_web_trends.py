@@ -134,3 +134,20 @@ def test_trends_all_empty_keeps_original_guidance(tmp_path, monkeypatch):
     html = c.get("/trends?week=2025-01-01").get_data(as_text=True)
     assert "没有任何记录" in html
     assert "去看看" not in html
+
+
+def test_template_danger_flags_has_11_keys():
+    """形状 A 模板 danger_flags 与 records_store 11 项红线键一致。"""
+    import json as _json
+    tpl = _json.load(open(os.path.join(
+        _ROOT, "templates", "multi_dim_record_template.json"), encoding="utf-8"))
+    import records_store
+    assert set(tpl["danger_flags"].keys()) == set(records_store.DANGER_FLAGS.keys())
+
+
+def test_lower_lid_baseline_no_vocab_warning():
+    """lower_lid 正常值「淡红」落词表（0 分基线），不再触发词表外告警。"""
+    from src.scoring import score_indicators
+    from src.dimensions import VisionDimension
+    got = score_indicators(VisionDimension.EYE, {"lower_lid": "淡红"})
+    assert got["lower_lid"] == 0

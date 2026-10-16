@@ -35,9 +35,16 @@ def week_payload(daily_dir: str, target: str) -> dict | None:
     recs = [rec_by_date[d] for d in dates if d in rec_by_date]
     data = gwr.generate_weekly_report_data(recs)
 
-    # 连续 7 天轴：无记录日 None（折线 connectNulls:false 断线、热力留空）
-    dev_by_date = {d: gwr.compute_dimension_deviation(rec_by_date[d])
-                   for d in rec_by_date}
+    # 连续 7 天轴：无记录日 None（折线 connectNulls:false 断线、热力留空）；
+    # 声明正常占位维度同样为 None（占位≠已观测，副作用修复）
+    dev_by_date = {}
+    for d in rec_by_date:
+        rec = records_store.DailyRecord(rec_by_date[d])
+        devs = gwr.compute_dimension_deviation(rec_by_date[d])
+        for dim in DIMENSIONS:
+            if records_store._is_declared_normal(rec.get_observation(dim)):
+                devs[dim.chinese_name] = None
+        dev_by_date[d] = devs
     dim_series = {}
     for dim in DIMENSIONS:
         cn = dim.chinese_name
@@ -47,10 +54,13 @@ def week_payload(daily_dir: str, target: str) -> dict | None:
     tm_by_date = {d: gwr.extract_tongue_metrics(rec_by_date[d]) for d in rec_by_date}
     flag_by_date = {d: gwr.extract_tongue_observation_flags(rec_by_date[d])
                     for d in rec_by_date}
+    tongue_declared = {d: records_store._is_declared_normal(
+            records_store.DailyRecord(rec_by_date[d]).get_observation("tongue"))
+        for d in rec_by_date}
     axes = list(next(iter(tm_by_date.values())).keys()) if tm_by_date else []
     heat_rows = []
     for d in dates:
-        if d in tm_by_date:
+        if d in tm_by_date and not tongue_declared[d]:
             tm, fl = tm_by_date[d], flag_by_date[d]
             heat_rows.append([tm.get(a) if fl.get(a) else None for a in axes])
         else:
@@ -91,6 +101,15 @@ def _all_obs_values(rec):
         yield from rec.get_observation(dim).values()
 
 
+def _all_evidence_values(rec):
+    """观察值 + 问诊答案（禁忌核对扫描面：戴阳「厥冷」等在问诊里）。"""
+    yield from _all_obs_values(rec)
+    inquiry = rec.raw.get("inquiry") or {}
+    for v in inquiry.values():
+        if isinstance(v, dict):
+            yield str(v.get("answer", ""))
+
+
 def build_report_input(rec) -> str:
     """辨证 LLM 的用户输入：观察值 + 评分 + 危险信号 + 置信度。"""
     from src.scoring import score, score_indicators
@@ -128,12 +147,18 @@ def build_report_input(rec) -> str:
          ["苍白", "㿠白", "甲错"]),
         ("黄疸（巩膜黄染、黄如橘皮）", ["黄染", "橘皮"]),
     ]:
-        hits = [k for k in keys if any(k in (v or "") for v in _all_obs_values(rec))]
+        hits = [k for k in keys if any(k in (v or "") for v in _all_evidence_values(rec))]
         lines.append(f"  - {label}：" + ("已观测：" + "、".join(hits)
                                       if hits else "未观测（≠已排除）"))
     lines.append(f"置信度：{rec.get_confidence() or '未知'}")
-    asked, total = rec.get_inquiry_coverage()
-    lines.append(f"问诊覆盖：{asked}/{total}")
+    # 问诊答案全量进入辨证输入（副作用修复：此前只输出覆盖计数，答案从不进 LLM）
+    inquiry = rec.raw.get("inquiry") or {}
+    answered = {q: v for q, v in inquiry.items()
+                if isinstance(v, dict) and v.get("asked") and v.get("answer")}
+    lines.append(f"问诊覆盖：{len(answered)}/16（含手足温凉；未答项 = 未提供，"
+                 f"不得推测）")
+    for q, v in answered.items():
+        lines.append(f"  - {q} {v['answer']}")
     return "\n".join(lines)
 
 

@@ -14,6 +14,7 @@ pytest.importorskip("flask")
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "web"))
 
+import llm_client  # noqa: E402
 import wizard_store  # noqa: E402
 from app import create_app  # noqa: E402
 
@@ -253,3 +254,40 @@ def test_tongue_score_max_dominant():
     from src.dimensions import VisionDimension
     obs = {"body_color": "青紫", "coating_thickness": "略厚", "coating_greasy": "微腻"}
     assert score(VisionDimension.TONGUE, obs) == 10.0  # 旧均值口径为 5.0
+
+
+def test_detect_danger_negation_guard():
+    """否定守卫：「无苔」前 4 字内有「无/不/未/没」即不触发。"""
+    assert wizard_store.detect_danger(
+        {"tongue": {"coating": {"peeling": "局部无苔"}}}) == []
+    assert wizard_store.detect_danger(
+        {"skin": {"sweat": "无冷汗"}}) == []
+    assert wizard_store.detect_danger(
+        {"tongue": {"coating": {"peeling": "光剥无苔"}}}) == ["mirror_tongue"]
+
+
+def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
+    """辨证输入：问诊答案全量进入，分母固定 16，未答项不出现。"""
+    monkeypatch.setattr(llm_client, "chat", lambda *a, **k: "# ok")
+    monkeypatch.setenv("LLM_API_KEY", "sk-x")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
+    _finish_all_parts(client, monkeypatch)
+    client.post("/wizard/inquiry", json={"question": "手足温凉", "answer": "厥冷（冰冷）"})
+    client.post("/wizard/inquiry", json={"question": "大便？", "answer": "便溏"})
+    client.post("/wizard/submit", json={"mode": "new"})
+    today = wizard_store.datetime.date.today().isoformat()
+    resp = client.post(f"/record/{today}/report")
+    assert resp.status_code == 200, resp.get_json()
+    # 检查传给 LLM 的用户输入
+    import trends_store
+    import records_store
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), today)
+    text = trends_store.build_report_input(rec)
+    assert "问诊覆盖：2/16" in text
+    assert "手足温凉 厥冷（冰冷）" in text
+    assert "大便？ 便溏" in text
+    assert "目眩？" not in text
+    # 禁忌核对能扫到问诊里的「厥冷」
+    assert "已观测：厥冷" in text

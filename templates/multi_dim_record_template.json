@@ -228,6 +228,14 @@
     "throat_erosion": {
       "triggered": false,
       "finding": ""
+    },
+    "yangming_critical": {
+      "triggered": false,
+      "finding": ""
+    },
+    "collapse_yang": {
+      "triggered": false,
+      "finding": ""
     }
   },
   "tags": [],

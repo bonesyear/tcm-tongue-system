@@ -264,8 +264,8 @@ def compute_dimension_deviation_detail(record: Dict[str, Any]) -> Dict[str, Dict
     """
     计算单条记录各望诊维度的偏离度多维信息：score / max / n。
 
-    - score：与 compute_dimension_deviation 完全同口径（score() 公开语义不变：
-      舌诊为有分指标 sparse 均值，其余维度为累加封顶 10——非舌维度该值是
+    - score：与 compute_dimension_deviation 完全同口径（score() 公开语义：
+      舌诊为最重单项（v1.7.21 起），其余维度为累加封顶 10——非舌维度该值是
       累加和而非均值，故键名为 score 而非 mean）；
     - max：该维度内最高单项分（无异常指标时为 0.0）——均值会被新增轻度异常
       稀释，max 不会，趋势判定需要它做第二道门槛；
@@ -305,11 +305,11 @@ def describe_trend(name: str, first_val: float, last_val: float,
     口径说明：只比较周初与周末两天，不反映周中波动。
 
     metric_name：降幅中性文案中对该数值的量纲称呼（默认"均值"，保持旧调用
-    逐字不变）。舌诊 score 是有分指标均值，用默认值即可；非舌维度 score 是
-    各指标之和（封顶 10），调用方应传"累计分"等词，避免把 sum 说成均值。
+    逐字不变）。非舌维度 score 是各指标之和（封顶 10），调用方应传"累计分"
+    等词，避免把 sum 说成均值；舌诊 score 自 v1.7.21 起为最重单项。
 
     双门槛（仅在调用方提供 first/last 的 max 与 n 时启用）：
-    均值的分母是有分指标数 n，新增轻度异常会稀释均值造成"假好转"
+    旧均值口径的分母是有分指标数 n，新增轻度异常会稀释均值造成"假好转"
     （实测 08-28：新增 3 项异常，均值反而 6.0 → 5.3）。因此仅当
     最重单项 max 同步下降 ≥0.5 且异常项数 n 不增（last_n <= first_n）
     时才允许输出"异常程度减轻"；max 降但 n 增、或 max 未同步下降时，

@@ -129,6 +129,11 @@ def _first_present(raw: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
     return None
 
 
+# 「未拍摄（用户声明正常）」占位标记（单一事实来源）。
+# KNOWN_ISSUES #10 的旧约定「声明正常视同覆盖」已于 v1.7.19 废止
+# （原著审查 P1：占位≠亲眼所见，不计覆盖度与置信度）。
+DECLARED_NORMAL_MARK = "未拍摄（用户声明正常）"
+
 # 顶层必填字段 schema（数据驱动 validator 用）。
 # 三种形状的顶层键不同，这里给出共性的"存在性判据"。
 SCHEMA = {
@@ -438,8 +443,14 @@ class DailyRecord:
 
     # ---- 覆盖度与置信度 ----
     def get_dimension_coverage(self) -> Dict[VisionDimension, bool]:
-        """返回每个维度是否被覆盖（有非空观测）。"""
-        return {dim: dim.is_covered(self.get_observation(dim)) for dim in DIMENSIONS}
+        """返回每个维度是否被覆盖（有非空观测）。
+
+        「未拍摄（用户声明正常）」占位不算覆盖（v1.7.19 起，
+        DECLARED_NORMAL_MARK 约定：占位≠亲眼所见）。"""
+        def covered(dim):
+            obs = self.get_observation(dim)
+            return dim.is_covered(obs) and DECLARED_NORMAL_MARK not in obs.values()
+        return {dim: covered(dim) for dim in DIMENSIONS}
 
     def get_covered_dimension_count(self) -> int:
         """已覆盖的维度数（用于置信度判定）。"""

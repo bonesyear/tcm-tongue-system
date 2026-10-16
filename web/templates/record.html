@@ -106,8 +106,8 @@
         <span class="badge {{ sev(dim.score) }} num">{{ dim.score }}</span>
         <div class="scorebar"><i class="{{ sev(dim.score) }}" style="width:{{ dim.score * 10 }}%"></i></div>
       </div>
-      {% if dim.max_indicator %}
-      <span class="faint num" style="font-size:12px;" title="该维度最重单项分（均值口径下不被稀释的异常负荷）">最重 {{ dim.max_indicator }}</span>
+      {% if dim.max_indicator and dim.max_indicator != dim.score %}
+      <span class="faint num" style="font-size:12px;" title="该维度最重单项分（累积口径下不被均摊的异常负荷）">最重 {{ dim.max_indicator }}</span>
       {% endif %}
       {% else %}
       <span class="badge sev-none">未覆盖</span>
