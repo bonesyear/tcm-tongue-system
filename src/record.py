@@ -85,7 +85,7 @@ _DIMENSION_INDICATORS: Dict[VisionDimension, Dict[str, Dict[str, List[str]]]] = 
         "dark_orbit":    {"A": ["目眶黯黑"],     "B": ["orbital_color"],    "C": ["dark_orbit"]},
         "sclera_color":  {"A": ["巩膜颜色"],     "B": ["sclera_color"],     "C": ["sclera_color"]},
         # 2026-10-16 P1（原著审查）：下睑/结膜颜色——「下睑淡黄或苍白」为血少明证
-        #（《经方探源》L7228）。拍摄法已要求暴露结膜，此前指标层漏项。
+        #（《经方探源》L5565）。拍摄法已要求暴露结膜，此前指标层漏项。
         "lower_lid":     {"A": ["下睑颜色"],     "B": ["lower_lid_color"],  "C": ["lower_lid"]},
     },
     VisionDimension.EAR: {
