@@ -109,7 +109,8 @@ def test_full_wizard_produces_shape_b_record(client, data_root, monkeypatch):
     # 声明正常的部位：占位写入首指标路径，计入覆盖
     assert "未拍摄（用户声明正常）" in json.dumps(
         raw["observations"]["head_face"], ensure_ascii=False)
-    assert raw["confidence"] == "HIGH"  # 7 部位全覆盖
+    # P1（原著审查）：声明正常占位不计覆盖度——仅舌诊实观测 → LOW
+    assert raw["confidence"] == "LOW"
     assert raw["danger_flags"]["triggered"] == []
     # 草稿已清
     assert not os.path.exists(wizard_store.draft_path(
@@ -184,3 +185,44 @@ def test_vision_unconfigured_saves_photo_but_no_observe(tmp_path, data_root, mon
     data = resp.get_json()
     assert resp.status_code == 400
     assert data["photo_saved"] is True  # 照片不丢，识图待配置后重试
+
+
+def test_inquiry_answer_written_into_record(client, data_root, monkeypatch):
+    """问诊步（手足温凉）：答案按模板 inquiry 契约写入记录。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/inquiry", json={"answer": "厥冷（冰冷）"})
+    assert resp.get_json()["ok"] is True
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    assert resp.get_json()["ok"] is True
+    import records_store
+    raw = records_store.load_record(
+        os.path.join(data_root, "records", "daily"),
+        resp.get_json()["date"]).raw
+    assert raw["inquiry"]["手足温凉"] == {"asked": True, "answer": "厥冷（冰冷）"}
+
+
+def test_declared_normal_dim_scores_none(client, data_root, monkeypatch):
+    """声明正常占位维度：列表/详情按未覆盖（None）处理，不再呈 0 分。"""
+    _finish_all_parts(client, monkeypatch)
+    client.post("/wizard/submit", json={"mode": "new"})
+    today = wizard_store.datetime.date.today().isoformat()
+    html = client.get(f"/record/{today}").get_data(as_text=True)
+    assert "未拍摄（用户声明正常）" in html
+    assert "按未覆盖处理" in html
+
+
+def test_mirror_tongue_pattern_no_false_positive():
+    """「局部剥落」不得命中镜面舌探测（pattern 为「无苔」）。"""
+    assert "无苔" not in "局部剥落"
+    assert wizard_store.detect_danger(
+        {"tongue": {"coating": {"peeling": "局部剥落"}}}) == []
+    assert wizard_store.detect_danger(
+        {"tongue": {"coating": {"peeling": "光剥无苔"}}}) == ["mirror_tongue"]
+
+
+def test_new_danger_patterns_detected():
+    """新增两条红线：直视→阳明危重、冷汗→脱阳前兆。"""
+    got = wizard_store.detect_danger({"skin": {"note": "微喘直视"}})
+    assert got == ["yangming_critical"]
+    got = wizard_store.detect_danger({"skin": {"sweat": "冷汗如油"}})
+    assert got == ["collapse_yang"]

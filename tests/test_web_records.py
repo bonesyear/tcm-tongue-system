@@ -106,3 +106,10 @@ def test_uncovered_dim_does_not_count_as_zero(demo_client, data_root):
     html = demo_client.get("/record/2026-06-26").get_data(as_text=True)
     assert "未覆盖" in html
     assert "24.7 / 60" in html  # 26.7 - 皮肤 2.0
+
+
+def test_review_badges_shown(demo_client):
+    """待复核徽标：齿痕/腻腐/厚薄/面色/黄染/舌下络脉等字段应显示（P1）。"""
+    html = demo_client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "待复核" in html
+    assert html.count("待复核") >= 3  # fixture 中齿痕/厚薄/腻腐/面色/络脉迂曲均有值

@@ -271,8 +271,26 @@ def create_app(env_file: str | None = None,
         return render_template(
             "wizard.html", page="wizard",
             state=wizard_store.wizard_state(daily_dir, today, existing),
+            inquiry_spec=wizard_store.INQUIRY_SPEC,
             danger_flags=records_store.DANGER_FLAGS,
         )
+
+    @app.post("/wizard/inquiry")
+    def wizard_inquiry():
+        """向导问诊步（手足温凉）：答案写入草稿。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = request.json or {}
+        answer = (body.get("answer") or "").strip()
+        today = datetime.date.today().isoformat()
+        draft = wizard_store.load_draft(daily_dir, today)
+        draft.setdefault("inquiry", {})
+        if answer:
+            draft["inquiry"][wizard_store.INQUIRY_SPEC["key"]] = answer
+        else:
+            draft["inquiry"].pop(wizard_store.INQUIRY_SPEC["key"], None)
+        wizard_store.save_draft(daily_dir, draft)
+        return jsonify({"ok": True})
 
     @app.post("/wizard/photo")
     def wizard_photo():
