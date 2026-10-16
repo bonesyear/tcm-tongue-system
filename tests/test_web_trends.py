@@ -136,8 +136,8 @@ def test_trends_all_empty_keeps_original_guidance(tmp_path, monkeypatch):
     assert "去看看" not in html
 
 
-def test_template_danger_flags_has_11_keys():
-    """形状 A 模板 danger_flags 与 records_store 11 项红线键一致。"""
+def test_template_danger_flags_keys_in_sync():
+    """形状 A 模板 danger_flags 与 records_store 红线键一致（11 + 危重舌象 8）。"""
     import json as _json
     tpl = _json.load(open(os.path.join(
         _ROOT, "templates", "multi_dim_record_template.json"), encoding="utf-8"))
