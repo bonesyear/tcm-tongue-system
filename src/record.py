@@ -73,7 +73,6 @@ _DIMENSION_INDICATORS: Dict[VisionDimension, Dict[str, Dict[str, List[str]]]] = 
         "face_luster":   {"A": ["面域", "光泽"],     "B": ["face", "luster"],  "C": ["face_luster"]},
         "lip_color":     {"A": ["唇域", "唇色"],     "B": ["lips", "color"],   "C": ["lip_color"]},
         "lip_moisture":  {"A": ["唇域", "唇润燥"],   "B": ["lips", "moisture"], "C": ["lip_moisture"]},
-        "lip_around":    {"A": ["唇域", "唇周"],     "B": ["lips", "around"],  "C": ["lip_around"]},
         "nose_color":    {"A": ["鼻域", "鼻色"],     "B": ["nose", "color"],   "C": ["nose_color"]},
         "nose_flare":    {"A": ["鼻域", "鼻翼煽动"], "B": ["nose", "flaring"], "C": ["nose_flare"]},
         "nose_bleeding": {"A": ["鼻域", "鼻衄"],     "B": ["nose", "bleeding"], "C": ["nose_bleeding"]},
