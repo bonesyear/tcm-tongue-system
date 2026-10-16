@@ -101,3 +101,52 @@ def test_correction_warning_does_not_block(client, data_root):
     assert resp.status_code == 200
     raw = _read_raw(data_root)
     assert raw["observations"]["tongue"]["body"]["tooth_marks"] == "轻度（与昨日一致）"
+
+
+# ---------------- 修正选项化（封闭词表按钮直选） ----------------
+
+def test_detail_exposes_scored_options(client, data_root):
+    """评分词表 key 直接作为修正选项下发（body_color 含 0 分基线，无兜底词）。"""
+    import records_store
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "data-opts" in html  # tojson 转义非 ASCII，选项内容走视图模型断言
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    detail = records_store.record_detail(rec)
+    tongue = next(d for d in detail["dims"] if d["key"] == "tongue")
+    fields = {f["ind"]: f for g in tongue["groups"] for f in g["fields"]}
+    assert fields["body_color"]["opts"][:2] == ["淡红", "红润"]
+    assert "紫暗" in fields["body_color"]["opts"]
+    assert "未见异常" not in fields["body_color"]["opts"]  # 自带 0 分基线不补兜底
+    # 点刺：评分层退出，但留存词表复活为参考项选项
+    assert fields["prickles"]["opts"] == ["无", "少量", "点刺", "芒刺"]
+
+
+def test_detail_normal_option_when_map_has_no_zero(client, data_root):
+    """词表无 0 分基线词的字段（如面色）补「未见异常」选项。"""
+    import records_store
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    detail = records_store.record_detail(rec)
+    face = next(d for d in detail["dims"] if d["key"] == "head_face")
+    face_color = next(f for g in face["groups"] for f in g["fields"]
+                      if f["ind"] == "face_color")
+    assert face_color["opts"][0] == records_store.NORMAL_OPTION
+
+
+def test_option_value_scores_directly(client):
+    """词表 key 作为值提交：选中即得分，无静默归零。"""
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "body_color", "value": "紫暗"})
+    assert resp.status_code == 200
+    assert resp.get_json()["field_score"] == 9
+
+
+def test_normal_option_scores_zero_and_passes(client, data_root):
+    """「未见异常」提交：validator 豁免区措辞，0 分且不触发 ❌ 拦截。"""
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "head_face", "indicator": "face_color", "value": "未见异常"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["field_score"] == 0
