@@ -38,3 +38,6 @@ records/photos/
 
 # 一日任务书（跨 Agent 派工单）：仅本地使用，不入库（AGENTS.md §2 约定）
 docs/*_TASK_*.md
+
+# 版权电子书原文（版权物，仅限本地对照研究，不入版本库）
+*.epub
