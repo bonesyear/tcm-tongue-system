@@ -292,6 +292,9 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "jaundice":     {"黄染明显": 8, "黄染轻度": 4, "黄染": 4},
         "edema":        {"卧蚕": 6, "浮肿明显": 4, "浮肿": 4, "微肿": 2},
         "dark_orbit":   {"黯黑": 4, "黑眼圈": 4},
+        "lower_lid":    {"淡白": 5, "淡黄": 5, "苍白": 5,  # 2026-10-16 P1：
+                                    # 下睑淡黄/苍白为血少定性证据（L7228）
+                         },
     },
     VisionDimension.EAR: {
         "color":  {"红赤": 3, "青黑": 3, "淡白": 2},

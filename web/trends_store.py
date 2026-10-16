@@ -97,6 +97,10 @@ def build_report_input(rec) -> str:
     lines = [f"日期：{rec.date}", ""]
     for dim in DIMENSIONS:
         obs = rec.get_observation(dim)
+        if records_store._is_declared_normal(obs):
+            lines.append(f"【{dim.chinese_name}】今日未拍摄（用户声明正常）——"
+                         f"按未覆盖处理，不得引为该维度证据")
+            continue
         if not dim.is_covered(obs):
             lines.append(f"【{dim.chinese_name}】今日未覆盖")
             continue
@@ -110,7 +114,8 @@ def build_report_input(rec) -> str:
                 lines.append(f"  - {ind}: {v}（参考项，不参与评分）")
     triggered = rec.get_triggered_danger_flags()
     lines.append("")
-    lines.append("危险信号：" + ("、".join(triggered) if triggered else "九项均未触发"))
+    lines.append("危险信号：" + ("、".join(triggered) if triggered
+                                     else f"{len(records_store.DANGER_FLAGS)} 项均未触发"))
     # 禁忌反向核对（P0 原著审查）：把出方禁忌的关键体征显式列给 LLM，
     # 避免「未观测」被误读为「已排除」
     lines.append("禁忌反向核对（出辛温解表剂前必须逐项回应）：")

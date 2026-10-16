@@ -41,6 +41,15 @@ PARTS = [
      "guide_anchor": "part-skin", "guide_label": "皮肤照",
      "tips": ["前臂或小腿伸侧", "自然光下拍摄", "如有黄汗/甲错部位请特写"]},
 ]
+# 向导问诊步（2026-10-16 P1 原著审查）：手足温厥是原著三阴三阳最快捷鉴别
+# （L6143），照片判不了，必须问。跳过不答也可（不编造）。
+INQUIRY_SPEC = {
+    "key": "手足温凉",
+    "title": "手足温度如何？（问诊 · 必答推荐）",
+    "hint": "手足厥冷=病在阴（太阴/少阴/厥阴）；手足温+渴=少阳；手足自温不排除太阴。原著三阴三阳最快捷鉴别。",
+    "options": ["温", "偏凉", "凉", "厥冷（冰冷）"],
+}
+
 PART_BY_NAME = {p["part"]: p for p in PARTS}
 
 # 识图输出（中文键，可嵌套）→ 形状 B 英文路径。
@@ -66,6 +75,7 @@ OBSERVE_MAP = {
     "眼部": {
         "目赤": ["redness"], "巩膜黄染": ["scleral_jaundice"],
         "眼睑浮肿": ["eyelid_edema"], "白睛颜色": ["sclera_color"],
+        "下睑结膜颜色": ["lower_lid_color"],
     },
     "耳部": {"耳色": ["color"], "润枯": ["helix"]},
     "手掌": {"掌色": ["palm_color"], "甲床颜色": ["nail_bed"],
@@ -128,6 +138,7 @@ def wizard_state(daily_dir: str, date_str: str, existing) -> dict:
         "date": date_str,
         "parts": parts,
         "done_count": sum(1 for p in parts if p["status"] != "pending"),
+        "inquiry": draft.get("inquiry", {}),
         "existing": existing,  # None 或 {"coverage": n, "uncovered": [中文名...]}
     }
 
@@ -192,12 +203,15 @@ DANGER_PATTERNS = {
     "daiyang": "面红如妆",
     "tongue_rigid": "强硬",
     "tongue_critical": "焦黑",
-    "mirror_tongue": "镜面",
+    "mirror_tongue": "无苔",
     "acute_jaundice": "黄如橘皮",
     "flesh_wasted": "大肉已脱",
     "wind_stroke": "口不能言",
     "skin_cold": "触之冰冷",
     "throat_erosion": "狐惑",
+    # 2026-10-16 P1（原著审查）补两条红线探测（均为低特异但值得复核的表述）
+    "yangming_critical": "直视",
+    "collapse_yang": "冷汗",
 }
 
 
@@ -284,6 +298,15 @@ def assemble_record(draft: dict, version: str,
          for pt, st in draft["parts"].items() if st.get("status") == "observed"]))
     raw["observations"] = observations
 
+    # 问诊步答案（手足温凉）：模板 inquiry 契约 {问题: {asked, answer}}
+    if merge_only_uncovered and existing_raw and isinstance(
+            existing_raw.get("inquiry"), dict):
+        raw["inquiry"] = dict(existing_raw["inquiry"])
+    answer = (draft.get("inquiry") or {}).get(INQUIRY_SPEC["key"])
+    if answer:
+        raw.setdefault("inquiry", {})[INQUIRY_SPEC["key"]] = {
+            "asked": True, "answer": answer}
+
     # danger_flags：草稿显式注入优先（测试/未来 LLM 步骤），否则词表探测
     if "danger_flags" in draft:
         raw["danger_flags"] = draft["danger_flags"]
@@ -295,7 +318,12 @@ def assemble_record(draft: dict, version: str,
             "triggered": triggered,
             "not_triggered": [k for k in DANGER_PATTERNS if k not in triggered],
         }
-    covered = DailyRecord(raw).get_covered_dimension_count()
+    covered = 0
+    rec_check = DailyRecord(raw)
+    for dim in DIMENSIONS:
+        obs = rec_check.get_observation(dim)
+        if dim.is_covered(obs) and DECLARED_NORMAL_PLACEHOLDER not in obs.values():
+            covered += 1  # 声明正常占位不计入覆盖度（P1 原著审查）
     raw["confidence"] = from_coverage(covered).value
     return raw
 

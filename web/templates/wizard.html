@@ -49,7 +49,17 @@
     {% for p in state.parts %}
     <li data-part="{{ p.part }}" class="{{ 'done' if p.status != 'pending' }}">{{ p.part }}</li>
     {% endfor %}
+    <li data-part="问诊">问诊</li>
   </ol>
+</div>
+
+<div class="card" id="inquiry-card" style="display:none;">
+  <div class="card-head">
+    <h2 id="inquiry-title"></h2>
+    <span class="tag cinnabar">问诊</span>
+  </div>
+  <p class="muted" id="inquiry-hint" style="font-size:13.5px;"></p>
+  <div class="row wrap" id="inquiry-options" style="gap:10px; margin-top:12px;"></div>
 </div>
 
 <div class="card">
@@ -146,11 +156,16 @@ if (modeMergeBtn) {
 function isWarnTip(t) { return t.indexOf("⚠") >= 0 || t.indexOf("禁") >= 0; }
 
 function render() {
-  var p = PARTS[cur];
+  var inInquiry = cur === 7;
+  var stepCard = document.getElementById("capture").closest(".card");
+  document.getElementById("inquiry-card").style.display = inInquiry ? "" : "none";
+  stepCard.style.display = inInquiry ? "none" : "";
   document.querySelectorAll("#steps li").forEach(function (li, i) {
-    li.className = (PARTS[i].status !== "pending" ? "done " : "") + (i === cur ? "current" : "");
+    li.className = ((PARTS[i] && PARTS[i].status !== "pending") || i === 7 && inquiryAnswered ? "done " : "") + (i === cur ? "current" : "");
   });
-  document.getElementById("step-title").textContent = "第 " + (cur + 1) + " / 7 步 · " + p.part;
+  if (inInquiry) { renderInquiry(); updateNav(); return; }
+  var p = PARTS[cur];
+  document.getElementById("step-title").textContent = "第 " + (cur + 1) + " / 8 步 · " + p.part;
   document.getElementById("step-dim").textContent = p.dim;
   document.getElementById("step-status").textContent =
     p.status === "observed" ? "✓ 已识图" :
@@ -169,16 +184,56 @@ function render() {
   } else {
     obsBox.style.display = "none";
   }
+  updateNav();
+}
+
+var inquiryAnswered = {{ (state.inquiry | length > 0) | tojson }};
+var INQUIRY = {{ inquiry_spec | tojson }};
+
+function renderInquiry() {
+  document.getElementById("inquiry-title").textContent = "第 8 / 8 步 · " + INQUIRY.key;
+  document.getElementById("inquiry-hint").textContent = INQUIRY.hint;
+  var box = document.getElementById("inquiry-options");
+  box.innerHTML = "";
+  INQUIRY.options.forEach(function (opt) {
+    var b = document.createElement("button");
+    b.className = "btn btn-ghost";
+    b.textContent = opt;
+    b.addEventListener("click", function () {
+      postJSON("/wizard/inquiry", {answer: opt}).then(function (d) {
+        if (d.ok) { inquiryAnswered = true; render(); }
+      });
+    });
+    box.appendChild(b);
+  });
+  var skip = document.createElement("button");
+  skip.className = "btn btn-subtle btn-sm";
+  skip.textContent = "跳过（不答）";
+  skip.addEventListener("click", function () {
+    postJSON("/wizard/inquiry", {answer: ""}).then(function (d) {
+      if (d.ok) { inquiryAnswered = true; render(); }
+    });
+  });
+  box.appendChild(skip);
+  if (inquiryAnswered) {
+    var done = document.createElement("span");
+    done.className = "tag ok";
+    done.textContent = "✓ 已回答";
+    box.appendChild(done);
+  }
+}
+
+function updateNav() {
   document.getElementById("btn-prev").disabled = cur === 0;
-  document.getElementById("btn-next").textContent = cur === 6 ? "到最后一步了" : "下一步 · " + PARTS[cur + 1].part + " ›";
-  document.getElementById("btn-next").disabled = cur === 6;
+  document.getElementById("btn-next").textContent = cur === 7 ? "到最后一步了" : (cur === 6 ? "下一步 · 问诊 ›" : "下一步 · " + PARTS[cur + 1].part + " ›");
+  document.getElementById("btn-next").disabled = cur === 7;
   var done = PARTS.filter(function (x) { return x.status !== "pending"; }).length;
-  document.getElementById("progress-text").textContent = "已完成 " + done + " / 7 部位";
+  document.getElementById("progress-text").textContent = "已完成 " + done + " / 7 部位" + (inquiryAnswered ? "，问诊已答" : "");
   document.getElementById("btn-submit").disabled = done < 7;
 }
 
 document.getElementById("btn-prev").addEventListener("click", function () { if (cur > 0) { cur--; render(); } });
-document.getElementById("btn-next").addEventListener("click", function () { if (cur < 6) { cur++; render(); } });
+document.getElementById("btn-next").addEventListener("click", function () { if (cur < 7) { cur++; render(); } });
 
 function postJSON(url, body) {
   return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})

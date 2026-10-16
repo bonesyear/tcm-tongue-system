@@ -88,7 +88,7 @@
 {% else %}
 <div class="card" style="display:flex; align-items:center; gap:12px; padding:14px 22px;">
   <i class="dot sev-0"></i>
-  <span>今日九项安全红线<strong style="color:var(--sev-0);">均未触发</strong></span>
+  <span>今日 {{ r.danger_all | length }} 项安全红线<strong style="color:var(--sev-0);">均未触发</strong></span>
   <span class="faint" style="font-size:12.5px;">{{ r.danger_all | join(" · ") }}</span>
 </div>
 {% endif %}
@@ -99,16 +99,23 @@
     <div class="row">
       <h3>{{ dim.name }}</h3>
       <span class="spacer"></span>
-      {% if dim.covered %}
+      {% if dim.declared_normal %}
+      <span class="tag cinnabar">未拍摄（用户声明正常）</span>
+      {% elif dim.covered %}
       <div class="scoreline" style="width: 180px;">
         <span class="badge {{ sev(dim.score) }} num">{{ dim.score }}</span>
         <div class="scorebar"><i class="{{ sev(dim.score) }}" style="width:{{ dim.score * 10 }}%"></i></div>
       </div>
+      {% if dim.max_indicator %}
+      <span class="faint num" style="font-size:12px;" title="该维度最重单项分（均值口径下不被稀释的异常负荷）">最重 {{ dim.max_indicator }}</span>
+      {% endif %}
       {% else %}
       <span class="badge sev-none">未覆盖</span>
       {% endif %}
     </div>
-    {% if not dim.covered %}
+    {% if dim.declared_normal %}
+    <p class="faint" style="font-size:13px;">该维度未拍摄，按未覆盖处理（不计入覆盖度与置信度）。</p>
+    {% elif not dim.covered %}
     <p class="faint" style="font-size:13px;">该维度未拍摄或无有效观测。</p>
     {% endif %}
     {% for g in dim.groups %}
@@ -123,6 +130,9 @@
           <span class="ref" title="{{ f.ref }}">参考项</span>
           {% else %}
           <span class="badge {{ sev(f.s) }} num">{{ f.s }}</span>
+          {% endif %}
+          {% if f.review %}
+          <span class="ref" title="{{ f.review }}" style="color:var(--sev-4); border-color:var(--sev-4);">待复核</span>
           {% endif %}
           <button class="edit" title="修正此项">✎</button>
         </span>
