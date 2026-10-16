@@ -291,3 +291,55 @@ def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
     assert "目眩？" not in text
     # 禁忌核对能扫到问诊里的「厥冷」
     assert "已观测：厥冷" in text
+
+
+# ---------------- 2026-10-16 教材复查修复（P0/P1/P2） ----------------
+
+def test_dynamics_options_include_suosuo_tunong():
+    """P0：舌体动态选项补短缩/吐弄（教材六种病理舌态齐全）。"""
+    import records_store
+    opts = records_store.FIELD_OPTIONS["body_dynamics"]
+    assert "短缩" in opts and "吐弄" in opts
+    assert "危重" in records_store.GLOSSARY["短缩"]
+
+
+def test_critical_tongue_flags_detected():
+    """P1：危重舌象 8 项文本探测（含否定守卫）。"""
+    assert wizard_store.detect_danger({"tongue": {"body": {"texture": "砂皮"}}}) \
+        == ["sandy_tongue"]
+    assert wizard_store.detect_danger({"tongue": {"note": "未见砂皮样改变"}}) == []
+    got = wizard_store.detect_danger({"tongue": {"body": {"color": "赭黑"}}})
+    assert got == ["ochre_tongue"]
+
+
+def test_collapse_yang_detects_juehan_tuple_pattern():
+    """P2：collapse_yang 支持多模式（冷汗/绝汗）。"""
+    assert wizard_store.detect_danger({"skin": {"sweat": "冷汗如油"}}) == ["collapse_yang"]
+    assert wizard_store.detect_danger({"inquiry": {"汗出时间特征？": "绝汗(大汗淋漓如油)"}}) \
+        == ["collapse_yang"]
+
+
+def test_inquiry_sweat_item_in_list():
+    """P2：问诊骨架含汗出时间特征（第 16 项）。"""
+    qs = [i["q"] for i in wizard_store.INQUIRY_ITEMS]
+    assert "汗出时间特征？" in qs and len(qs) == 16
+
+
+def test_inquiry_juehan_triggers_danger_on_submit(client, data_root, monkeypatch):
+    """P2 端到端：问诊自陈绝汗 → 提交后 collapse_yang 红线触发。"""
+    _finish_all_parts(client, monkeypatch)
+    client.post("/wizard/inquiry",
+                json={"question": "汗出时间特征？", "answer": "绝汗(大汗淋漓如油)"})
+    # 红线拦截层：未确认不直接落盘
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    d = resp.get_json()
+    assert d["need_danger_ack"] is True
+    assert any(f["key"] == "collapse_yang" for f in d["danger"])
+    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "keep"})
+    assert resp.get_json()["ok"] is True
+    import records_store
+    raw = records_store.load_record(
+        os.path.join(data_root, "records", "daily"),
+        resp.get_json()["date"]).raw
+    assert raw["inquiry"]["汗出时间特征？"]["answer"] == "绝汗(大汗淋漓如油)"
+    assert "collapse_yang" in raw["danger_flags"]["triggered"]
