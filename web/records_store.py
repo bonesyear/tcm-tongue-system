@@ -193,6 +193,37 @@ GLOSSARY.update({
     "色正黄": "黄色纯正（黄汗的汗色）",
     "温": "手脚温度正常暖和",
     "凉": "手脚偏凉",
+    # 问诊选项（向导步 chips 悬浮注解）
+    "恶寒": "怕冷、添衣不减，多主表寒",
+    "往来寒热": "忽冷忽热交替，少阳病特征",
+    "头项强痛": "头痛连后颈僵硬，太阳表束",
+    "目眩": "头晕眼花、天旋地转",
+    "渴不欲饮": "口干但不想喝水",
+    "口燥但欲漱水不欲咽": "口干想漱口却不想咽下——瘀血特征",
+    "纳呆不食": "没胃口、不想吃饭",
+    "饥不欲食": "肚子饿却吃不下，多主胃阴伤",
+    "消谷善饥": "吃得多还老饿，多主胃热",
+    "便溏": "大便稀软不成形，多主脾虚湿",
+    "便硬": "大便干硬难下",
+    "便燥": "大便干燥",
+    "下利": "腹泻、大便稀水样",
+    "小便清长": "小便量多色淡，多主寒",
+    "小便黄赤": "小便黄少，多主热",
+    "小便不利": "排尿不畅、尿量少",
+    "小便白": "小便色白清稀，多主少阴虚寒",
+    "失眠烦躁": "睡不着、心烦",
+    "嗜睡多寐": "老想睡、精神萎靡",
+    "胸胁苦满": "胸口和两胁胀满不舒，少阳柴胡证",
+    "心下痞": "心窝部堵闷感",
+    "腹满": "腹部胀满",
+    "胸闷": "胸部憋闷",
+    "耳鸣": "耳内鸣响",
+    "耳无所闻": "听不到声音",
+    "鼻鸣": "鼻塞呼吸有声",
+    "自汗(白天易汗出)": "白天不动也出汗，多主阳虚/表虚",
+    "盗汗(睡中汗出)": "睡着后出汗、醒则止，多主阴虚",
+    "绝汗(大汗淋漓如油)": "大汗淋漓不止——脱阳前兆，危重",
+    "厥冷（冰冷）": "手脚冰凉过肘膝——病在阴，警惕危重",
 })
 
 
@@ -583,6 +614,24 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
     raw["manually_corrected"] = True
     raw["corrected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
 
+    # 修正可能写入红线词（强硬/短缩/镜面等封闭选项）——重估 danger_flags。
+    # 仅形状 B 列表结构；形状 A 每旗对象结构由 LLM 维护，不动。
+    import wizard_store
+    detected = wizard_store.detect_danger(raw.get("observations", {}))
+    df = raw.get("danger_flags")
+    if isinstance(df, dict) and isinstance(df.get("triggered"), list):
+        triggered = sorted(set(df["triggered"]) | set(detected))
+    elif detected:
+        triggered = sorted(detected)
+    else:
+        triggered = None
+    if triggered is not None:
+        raw["danger_flags"] = {
+            "triggered": triggered,
+            "not_triggered": [k for k in wizard_store.DANGER_PATTERNS
+                              if k not in triggered],
+        }
+
     # 临时档先校验，❌ 拦截（原档不动）；通过则备份旧版 → 原子替换
     tmp = filepath + ".validate-tmp"
     try:
@@ -609,6 +658,7 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
         "backup": os.path.basename(backup),
         "field_score": scored.get(indicator),
         "dim_score": round(score(dim, obs), 1) if dim.is_covered(obs) else None,
+        "danger_triggered": (raw.get("danger_flags") or {}).get("triggered", []),
         "summary": record_summary(new_rec),
     }
 
@@ -636,7 +686,9 @@ def record_detail(rec: DailyRecord) -> dict:
             for ind in indicators:
                 v = obs.get(ind, "")
                 opts = _field_options(dim, ind)
-                base = {"k": INDICATOR_LABELS.get(ind, ind), "v": v, "ind": ind,
+                label = INDICATOR_LABELS.get(ind, ind)
+                base = {"k": label, "v": v, "ind": ind,
+                        "kgloss": GLOSSARY.get(label),
                         "opts": opts,
                         "gloss": {o: GLOSSARY[o] for o in opts
                                   if o in GLOSSARY} if opts else None}

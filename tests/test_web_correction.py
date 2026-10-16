@@ -201,3 +201,15 @@ def test_legacy_lip_around_record_still_loads(client, data_root):
     resp = client.post("/record/2026-06-25/field", json={
         "dim": "head_face", "indicator": "lip_color", "value": "红润"})
     assert resp.status_code == 200, resp.get_json()
+
+
+def test_correction_redetects_danger_flags(client, data_root):
+    """审查中危修复：修正写入红线词（强硬）→ danger_flags 重估并落盘。"""
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "body_dynamics", "value": "强硬"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "tongue_rigid" in data["danger_triggered"]
+    raw = _read_raw(data_root)
+    assert "tongue_rigid" in raw["danger_flags"]["triggered"]
+    # 改成正常值后旧触发仍保留（历史曾经触发，不归零——与向导并集语义一致）

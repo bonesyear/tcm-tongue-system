@@ -191,6 +191,7 @@ var inquiryAnswered = {{ (state.inquiry | length > 0) | tojson }};
 var INQUIRY = {{ inquiry_spec | tojson }};
 var INQUIRY_ITEMS = {{ inquiry_items | tojson }};
 var ANSWERS = {{ state.inquiry | tojson }};
+var GLOSSARY = {{ glossary | tojson }};
 
 function renderInquiry() {
   document.getElementById("inquiry-title").textContent = "第 8 / 8 步 · 问诊（" + Object.keys(ANSWERS).length + " / " + (INQUIRY_ITEMS.length + 1) + " 已答）";
@@ -213,6 +214,7 @@ function renderInquiry() {
       var on = ANSWERS[q] === opt;
       b.className = "btn btn-sm " + (on ? "btn-primary" : "btn-ghost");
       b.textContent = opt;
+      if (GLOSSARY[opt]) b.title = GLOSSARY[opt];
       b.addEventListener("click", function () {
         postJSON("/wizard/inquiry", {question: q, answer: opt}).then(function (d) {
           if (d.ok) { ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
@@ -226,7 +228,7 @@ function renderInquiry() {
 
   /* 第 0 项：手足温凉（必答推荐，置顶高亮） */
   mkRow(INQUIRY.key, INQUIRY.options, true);
-  /* 其余 15 项（全部可跳过） */
+  /* 其余 16 项（全部可跳过） */
   INQUIRY_ITEMS.forEach(function (item) { mkRow(item.q, item.options, false); });
 
   var skipAll = document.createElement("button");
