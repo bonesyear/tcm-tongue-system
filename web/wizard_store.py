@@ -41,9 +41,10 @@ PARTS = [
      "guide_anchor": "part-skin", "guide_label": "皮肤照",
      "tips": ["前臂或小腿伸侧", "自然光下拍摄", "如有黄汗/甲错部位请特写"]},
 ]
-# 向导问诊步（2026-10-16 原著审查 P1 + 主人批准开放 15 项）：
+# 向导问诊步（2026-10-16 原著审查 P1 + 主人批准开放 15 项，同日教材复查
+# P2 增补「汗出时间特征」为第 16 项——绝汗直接支撑 collapse_yang 红线）：
 # 第 0 项「手足温凉」是原著三阴三阳最快捷鉴别（L6143），照片判不了，必答推荐；
-# 其余 15 项为模板既定问诊骨架（全部可跳过）。
+# 其余 16 项为模板既定问诊骨架（全部可跳过）。
 INQUIRY_SPEC = {
     "key": "手足温凉",
     "title": "手足温度如何？（问诊 · 必答推荐）",
@@ -69,6 +70,10 @@ INQUIRY_ITEMS = [
     {"q": "腹部？", "options": ["无不适", "腹满", "腹痛", "心下痞"]},
     {"q": "听力？", "options": ["正常", "耳鸣", "听力下降", "耳无所闻"]},
     {"q": "鼻部？", "options": ["正常", "鼻塞", "鼻鸣", "鼻衄"]},
+    # 2026-10-16 教材复查 P2：绝汗（脱汗）直接支撑 collapse_yang 红线，
+    # 自汗/盗汗为阴阳鉴别常规项（《中医诊断学》p149 特殊汗出）
+    {"q": "汗出时间特征？", "options": ["无异常", "自汗(白天易汗出)",
+                                      "盗汗(睡中汗出)", "绝汗(大汗淋漓如油)"]},
 ]
 
 PART_BY_NAME = {p["part"]: p for p in PARTS}
@@ -234,7 +239,16 @@ DANGER_PATTERNS = {
     "throat_erosion": "狐惑",
     # 2026-10-16 P1（原著审查）补两条红线探测（均为低特异但值得复核的表述）
     "yangming_critical": "直视",
-    "collapse_yang": "冷汗",
+    "collapse_yang": ("冷汗", "绝汗"),
+    # 2026-10-16 教材复查 P1：危重舌象 8 项文本探测（《中医诊断学》p117）
+    "pigkidney_tongue": "猪腰",
+    "sandy_tongue": "砂皮",
+    "litchi_tongue": "干荔",
+    "persimmon_tongue": "火柿",
+    "ochre_tongue": "赭黑",
+    "thin_coatless": "瘦薄无苔",
+    "retracted_tongue": "囊缩",
+    "blue_tongue": "蓝舌",
 }
 
 
@@ -246,14 +260,17 @@ def detect_danger(observations: dict) -> list:
     from src.record import _flatten_to_text
     text = _flatten_to_text(observations)
     out = []
-    for key, pat in DANGER_PATTERNS.items():
-        idx = text.find(pat)
-        while idx != -1:
-            window = text[max(0, idx - 4):idx]
-            if not any(n in window for n in ("无", "不", "未", "没")):
-                out.append(key)
+    for key, pats in DANGER_PATTERNS.items():
+        for pat in (pats if isinstance(pats, tuple) else (pats,)):
+            idx = text.find(pat)
+            while idx != -1:
+                window = text[max(0, idx - 4):idx]
+                if not any(n in window for n in ("无", "不", "未", "没")):
+                    out.append(key)
+                    break
+                idx = text.find(pat, idx + 1)
+            if key in out:
                 break
-            idx = text.find(pat, idx + 1)
     return out
 
 
@@ -345,7 +362,9 @@ def assemble_record(draft: dict, version: str,
     if "danger_flags" in draft:
         raw["danger_flags"] = draft["danger_flags"]
     else:
-        detected = detect_danger(observations)
+        # 问诊答案一并扫描（绝汗→collapse_yang 等红线体征由问诊自陈捕获）
+        detected = detect_danger({"observations": observations,
+                                  "inquiry": draft.get("inquiry") or {}})
         prev_triggered = (raw.get("danger_flags") or {}).get("triggered", [])
         triggered = sorted(set(prev_triggered) | set(detected))
         raw["danger_flags"] = {

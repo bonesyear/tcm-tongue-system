@@ -235,6 +235,38 @@
     "collapse_yang": {
       "triggered": false,
       "finding": ""
+    },
+    "pigkidney_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "sandy_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "litchi_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "persimmon_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "ochre_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "thin_coatless": {
+      "triggered": false,
+      "finding": ""
+    },
+    "retracted_tongue": {
+      "triggered": false,
+      "finding": ""
+    },
+    "blue_tongue": {
+      "triggered": false,
+      "finding": ""
     }
   },
   "tags": [],
