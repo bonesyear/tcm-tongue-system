@@ -15,7 +15,7 @@ import sys
 from src import paths
 from src.confidence import from_coverage
 from src.dimensions import DIMENSIONS, from_chinese
-from src.record import DailyRecord
+from src.record import DailyRecord, DECLARED_NORMAL_MARK
 
 # 七部位（顺序即向导步骤）；prompt_key 对齐 scripts/vision_client.py PROMPTS
 PARTS = [
@@ -51,23 +51,24 @@ INQUIRY_SPEC = {
     "options": ["温", "偏凉", "凉", "厥冷（冰冷）"],
 }
 
-# 15 项问诊骨架（与 templates/adaptive_analysis_prompt.md §2.1.2 逐项一致）
+# 15 项问诊骨架（问题文本与 templates/adaptive_analysis_prompt.md §2.1.2 逐字一致，
+# 保证报告输入符合模板证据矩阵契约）
 INQUIRY_ITEMS = [
-    {"q": "恶寒还是恶热？", "options": ["恶寒", "恶热", "往来寒热", "都不明显"]},
-    {"q": "有汗还是无汗？", "options": ["有汗", "无汗"]},
-    {"q": "头痛或身痛？", "options": ["无", "头痛", "身痛", "头项强痛"]},
-    {"q": "口苦吗？", "options": ["无", "晨起口苦", "全天口苦"]},
-    {"q": "咽干吗？", "options": ["无", "轻微", "明显", "咽干欲饮"]},
-    {"q": "目眩吗？", "options": ["无", "头晕", "目眩（天旋地转）"]},
-    {"q": "口渴吗？", "options": ["口不渴", "口渴欲饮", "渴不欲饮", "口燥但欲漱水不欲咽"]},
-    {"q": "食欲如何？", "options": ["正常", "纳呆不食", "饥不欲食", "消谷善饥"]},
-    {"q": "大便如何？", "options": ["正常", "便溏", "便硬", "便燥", "下利"]},
-    {"q": "小便如何？", "options": ["正常", "小便清长", "小便黄赤", "小便白", "小便不利"]},
-    {"q": "睡眠如何？", "options": ["正常", "失眠烦躁", "嗜睡多寐"]},
-    {"q": "胸胁有不适吗？", "options": ["无不适", "胸胁苦满", "胸闷"]},
-    {"q": "腹部有不适吗？", "options": ["无不适", "腹满", "腹痛", "心下痞"]},
-    {"q": "听力如何？", "options": ["正常", "耳鸣", "听力下降", "耳无所闻"]},
-    {"q": "鼻部如何？", "options": ["正常", "鼻塞", "鼻鸣", "鼻衄"]},
+    {"q": "恶寒or恶热？", "options": ["恶寒", "恶热", "往来寒热", "都不明显"]},
+    {"q": "有汗or无汗？", "options": ["有汗", "无汗"]},
+    {"q": "头痛or身痛？", "options": ["无", "头痛", "身痛", "头项强痛"]},
+    {"q": "口苦？", "options": ["无", "晨起口苦", "全天口苦"]},
+    {"q": "咽干？", "options": ["无", "轻微", "明显", "咽干欲饮"]},
+    {"q": "目眩？", "options": ["无", "头晕", "目眩(天旋地转)"]},
+    {"q": "口渴？", "options": ["口不渴", "口渴欲饮", "渴不欲饮", "口燥但欲漱水不欲咽"]},
+    {"q": "食欲？", "options": ["正常", "纳呆不食", "饥不欲食", "消谷善饥"]},
+    {"q": "大便？", "options": ["正常", "便溏", "便硬", "便燥", "下利"]},
+    {"q": "小便？", "options": ["正常", "小便清长", "小便黄赤", "小便白", "小便不利"]},
+    {"q": "睡眠？", "options": ["正常", "失眠烦躁", "嗜睡多寐"]},
+    {"q": "胸胁？", "options": ["无不适", "胸胁苦满", "胸闷"]},
+    {"q": "腹部？", "options": ["无不适", "腹满", "腹痛", "心下痞"]},
+    {"q": "听力？", "options": ["正常", "耳鸣", "听力下降", "耳无所闻"]},
+    {"q": "鼻部？", "options": ["正常", "鼻塞", "鼻鸣", "鼻衄"]},
 ]
 
 PART_BY_NAME = {p["part"]: p for p in PARTS}
@@ -106,7 +107,7 @@ OBSERVE_MAP = {
 
 # 「未拍摄（用户声明正常）」占位：写到该维度第一个指标路径（validator 对该
 # 措辞有豁免，见 input_validator 词表覆盖检查注释；KNOWN_ISSUES #10 定策）
-DECLARED_NORMAL_PLACEHOLDER = "未拍摄（用户声明正常）"
+DECLARED_NORMAL_PLACEHOLDER = DECLARED_NORMAL_MARK  # 别名（单一事实来源）
 
 
 def draft_path(daily_dir: str, date_str: str) -> str:
@@ -223,7 +224,9 @@ DANGER_PATTERNS = {
     "daiyang": "面红如妆",
     "tongue_rigid": "强硬",
     "tongue_critical": "焦黑",
-    "mirror_tongue": "无苔",
+    # 镜面舌探测：识图封闭词表只会报「剥落」类，故用「光剥无苔」；
+    # 不以裸「无苔」探测（「局部无苔」是花剥/地图舌，非镜面）
+    "mirror_tongue": "光剥无苔",
     "acute_jaundice": "黄如橘皮",
     "flesh_wasted": "大肉已脱",
     "wind_stroke": "口不能言",
@@ -236,10 +239,22 @@ DANGER_PATTERNS = {
 
 
 def detect_danger(observations: dict) -> list:
-    """扫描观察值文本，返回命中的危险信号键列表（无命中返回 []）。"""
+    """扫描观察值文本，返回命中的危险信号键列表（无命中返回 []）。
+
+    带否定守卫（与评分层同原则）：「无苔」不命中「局部无苔」前的「无」，
+    「冷汗」不命中「无冷汗」——匹配位置前 4 字内含否定词即跳过。"""
     from src.record import _flatten_to_text
     text = _flatten_to_text(observations)
-    return [key for key, pat in DANGER_PATTERNS.items() if pat in text]
+    out = []
+    for key, pat in DANGER_PATTERNS.items():
+        idx = text.find(pat)
+        while idx != -1:
+            window = text[max(0, idx - 4):idx]
+            if not any(n in window for n in ("无", "不", "未", "没")):
+                out.append(key)
+                break
+            idx = text.find(pat, idx + 1)
+    return out
 
 
 def assemble_record(draft: dict, version: str,

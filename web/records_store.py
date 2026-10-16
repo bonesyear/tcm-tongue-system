@@ -41,8 +41,8 @@ REVIEW_FIELDS = {
     "coating_thickness": "识图抖动高发字段，需肉眼复核",
 }
 
-# 「未拍摄（用户声明正常）」占位检测（wizard_store 同值，防双写漂移）
-DECLARED_NORMAL_MARK = "未拍摄（用户声明正常）"
+# 「未拍摄（用户声明正常）」占位检测（单一事实来源在 src/record.py）
+from src.record import DECLARED_NORMAL_MARK  # noqa: F401
 
 # 指标 → 页面中文短标签（与 web/design 设计稿一致）
 INDICATOR_LABELS = {
