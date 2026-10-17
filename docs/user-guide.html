@@ -144,7 +144,7 @@ blockquote{
   <div class="subtitle">七步影像采集 · 本机辨证 · 数据不出机</div>
 </header>
 <nav class="toc">
-  <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十五项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
+  <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十六项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
   <div class="toc-row toc-parts"><span class="toc-label">部位</span><a href="#part-tongue-surface">舌面</a><a href="#part-tongue-bottom">舌底</a><a href="#part-face">头面</a><a href="#part-eyes">目</a><a href="#part-ear">耳</a><a href="#part-hands">手掌</a><a href="#part-skin">皮肤</a></div>
 </nav>
 <p class="meta">版本与变更记录见根目录的 <code>VERSION</code> 和 <code>CHANGELOG.md</code>。识图模型支持任意 OpenAI 兼容的多模态模型，默认配置在 <code>.env.example</code>，更换模型与重新标定的方法见 README 的「配置自己的视觉模型」一节。</p>
@@ -235,8 +235,8 @@ blockquote{
 <p>观察内容：肤色、有无甲错（干燥粗糙脱屑）、黄汗痕迹、水肿、皮疹。</p>
 <p><img width="1024" height="1024" src="images/skin.jpg?v=20261016f" alt="皮肤照示例" /></p>
 <hr />
-<h2 id="sec-inquiry">问诊十五项</h2>
-<p>体系设计了 15 项问诊，<strong>目前 Web 向导暂不采集</strong>，辨证仅基于六维望诊。问诊不改变置信度等级，只在同一等级内提高判断精度（记录模型仍会统计问诊覆盖，趋势页可见）。后续版本若开放采集，问卷内容如下：</p>
+<h2 id="sec-inquiry">问诊十六项</h2>
+<p>体系设计了 16 项问诊（拍照向导第 8 步采集，全部可跳过；首项「手足温凉」为必答推荐）。问诊不改变置信度等级，只在同一等级内提高判断精度（记录模型仍会统计问诊覆盖，趋势页可见）。问卷内容如下：</p>
 <table>
 <thead>
 <tr>
@@ -320,6 +320,11 @@ blockquote{
 <td>15</td>
 <td>鼻部？</td>
 <td>正常 / 鼻塞 / 鼻鸣 / 鼻衄</td>
+</tr>
+<tr>
+<td>16</td>
+<td>汗出时间特征？</td>
+<td>无异常 / 自汗（白天易汗出）/ 盗汗（睡中汗出）/ 绝汗（大汗淋漓如油）</td>
 </tr>
 </tbody>
 </table>
