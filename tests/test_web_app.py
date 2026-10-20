@@ -390,3 +390,16 @@ def test_guide_anchors_match_wizard_parts():
     wizard_anchors = {p["guide_anchor"] for p in wizard_store.PARTS}
     assert wizard_anchors == html_anchors
 
+
+
+def test_inquiry_options_glossary_full_coverage():
+    """问诊全部选项词在 GLOSSARY 有白话词条（INQUIRY_UX 任务① 验收）。"""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import records_store
+    import wizard_store
+    opts = set(wizard_store.INQUIRY_SPEC["options"])
+    for item in wizard_store.INQUIRY_ITEMS:
+        opts.update(item["options"])
+    missing = sorted(o for o in opts if o not in records_store.GLOSSARY)
+    assert missing == [], f"缺词条: {missing}"
