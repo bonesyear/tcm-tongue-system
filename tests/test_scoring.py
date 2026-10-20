@@ -183,12 +183,12 @@ def test_normal_tongue_scores_zero():
 
 
 def test_tongue_score_sparse_not_diluted():
-    # 单条「青紫」只覆盖舌质颜色一项，不应被固定 8 项均值稀释为 1.2。
+    # 单条「紫暗」只覆盖舌质颜色一项，不应被固定 8 项均值稀释为 1.2。
     # 轮次 3 起用结构化 dict 表达：sublingual_color 也收「青紫」(8)，
     # 纯文本输入会双命中变均值 9.0——"稀疏不稀释"的意图用结构化
     # 入参（Record.get_observation 产出，推荐的精确路径）表达更准确，
     # 断言强度不变（仍 == 10）
-    assert score(VisionDimension.TONGUE, {"body_color": "青紫"}) == 10
+    assert score(VisionDimension.TONGUE, {"body_color": "紫暗"}) == 9
 
 
 def test_body_luster_not_scored():
@@ -319,16 +319,20 @@ def test_sublingual_scoring():
                             {"sublingual_petechiae": "无"})["sublingual_petechiae"] == 0
 
 
-def test_body_color_hongrun_not_misjudged():
-    """轮次 3 词表缺口修补：正常描述「红润」不再靠单字「红」误报 7 分
-    （「红润」最长匹配压过「红」）；真正的偏红仍判 7。"""
+def test_body_color_five_level_after_purge():
+    """2026-10-20 舌色并五档：淡红=0 仍是唯一正常基线；红=7、红绛=8、紫暗=9。
+    注意：「红润」盾牌词随归并删除——该词现在会命中裸「红」判 7；
+    prompt 只产五档词不会再输出「红润」，此为归并的接受行为（主人定）。"""
     assert score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "红润"})["body_color"] == 0
+                            {"body_color": "淡红"})["body_color"] == 0
     assert score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "舌质红润，苔薄白"})["body_color"] == 0
-    # 对照：裸「红」仍是 7
+                            {"body_color": "舌质淡红，苔薄白"})["body_color"] == 0
     assert score_indicators(VisionDimension.TONGUE,
                             {"body_color": "红"})["body_color"] == 7
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "红绛"})["body_color"] == 8
+    assert score_indicators(VisionDimension.TONGUE,
+                            {"body_color": "紫暗"})["body_color"] == 9
 
 
 def test_sclera_color_scoring():
@@ -439,21 +443,6 @@ def test_body_size_negation_guard():
 # ============================================================
 # 轮次 8：跨维度词表补漏 + 档案数据约定（2026-09-18，分值用户签认）
 # ============================================================
-
-def test_body_color_danzi_scores_6_sublingual_isolated():
-    """舌质淡紫 = 血瘀轻/寒凝 = 异常（用户定 6，不是 7）；
-    同名异义隔离：sublingual_color 的「淡紫」仍为 0（舌下浅蓝紫 = 生理性正常），
-    两表独立，同一观测 dict 中互不干扰。"""
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "淡紫"})["body_color"] == 6
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "舌质淡紫"})["body_color"] == 6
-    assert score_indicators(VisionDimension.TONGUE,
-                            {"sublingual_color": "淡紫"})["sublingual_color"] == 0
-    inds = score_indicators(VisionDimension.TONGUE,
-                            {"body_color": "淡紫", "sublingual_color": "淡紫"})
-    assert inds["body_color"] == 6
-    assert inds["sublingual_color"] == 0
 
 
 def test_coating_thickness_new_terms():
@@ -596,8 +585,8 @@ def test_ear_helix_new_terms():
 def test_match_keyword_exact_and_longest():
     # 精确匹配
     assert match_keyword(TONGUE_BODY_COLOR_MAP, "淡红") == "淡红"
-    # 最长匹配压过短词（"红润" 压过 "红"）
-    assert match_keyword(TONGUE_BODY_COLOR_MAP, "舌质红润有光泽") == "红润"
+    # 最长匹配压过短词（"红绛" 压过 "红"）
+    assert match_keyword(TONGUE_BODY_COLOR_MAP, "舌质红绛少津") == "红绛"
 
 
 def test_match_keyword_no_hit_returns_none():
