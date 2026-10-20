@@ -46,8 +46,8 @@ def test_no_false_match_red_ruyang():
     # 普通红润/正常不应误命中「红如妆」
     assert score(VisionDimension.HEAD_FACE,
                  {"face_color": "正常", "lip_color": "红润", "face_luster": "有光泽"}) == 0
-    # face_color 未定义红赤规则（结构化入参下不受 lip_color 裸「红」干扰）
-    assert score(VisionDimension.HEAD_FACE, {"face_color": "红赤"}) == 0
+    # face_color 红赤已入词表（2026-10-20：太阳面赤=3，修 prompt 枚举词静默 0 分）
+    assert score(VisionDimension.HEAD_FACE, {"face_color": "红赤"}) == 3
 
 
 def test_negation_guard_on_edema():
