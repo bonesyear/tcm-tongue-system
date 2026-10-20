@@ -440,3 +440,53 @@ def test_wizard_field_danger_feedback(client, data_root, monkeypatch):
     d = resp.get_json()
     assert d["need_danger_ack"] is True
     assert any(f["key"] == "tongue_rigid" for f in d["danger"])
+
+
+def test_wizard_field_rejects_non_observed_part(client, data_root, monkeypatch):
+    """复审修复：跳过/未拍部位不可写——防凭空造「无照片伪观察」。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/field", json={
+        "part": "耳", "indicator": "color", "value": "红赤"})
+    assert resp.status_code == 400
+    assert "未识图" in resp.get_json()["error"]
+
+
+def test_wizard_field_rejects_cross_part_write(client, data_root, monkeypatch):
+    """复审修复：舌底不可写舌面字段（共享舌诊维度，防静默顶值）。"""
+    _finish_all_parts(client, monkeypatch)
+    # 给舌底造一个 observed 状态（ mock 识图）
+    client.post("/wizard/skip", json={"part": "舌底", "mode": "uncovered"})
+    draft = wizard_store.load_draft(
+        os.path.join(data_root, "records", "daily"),
+        __import__("datetime").date.today().isoformat())
+    draft["parts"]["舌底"] = {"status": "observed",
+                              "observation": {"sublingual": {"vein_color": "淡紫"}}}
+    wizard_store.save_draft(os.path.join(data_root, "records", "daily"), draft)
+    resp = client.post("/wizard/field", json={
+        "part": "舌底", "indicator": "body_color", "value": "红"})
+    assert resp.status_code == 400
+    # 但舌底本域（sublingual）可写
+    resp = client.post("/wizard/field", json={
+        "part": "舌底", "indicator": "sublingual_color", "value": "紫暗"})
+    assert resp.status_code == 200
+
+
+def test_wizard_field_rejects_out_of_vocab_value(client, data_root, monkeypatch):
+    """复审修复：封闭选项即时校验——词表外措辞 400。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/field", json={
+        "part": "舌面", "indicator": "body_color", "value": "随便描述"})
+    assert resp.status_code == 400
+    assert "词表" in resp.get_json()["error"]
+
+
+def test_wizard_field_adds_missing_field(client, data_root, monkeypatch):
+    """复审修复：模型漏报的字段（如裂纹）可在第 8 步补录。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/field", json={
+        "part": "舌面", "indicator": "fissure", "value": "深裂"})
+    assert resp.status_code == 200
+    draft = wizard_store.load_draft(
+        os.path.join(data_root, "records", "daily"),
+        __import__("datetime").date.today().isoformat())
+    assert draft["parts"]["舌面"]["observation"]["body"]["cracks"] == "深裂"

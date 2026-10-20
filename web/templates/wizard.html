@@ -286,7 +286,10 @@ function digPath(obj, path) {
 function setPath(obj, path, val) {
   var cur = obj;
   var keys = path.split(".");
-  for (var i = 0; i < keys.length - 1; i++) cur = cur[keys[i]];
+  for (var i = 0; i < keys.length - 1; i++) {
+    if (!cur[keys[i]] || typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
+    cur = cur[keys[i]];
+  }
   cur[keys[keys.length - 1]] = val;
 }
 
@@ -306,7 +309,8 @@ function mkReviewRow(p, dimEn, r) {
   k.textContent = r.meta.label;
   var v = document.createElement("span");
   v.className = "v";
-  v.textContent = r.val;
+  v.textContent = r.val || "未检出";
+  if (!r.val) v.classList.add("faint");
   var act = document.createElement("span");
   var ed = document.createElement("button");
   ed.className = "edit";
@@ -355,14 +359,19 @@ function renderReview() {
   var card = document.getElementById("review-card");
   var list = document.getElementById("review-list");
   list.innerHTML = "";
+  /* 舌面/舌底共享舌诊维度：按 B 路径前缀划分各自可修订的字段，
+     与 /wizard/field 的部位白名单同口径 */
+  var PART_PREFIX = {"舌面": ["body.", "coating."], "舌底": ["sublingual."]};
   var any = false;
   PARTS.forEach(function (p) {
     if (p.status !== "observed" || !p.observation) return;
     var fields = CORRECTION_META[DIM_EN[p.dim]] || {};
+    var prefixes = PART_PREFIX[p.part];
     var rows = [];
     Object.keys(fields).forEach(function (path) {
-      var val = digPath(p.observation, path);
-      if (val) rows.push({path: path, meta: fields[path], val: val});
+      if (prefixes && prefixes.every(function (x) { return path.indexOf(x) !== 0; })) return;
+      rows.push({path: path, meta: fields[path],
+                 val: digPath(p.observation, path)});
     });
     if (!rows.length) return;
     any = true;
