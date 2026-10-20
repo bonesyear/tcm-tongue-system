@@ -144,7 +144,7 @@ blockquote{
   <div class="subtitle">七步影像采集 · 本机辨证 · 数据不出机</div>
 </header>
 <nav class="toc">
-  <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十六项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
+  <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十七项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
   <div class="toc-row toc-parts"><span class="toc-label">部位</span><a href="#part-tongue-surface">舌面</a><a href="#part-tongue-bottom">舌底</a><a href="#part-face">头面</a><a href="#part-eyes">目</a><a href="#part-ear">耳</a><a href="#part-hands">手掌</a><a href="#part-skin">皮肤</a></div>
 </nav>
 <p class="meta">版本与变更记录见根目录的 <code>VERSION</code> 和 <code>CHANGELOG.md</code>。识图模型支持任意 OpenAI 兼容的多模态模型，默认配置在 <code>.env.example</code>，更换模型与重新标定的方法见 README 的「配置自己的视觉模型」一节。</p>
@@ -235,8 +235,8 @@ blockquote{
 <p>观察内容：肤色、有无甲错（干燥粗糙脱屑）、黄汗痕迹、水肿、皮疹。</p>
 <p><img width="1024" height="1024" src="images/skin.jpg?v=20261016f" alt="皮肤照示例" /></p>
 <hr />
-<h2 id="sec-inquiry">问诊十六项</h2>
-<p>体系设计了 16 项问诊（拍照向导第 8 步采集，全部可跳过；首项「手足温凉」为必答推荐）。问诊不改变置信度等级，只在同一等级内提高判断精度（记录模型仍会统计问诊覆盖，趋势页可见）。问卷内容如下：</p>
+<h2 id="sec-inquiry">问诊十七项</h2>
+<p>体系设计了 17 项问诊（拍照向导第 8 步采集，全部可跳过；第 0 项「手足温凉」为必答推荐）。问诊不改变置信度等级，只在同一等级内提高判断精度（记录模型仍会统计问诊覆盖，趋势页可见）。问卷内容如下：</p>
 <table>
 <thead>
 <tr>
@@ -246,6 +246,11 @@ blockquote{
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>0</td>
+<td>手足温凉？（必答推荐）</td>
+<td>温 / 偏凉 / 凉 / 厥冷（冰冷）</td>
+</tr>
 <tr>
 <td>1</td>
 <td>恶寒还是恶热？</td>
@@ -339,7 +344,7 @@ blockquote{
 <ol>
 <li>在项目根目录运行 <code>python web/app.py</code> 启动（依赖安装与初始配置见 <a href="web-quickstart.md">web-quickstart</a>）</li>
 <li>浏览器打开 http://127.0.0.1:8600（手机连接同一 WiFi 的方法见 <a href="web-quickstart.md">web-quickstart</a> 第六章）</li>
-<li>点击顶栏「拍照」进入向导，按舌面→舌底→头面→目→耳→手→皮肤七步逐张拍摄或上传</li>
+<li>点击顶栏「拍照」进入向导，按舌面→舌底→头面→目→耳→手→皮肤七步逐张拍摄或上传，第 8 步回答问诊（第 0 项「手足温凉」为必答推荐，其余可跳过）</li>
 <li>无法拍摄的部位可选「跳过（声明正常）」或「跳过（未覆盖）」</li>
 <li>提交后系统自动完成识图、评分并生成当日记录；若触发危险信号，会先弹出复核提示再入库</li>
 </ol>
