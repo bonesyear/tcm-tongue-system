@@ -355,3 +355,21 @@ def test_detect_danger_no_cross_field_negation_bleed():
         {"tongue": {"prickles": "无", "dynamics": "强硬"}})
     # 字段内否定语义保持抑制
     assert wizard_store.detect_danger({"skin": {"sweat": "无冷汗"}}) == []
+
+
+def test_sweat_question_has_healthy_exit():
+    """「有汗or无汗」含退出项「没有外感不适」（主人批准②）。"""
+    item = next(i for i in wizard_store.INQUIRY_ITEMS
+                if i["q"] == "有汗or无汗？")
+    assert item["options"] == ["有汗", "无汗", "没有外感不适"]
+
+
+def test_prompt_has_healthy_exit_branch():
+    """模板含「平人出口」明文分支（主人批准③）：六维全 0 + 四证皆无不出方。"""
+    import io as _io
+    prompt = _io.open(os.path.join(
+        _ROOT, "templates", "adaptive_analysis_prompt.md"),
+        encoding="utf-8").read()
+    assert "平人出口" in prompt
+    assert "未见明显病证" in prompt
+    assert prompt.count("平人出口") >= 2  # HIGH 与 MEDIUM 两处
