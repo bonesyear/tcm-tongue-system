@@ -26,7 +26,7 @@ NORMAL_OK = {"正常", "无", "不明显", "润泽", "润", "淡红", "红润", 
 
 # (prompt_key, 字段提示子串, 枚举词, 评分表)
 CASES = [
-    # 舌色并五档（2026-10-20 主人定：九档超模型色分辨力；旧词留词表兼容历史档）
+    # 舌色并五档（2026-10-20 主人定：九档超模型色分辨力，细分词已删除）
     ("舌面", "舌质颜色", ["淡红", "淡白", "红", "红绛", "紫暗"],
      R[V.TONGUE]["body_color"]),
     ("舌面", "舌苔颜色", ["白", "黄", "灰", "灰黑", "黑"],
@@ -91,12 +91,6 @@ def test_prompt_enum_hits_vocab(pkey, field, words, rules):
     assert not missing_prompt, f"{pkey}·{field} prompt 缺枚举词: {missing_prompt}"
     assert not misses_vocab, \
         f"{pkey}·{field} 枚举词不命中词表且非正常语义（会静默 0 分）: {misses_vocab}"
-
-
-def test_legacy_tongue_color_words_still_scored():
-    """并档后旧词不删：历史档案的青紫/暗红/淡紫/红润照评不误。"""
-    m = R[V.TONGUE]["body_color"]
-    assert m["青紫"] == 10 and m["暗红"] == 8 and m["淡紫"] == 6 and m["红润"] == 0
 
 
 def test_face_color_hongchi_scored():

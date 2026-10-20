@@ -252,8 +252,8 @@ def test_tongue_score_max_dominant():
     """v1.7.21 舌诊口径：最重单项主导，不被多项正常稀释（原著审查 P1）。"""
     from src.scoring import score
     from src.dimensions import VisionDimension
-    obs = {"body_color": "青紫", "coating_thickness": "略厚", "coating_greasy": "微腻"}
-    assert score(VisionDimension.TONGUE, obs) == 10.0  # 旧均值口径为 5.0
+    obs = {"body_color": "紫暗", "coating_thickness": "略厚", "coating_greasy": "微腻"}
+    assert score(VisionDimension.TONGUE, obs) == 9.0  # 旧均值口径为 4.7；青紫已并入紫暗
 
 
 def test_detect_danger_negation_guard():
