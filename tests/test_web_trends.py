@@ -151,3 +151,28 @@ def test_lower_lid_baseline_no_vocab_warning():
     from src.dimensions import VisionDimension
     got = score_indicators(VisionDimension.EYE, {"lower_lid": "淡红"})
     assert got["lower_lid"] == 0
+
+
+def test_inquiry_denominator_dynamic_17(tmp_path, monkeypatch):
+    """问诊分母 = INQUIRY_TOTAL（1 + 骨架数）：全答记录输出 17/17，不含 /16。"""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(_ROOT, "web"))
+    import trends_store
+    import wizard_store
+
+    # 构造 17 项全答记录
+    inquiry = {wizard_store.INQUIRY_SPEC["key"]: {"asked": True, "answer": "温"}}
+    for item in wizard_store.INQUIRY_ITEMS:
+        inquiry[item["q"]] = {"asked": True, "answer": item["options"][0]}
+    raw = {"date": "2026-10-20", "observations": {}, "inquiry": inquiry}
+
+    class Rec:
+        pass
+    rec = Rec()
+    rec.raw = raw
+    from src.record import DailyRecord
+    rec = DailyRecord(raw)
+    text = trends_store.build_report_input(rec)
+    assert f"问诊覆盖：17/{wizard_store.INQUIRY_TOTAL}" in text
+    assert "17/17" in text
+    assert "/16" not in text

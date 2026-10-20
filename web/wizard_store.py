@@ -77,6 +77,9 @@ INQUIRY_ITEMS = [
                                       "盗汗(睡中汗出)", "绝汗(大汗淋漓如油)"]},
 ]
 
+# 问诊总题数（INQUIRY_SPEC 第 0 项 + INQUIRY_ITEMS 骨架），单一事实来源
+INQUIRY_TOTAL = 1 + len(INQUIRY_ITEMS)
+
 PART_BY_NAME = {p["part"]: p for p in PARTS}
 
 # 识图输出（中文键，可嵌套）→ 形状 B 英文路径。
