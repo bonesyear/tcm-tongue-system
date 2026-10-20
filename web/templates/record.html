@@ -4,6 +4,12 @@
 <style>
   /* ---- 详情页私有（与 web/design/pages/record.html 一致） ---- */
   #dims { align-items: start; }
+  /* 宽屏六维卡改多栏瀑布：舌诊体量远大于其他维度，网格同行对齐
+     会在短卡下留大片空白；多栏按内容自动平衡两列，卡片不跨列截断 */
+  @media (min-width: 761px) {
+    #dims { display: block; column-count: 2; column-gap: var(--gap); }
+    #dims .dim-card { break-inside: avoid; margin-bottom: var(--gap); }
+  }
   .dim-card h3 { font-size: 17px; letter-spacing: 0.06em; }
   .group-name {
     font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.14em;
@@ -19,6 +25,13 @@
     font-size: 12px; color: var(--ink-3); border: 1px dashed var(--line-strong);
     border-radius: var(--radius-pill); padding: 2px 9px; white-space: nowrap;
   }
+  /* 待复核字段：字段名后琥珀小圆点（tooltip 说明原因）+ 整行淡暖黄底，
+     轻级提醒语义，不用徽章，避免与分数徽章争视觉 */
+  .rv {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--sev-1); vertical-align: middle; margin: 0 1px 1px 5px;
+  }
+  .field-row.review { background: var(--sev-1-bg); }
   .field-row.editing { background: var(--cinnabar-tint); }
   .field-row.editing .v input {
     width: 100%; padding: 5px 9px; border: 1px solid var(--cinnabar);
@@ -97,6 +110,10 @@
 </div>
 {% endif %}
 
+<p class="faint" style="font-size:12.5px; margin: 2px 6px 10px;">
+  淡黄底、字段名带<i class="rv" style="margin:0 3px 1px;"></i>的为识图易抖动或危重鉴别相关项，建议对照下方原图肉眼复核（鼠标悬停圆点可见具体原因）。
+</p>
+
 <div class="grid cols-2" id="dims">
   {% for dim in r.dims %}
   <section class="card dim-card">
@@ -126,19 +143,16 @@
     <div class="group-name">{{ g.name }}</div>
     <div class="fields">
       {% for f in g.fields %}
-      <div class="field-row" data-dim="{{ dim.key }}" data-ind="{{ f.ind }}"
+      <div class="field-row{% if f.review %} review{% endif %}" data-dim="{{ dim.key }}" data-ind="{{ f.ind }}"
            {% if f.opts %}data-opts='{{ f.opts | tojson | forceescape }}'{% endif %}
            {% if f.gloss %}data-gloss='{{ f.gloss | tojson | forceescape }}'{% endif %}>
-        <span class="k"{% if f.kgloss %} title="{{ f.kgloss }}"{% endif %}>{{ f.k }}</span>
+        <span class="k"{% if f.kgloss %} title="{{ f.kgloss }}"{% endif %}>{{ f.k }}{% if f.review %}<i class="rv" title="{{ f.review }}"></i>{% endif %}</span>
         <span class="v">{{ f.v }}</span>
         <span class="row" style="gap:2px;">
           {% if f.ref %}
           <span class="ref" title="{{ f.ref }}">参考项</span>
           {% else %}
           <span class="badge {{ sev(f.s) }} num">{{ f.s }}</span>
-          {% endif %}
-          {% if f.review %}
-          <span class="ref" title="{{ f.review }}" style="color:var(--sev-4); border-color:var(--sev-4);">待复核</span>
           {% endif %}
           <button class="edit" title="修正此项">✎</button>
         </span>
