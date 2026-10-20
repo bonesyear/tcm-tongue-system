@@ -320,6 +320,9 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "nail_color":  {"紫暗": 4, "暗紫": 4,
                         "淡白": 4,  # 2026-10-16 P0（原著审查）：甲床淡白为血少
                                     # 定性证据（L5565），原值 2 偏低，与唇色对齐
+                        "红润": 0,  # 2026-10-20：正常基线（同 palm_color/lip_color
+                                    # 「红润:0」先例）——prompt 枚举词此前静默 0
+                                    # 且每条正常甲床记录收词表外告警
                         },
         "nail_shape":  {"甲错": 3},
         "ecchymosis":  {"散在": 5, "密集": 9},
