@@ -13,6 +13,7 @@ import generate_weekly_report as gwr
 from src.dimensions import DIMENSIONS
 
 import records_store
+import wizard_store
 
 
 def week_payload(daily_dir: str, target: str) -> dict | None:
@@ -155,8 +156,8 @@ def build_report_input(rec) -> str:
     inquiry = rec.raw.get("inquiry") or {}
     answered = {q: v for q, v in inquiry.items()
                 if isinstance(v, dict) and v.get("asked") and v.get("answer")}
-    lines.append(f"问诊覆盖：{len(answered)}/16（含手足温凉；未答项 = 未提供，"
-                 f"不得推测）")
+    lines.append(f"问诊覆盖：{len(answered)}/{wizard_store.INQUIRY_TOTAL}"
+                 f"（含手足温凉；未答项 = 未提供，不得推测）")
     for q, v in answered.items():
         lines.append(f"  - {q} {v['answer']}")
     return "\n".join(lines)

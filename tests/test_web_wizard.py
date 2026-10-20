@@ -285,7 +285,7 @@ def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
     rec = records_store.load_record(
         os.path.join(data_root, "records", "daily"), today)
     text = trends_store.build_report_input(rec)
-    assert "问诊覆盖：2/16" in text
+    assert "问诊覆盖：2/" + str(wizard_store.INQUIRY_TOTAL) in text
     assert "手足温凉 厥冷（冰冷）" in text
     assert "大便？ 便溏" in text
     assert "目眩？" not in text
