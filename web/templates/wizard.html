@@ -307,6 +307,14 @@ function mkReviewRow(p, dimEn, r) {
   var k = document.createElement("span");
   k.className = "k";
   k.textContent = r.meta.label;
+  if (r.meta.scored === false) {
+    var ref = document.createElement("span");
+    ref.className = "ref";
+    ref.title = "不参与评分，仅供辨证";
+    ref.textContent = "参考项";
+    k.appendChild(document.createTextNode(" "));
+    k.appendChild(ref);
+  }
   var v = document.createElement("span");
   v.className = "v";
   v.textContent = r.val || "未检出";

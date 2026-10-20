@@ -212,3 +212,29 @@ def test_correction_redetects_danger_flags(client, data_root):
     raw = _read_raw(data_root)
     assert "tongue_rigid" in raw["danger_flags"]["triggered"]
     # 改成正常值后旧触发仍保留（历史曾经触发，不归零——与向导并集语义一致）
+
+
+def test_unscored_fields_show_ref_badge_not_zero(client, data_root):
+    """不评分字段（如舌质光泽/舌体动态）显示「参考项」而非 0 分徽标。"""
+    import records_store
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    detail = records_store.record_detail(rec)
+    tongue = next(d for d in detail["dims"] if d["key"] == "tongue")
+    fields = {f["ind"]: f for g in tongue["groups"] for f in g["fields"]}
+    for ind in ("body_luster", "body_dynamics", "prickles"):
+        if ind in fields:
+            assert fields[ind].get("ref"), f"{ind} 缺参考项说明"
+            assert fields[ind].get("s") is None, f"{ind} 不应显示分数徽标"
+    # 评分字段不受影响
+    assert fields["body_color"].get("ref") is None
+    assert fields["body_color"]["s"] is not None
+
+
+def test_correction_meta_marks_unscored():
+    """correction_meta 的 scored 标记：向导复核卡「参考项」展示数据源。"""
+    import records_store
+    meta = records_store.correction_meta()
+    assert meta["tongue"]["body.luster"]["scored"] is False
+    assert meta["tongue"]["body.color"]["scored"] is True
+    assert meta["hand"]["palm_temperature"]["scored"] is False

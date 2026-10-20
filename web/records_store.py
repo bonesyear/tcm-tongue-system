@@ -24,10 +24,17 @@ from src.scoring import DIMENSION_RULES, score, score_indicators
 _SUSPECT_ARCHIVE_RE = re.compile(r"\.bak|copy|tmp|_旧格式", re.IGNORECASE)
 _DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
-# 退出评分层的字段：只展示不打分（KNOWN_ISSUES #5 点刺 / #18 掌温）
+# 退出评分层的字段：只展示不打分（KNOWN_ISSUES #5 点刺 / #18 掌温；
+# 其余 5 项 2026-10-20 补齐——显示「0 分」徽标会让用户误以为评分出错，
+# 统一给「参考项」徽标 + 原因说明）
 REF_FIELDS = {
-    "prickles": "退出评分层，仅供辨证（需肉眼确认）",
-    "palm_temp": "照片不可判，已降级为参考项",
+    "prickles": "退出评分层，仅供辨证（凸起需触诊，照片判不准）",
+    "palm_temp": "照片不可判，已降级为参考项（温度需触诊）",
+    "body_luster": "不参与评分，仅供辨证（光泽受光线/闪光灯干扰，静态照片不可判）",
+    "body_dynamics": "不参与评分，仅供辨证（动态体征需动态观察；红线词仍会触发危险信号）",
+    "coating_distribution": "不参与评分，仅供辨证",
+    "nose_color": "不参与评分，仅供辨证",
+    "nose_bleeding": "不参与评分，仅供辨证（发作事件照片拍不到，以自陈为准）",
 }
 
 # 修正选项（web 层 UI 数据，不进 src 核心库契约）：
@@ -285,6 +292,7 @@ def correction_meta() -> dict:
             opts = _field_options(dim, ind)
             fields[b_path] = {
                 "ind": ind, "label": label, "opts": opts,
+                "scored": ind in DIMENSION_RULES.get(dim, {}),
                 "gloss": {o: GLOSSARY[o] for o in opts
                           if o in GLOSSARY} if opts else None,
             }
