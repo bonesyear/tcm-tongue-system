@@ -101,6 +101,15 @@
   </ol>
 </div>
 
+<div class="card" id="review-card" style="display:none;">
+  <div class="card-head">
+    <h2>识图结果复核与修正</h2>
+    <span class="faint" style="font-size:12.5px;">逐项肉眼复核；点 ✎ 改错（改的是草稿，提交时生效）</span>
+  </div>
+  <div id="review-danger" class="alert-danger" style="display:none; margin-bottom:10px;"></div>
+  <div id="review-list"></div>
+</div>
+
 <div class="card" id="inquiry-card" style="display:none;">
   <div class="card-head">
     <h2>第 8 / 8 步 · 问诊</h2>
@@ -221,12 +230,14 @@ function render() {
   var inInquiry = cur === 7;
   var stepCard = document.getElementById("capture").closest(".card");
   document.getElementById("inquiry-card").style.display = inInquiry ? "" : "none";
+  document.getElementById("review-card").style.display = "none";
   stepCard.style.display = inInquiry ? "none" : "";
   document.querySelectorAll("#steps li").forEach(function (li, i) {
     li.className = ((PARTS[i] && PARTS[i].status !== "pending") || i === 7 && inquiryAnswered ? "done " : "") + (i === cur ? "current" : "");
   });
   if (inInquiry) {
     document.getElementById("inquiry-back").textContent = "‹ 返回第 7 步 · " + PARTS[6].part;
+    renderReview();
     renderInquiry(); updateNav(); return;
   }
   var p = PARTS[cur];
@@ -257,6 +268,112 @@ var INQUIRY = {{ inquiry_spec | tojson }};
 var INQUIRY_ITEMS = {{ inquiry_items | tojson }};
 var ANSWERS = {{ state.inquiry | tojson }};
 var GLOSSARY = {{ glossary | tojson }};
+var CORRECTION_META = {{ correction_meta | tojson }};
+var DIM_EN = {"舌诊": "tongue", "头面诊": "head_face", "目诊": "eye",
+              "耳诊": "ear", "手诊": "hand", "皮肤诊": "skin"};
+
+/* ---- 第 8 步：识图结果复核与修正（草稿级，提交时生效） ---- */
+function digPath(obj, path) {
+  var cur = obj;
+  var keys = path.split(".");
+  for (var i = 0; i < keys.length; i++) {
+    if (!cur || typeof cur !== "object") return "";
+    cur = cur[keys[i]];
+  }
+  return (typeof cur === "string") ? cur : "";
+}
+
+function setPath(obj, path, val) {
+  var cur = obj;
+  var keys = path.split(".");
+  for (var i = 0; i < keys.length - 1; i++) cur = cur[keys[i]];
+  cur[keys[keys.length - 1]] = val;
+}
+
+function showReviewDanger(names) {
+  var box = document.getElementById("review-danger");
+  if (!names || !names.length) { box.style.display = "none"; return; }
+  box.innerHTML = "<strong>⚠ 触发危险信号：" + names.join("、") +
+    "</strong>——提交时会出现拦截确认，请逐项肉眼复核";
+  box.style.display = "";
+}
+
+function mkReviewRow(p, dimEn, r) {
+  var row = document.createElement("div");
+  row.className = "field-row";
+  var k = document.createElement("span");
+  k.className = "k";
+  k.textContent = r.meta.label;
+  var v = document.createElement("span");
+  v.className = "v";
+  v.textContent = r.val;
+  var act = document.createElement("span");
+  var ed = document.createElement("button");
+  ed.className = "edit";
+  ed.title = "修正此项";
+  ed.textContent = "✎";
+  ed.addEventListener("click", function () {
+    if (row.dataset.editing) return;
+    row.dataset.editing = "1";
+    v.innerHTML = "";
+    act.innerHTML = "";
+    var box = document.createElement("div");
+    box.className = "row wrap";
+    box.style.gap = "6px";
+    (r.meta.opts || []).forEach(function (opt) {
+      var c = document.createElement("button");
+      c.type = "button";
+      c.className = "btn btn-sm " + (opt === r.val ? "btn-primary" : "btn-ghost");
+      c.textContent = opt;
+      if (r.meta.gloss && r.meta.gloss[opt]) c.title = r.meta.gloss[opt];
+      c.addEventListener("click", function () {
+        postJSON("/wizard/field", {part: p.part, indicator: r.meta.ind, value: opt})
+          .then(function (d) {
+            if (d.ok) {
+              setPath(p.observation, r.path, opt);
+              r.val = opt;
+              showReviewDanger(d.danger_names);
+              renderReview();
+            } else { alert(d.error || "保存失败"); }
+          });
+      });
+      box.appendChild(c);
+    });
+    var cancel = document.createElement("button");
+    cancel.className = "btn btn-subtle btn-sm";
+    cancel.textContent = "取消";
+    cancel.addEventListener("click", function () { renderReview(); });
+    v.appendChild(box);
+    act.appendChild(cancel);
+  });
+  act.appendChild(ed);
+  row.appendChild(k); row.appendChild(v); row.appendChild(act);
+  return row;
+}
+
+function renderReview() {
+  var card = document.getElementById("review-card");
+  var list = document.getElementById("review-list");
+  list.innerHTML = "";
+  var any = false;
+  PARTS.forEach(function (p) {
+    if (p.status !== "observed" || !p.observation) return;
+    var fields = CORRECTION_META[DIM_EN[p.dim]] || {};
+    var rows = [];
+    Object.keys(fields).forEach(function (path) {
+      var val = digPath(p.observation, path);
+      if (val) rows.push({path: path, meta: fields[path], val: val});
+    });
+    if (!rows.length) return;
+    any = true;
+    var h = document.createElement("div");
+    h.className = "group-name";
+    h.textContent = p.part;
+    list.appendChild(h);
+    rows.forEach(function (r) { list.appendChild(mkReviewRow(p, DIM_EN[p.dim], r)); });
+  });
+  card.style.display = any ? "" : "none";
+}
 
 /* 大白话显示层（2026-10-20 主人决议）：记录层键名与模板 §2.1.2 逐字契约不变，
    仅页面题干换成人人能自检的问法；键不匹配时回落原始题干，不影响提交。 */
