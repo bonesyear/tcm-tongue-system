@@ -275,7 +275,50 @@ def create_app(env_file: str | None = None,
             inquiry_items=wizard_store.INQUIRY_ITEMS,
             danger_flags=records_store.DANGER_FLAGS,
             glossary=records_store.GLOSSARY,
+            correction_meta=records_store.correction_meta(),
         )
+
+    @app.post("/wizard/field")
+    def wizard_update_field():
+        """向导草稿就地修正一个观察值（第 8 步复核卡片）。
+        只写草稿不落盘；危险信号在提交组装时统一重探（assemble_record）。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = request.json or {}
+        part = str(body.get("part", ""))
+        indicator = str(body.get("indicator", ""))
+        value = str(body.get("value", "")).strip()
+        p = wizard_store.PART_BY_NAME.get(part)
+        if not p:
+            return jsonify({"ok": False, "error": f"未知部位: {part}"}), 400
+        from src.dimensions import from_chinese
+        from src.record import _DIMENSION_INDICATORS
+        dim = from_chinese(p["dim"])
+        shapes = _DIMENSION_INDICATORS.get(dim, {}).get(indicator)
+        if shapes is None:
+            return jsonify({"ok": False, "error":
+                            f"未知指标: {part}/{indicator}"}), 400
+        if not value:
+            return jsonify({"ok": False, "error": "值不能为空"}), 400
+        today = datetime.date.today().isoformat()
+        draft = wizard_store.load_draft(daily_dir, today)
+        st = draft["parts"].setdefault(part, {})
+        obs = st.setdefault("observation", {})
+        node = obs
+        for k in shapes["B"][:-1]:
+            node = node.setdefault(k, {})
+            if not isinstance(node, dict):
+                return jsonify({"ok": False, "error": "草稿结构异常"}), 400
+        node[shapes["B"][-1]] = value
+        st["status"] = "observed"
+        wizard_store.save_draft(daily_dir, draft)
+        # 即时红线反馈（全草稿口径，与 assemble 的探测同源）
+        all_obs = {pt: s.get("observation")
+                   for pt, s in draft["parts"].items() if s.get("observation")}
+        danger = wizard_store.detect_danger(all_obs)
+        return jsonify({"ok": True, "danger": danger,
+                        "danger_names": [records_store.DANGER_FLAGS.get(
+                            k, {}).get("name", k) for k in danger]})
 
     @app.post("/wizard/inquiry")
     def wizard_inquiry():

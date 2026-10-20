@@ -396,3 +396,47 @@ def test_inquiry_unknown_question_rejected(client):
     resp = client.post("/wizard/inquiry",
                        json={"question": "随便编的问题", "answer": "x"})
     assert resp.status_code == 400
+
+
+# ---------------- 第 8 步草稿就地修正（/wizard/field） ----------------
+
+def test_wizard_field_updates_draft_at_b_path(client, data_root, monkeypatch):
+    """草稿修正写到形状 B 正确路径，提交后值进记录。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/field", json={
+        "part": "舌面", "indicator": "body_color", "value": "紫暗"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    draft = wizard_store.load_draft(
+        os.path.join(data_root, "records", "daily"),
+        __import__("datetime").date.today().isoformat())
+    assert draft["parts"]["舌面"]["observation"]["body"]["color"] == "紫暗"
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    assert resp.get_json()["ok"] is True
+    import records_store
+    raw = records_store.load_record(
+        os.path.join(data_root, "records", "daily"),
+        resp.get_json()["date"]).raw
+    assert raw["observations"]["tongue"]["body"]["color"] == "紫暗"
+
+
+def test_wizard_field_rejects_unknown(client):
+    resp = client.post("/wizard/field", json={
+        "part": "舌面", "indicator": "nonsense", "value": "x"})
+    assert resp.status_code == 400
+    resp = client.post("/wizard/field", json={
+        "part": "不存在", "indicator": "body_color", "value": "红"})
+    assert resp.status_code == 400
+
+
+def test_wizard_field_danger_feedback(client, data_root, monkeypatch):
+    """改成红线词 → 响应带 danger；提交时拦截层同口径触发。"""
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/field", json={
+        "part": "舌面", "indicator": "body_dynamics", "value": "强硬"})
+    assert "tongue_rigid" in resp.get_json()["danger"]
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    d = resp.get_json()
+    assert d["need_danger_ack"] is True
+    assert any(f["key"] == "tongue_rigid" for f in d["danger"])
