@@ -398,7 +398,7 @@ function renderInquiry() {
       it.appendChild(ln);
     }
     var gloss = glossLine(item.options);
-    if (disp && disp.note) gloss = (gloss ? gloss + "；" : "") + disp.note;
+    if (disp && disp.note) gloss = disp.note + (gloss ? "；" + gloss : "");
     if (gloss && !locked) {
       var g = document.createElement("div");
       g.className = "inq-gloss";
