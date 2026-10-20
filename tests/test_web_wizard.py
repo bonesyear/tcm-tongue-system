@@ -373,3 +373,19 @@ def test_prompt_has_healthy_exit_branch():
     assert "平人出口" in prompt
     assert "未见明显病证" in prompt
     assert prompt.count("平人出口") >= 2  # HIGH 与 MEDIUM 两处
+
+
+def test_inquiry_clear_all(client, data_root, monkeypatch):
+    """清除全部已选：clear_all 清空草稿问诊答案。"""
+    _finish_all_parts(client, monkeypatch)
+    client.post("/wizard/inquiry", json={"question": "手足温凉", "answer": "凉"})
+    client.post("/wizard/inquiry", json={"question": "大便？", "answer": "便溏"})
+    today = wizard_store.datetime.date.today().isoformat()
+    daily = os.path.join(data_root, "records", "daily")
+    draft = wizard_store.load_draft(daily, today)
+    assert len(draft["inquiry"]) == 2
+
+    resp = client.post("/wizard/inquiry", json={"clear_all": True})
+    assert resp.get_json()["ok"] is True
+    draft = wizard_store.load_draft(daily, today)
+    assert draft["inquiry"] == {}

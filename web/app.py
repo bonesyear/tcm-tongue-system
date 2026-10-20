@@ -283,10 +283,15 @@ def create_app(env_file: str | None = None,
         if not admin_allowed():
             return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
         body = request.json or {}
-        answer = (body.get("answer") or "").strip()
-        question = (body.get("question") or wizard_store.INQUIRY_SPEC["key"]).strip()
         today = datetime.date.today().isoformat()
         draft = wizard_store.load_draft(daily_dir, today)
+        if body.get("clear_all"):
+            # 清除全部问诊已选（用户主动清空，不留痕迹）
+            draft["inquiry"] = {}
+            wizard_store.save_draft(daily_dir, draft)
+            return jsonify({"ok": True})
+        answer = (body.get("answer") or "").strip()
+        question = (body.get("question") or wizard_store.INQUIRY_SPEC["key"]).strip()
         draft.setdefault("inquiry", {})
         if answer:
             draft["inquiry"][question] = answer
