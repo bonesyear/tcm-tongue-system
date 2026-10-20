@@ -278,6 +278,10 @@ def create_app(env_file: str | None = None,
             correction_meta=records_store.correction_meta(),
         )
 
+    # 部位 → 可写的 B 路径前缀（舌面/舌底共享舌诊维度，防止跨部位写
+    # 静默顶掉同维度真值；其余维度一部件一维度全量放开）
+    _PART_B_PREFIX = {"舌面": ("body.", "coating."), "舌底": ("sublingual.",)}
+
     @app.post("/wizard/field")
     def wizard_update_field():
         """向导草稿就地修正一个观察值（第 8 步复核卡片）。
@@ -298,23 +302,38 @@ def create_app(env_file: str | None = None,
         if shapes is None:
             return jsonify({"ok": False, "error":
                             f"未知指标: {part}/{indicator}"}), 400
+        b_path = ".".join(shapes["B"])
+        prefixes = _PART_B_PREFIX.get(part)
+        if prefixes and not b_path.startswith(prefixes):
+            return jsonify({"ok": False, "error":
+                            f"{part} 不可写指标 {indicator}"}), 400
         if not value:
             return jsonify({"ok": False, "error": "值不能为空"}), 400
+        # 封闭选项即时校验（与详情页修正同口径，防词表外措辞静默 0 分）
+        opts = records_store._field_options(dim, indicator)
+        if opts and value not in opts:
+            return jsonify({"ok": False, "error":
+                            f"值不在封闭词表内: {value}"}), 400
         today = datetime.date.today().isoformat()
         draft = wizard_store.load_draft(daily_dir, today)
-        st = draft["parts"].setdefault(part, {})
-        obs = st.setdefault("observation", {})
-        node = obs
+        st = draft["parts"].get(part, {})
+        # 只允许修订已识图部位——防凭空造「无照片伪观察」（虚增覆盖度/
+        # photo_coverage/confidence），也保住「声明正常」的审计痕迹
+        if st.get("status") != "observed" or not isinstance(
+                st.get("observation"), dict):
+            return jsonify({"ok": False, "error":
+                            "该部位未识图，无观察值可修正"}), 400
+        node = st["observation"]
         for k in shapes["B"][:-1]:
             node = node.setdefault(k, {})
             if not isinstance(node, dict):
                 return jsonify({"ok": False, "error": "草稿结构异常"}), 400
         node[shapes["B"][-1]] = value
-        st["status"] = "observed"
         wizard_store.save_draft(daily_dir, draft)
-        # 即时红线反馈（全草稿口径，与 assemble 的探测同源）
+        # 即时红线反馈（全草稿 + 问诊答案，与 assemble 探测同口径）
         all_obs = {pt: s.get("observation")
                    for pt, s in draft["parts"].items() if s.get("observation")}
+        all_obs["inquiry"] = draft.get("inquiry") or {}
         danger = wizard_store.detect_danger(all_obs)
         return jsonify({"ok": True, "danger": danger,
                         "danger_names": [records_store.DANGER_FLAGS.get(
