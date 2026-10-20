@@ -264,22 +264,21 @@ var DISPLAY = {
   "手足温凉": {label: "手脚是温的还是凉的？"},
   "恶寒or恶热？": {label: "怕冷还是怕热？"},
   "有汗or无汗？": {label: "现在身上有汗吗？",
-    hint: "指生病状态下的出汗；运动、天热、吃饭时出汗不算"},
+    note: "指生病状态下的出汗；运动、天热、吃饭时出汗不算"},
   "头痛or身痛？": {label: "头痛或身上痛吗？"},
   "口苦？": {label: "嘴里发苦吗？"},
   "咽干？": {label: "嗓子干吗？"},
-  "目眩？": {label: "头晕吗？", hint: "「目眩」指天旋地转、站不稳的晕"},
+  "目眩？": {label: "头晕吗？"},
   "口渴？": {label: "口渴、想喝水吗？"},
   "食欲？": {label: "吃饭胃口怎么样？"},
   "大便？": {label: "大便怎么样？"},
-  "小便？": {label: "小便怎么样？", hint: "看颜色和尿量：色深量少或色淡量多都算异常"},
+  "小便？": {label: "小便怎么样？"},
   "睡眠？": {label: "睡眠怎么样？"},
   "胸胁？": {label: "胸口或两胁有胀闷吗？"},
   "腹部？": {label: "肚子有胀、痛或堵闷吗？"},
   "听力？": {label: "耳朵有鸣响或听力下降吗？"},
-  "鼻部？": {label: "鼻子通气吗？", hint: "鼻塞、呼吸有声、鼻出血都算异常"},
-  "汗出时间特征？": {label: "出汗的时间有异常吗？",
-    hint: "白天不动也出汗 = 自汗；睡着出汗、醒就停 = 盗汗；大汗淋漓不止 = 绝汗（危重信号）"}
+  "鼻部？": {label: "鼻子通气吗？"},
+  "汗出时间特征？": {label: "出汗的时间有异常吗？"}
 };
 /* 「不答本题」是纯前端姿态：不入记录（未答 = 未提供），刷新后恢复未答态 */
 var SKIPS = {};
@@ -391,12 +390,6 @@ function renderInquiry() {
       label.appendChild(sk);
     }
     it.appendChild(label);
-    if (disp && disp.hint && !SKIPS[q] && !locked) {
-      var h2 = document.createElement("div");
-      h2.className = "inq-hint2";
-      h2.textContent = disp.hint;
-      it.appendChild(h2);
-    }
     it.appendChild(mkChips(q, item.options, locked));
     if (locked) {
       var ln = document.createElement("div");
@@ -404,7 +397,8 @@ function renderInquiry() {
       ln.textContent = "先答第 1 题「怕冷还是怕热？」——此题专用于外感（中风/伤寒）鉴别，无寒热表证时不适用。";
       it.appendChild(ln);
     }
-    var gloss = (disp && disp.hint) ? "" : glossLine(item.options);
+    var gloss = glossLine(item.options);
+    if (disp && disp.note) gloss = (gloss ? gloss + "；" : "") + disp.note;
     if (gloss && !locked) {
       var g = document.createElement("div");
       g.className = "inq-gloss";
