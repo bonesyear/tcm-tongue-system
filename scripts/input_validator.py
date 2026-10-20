@@ -263,8 +263,9 @@ def _validate_scoring_value_hygiene(record: DailyRecord) -> List[str]:
     if ("淡紫" in tongue_obs.get("body_color", "")
             and "淡紫" in tongue_obs.get("sublingual_color", "")):
         warnings.append(
-            "⚠️ body_color 与 sublingual_color 同时含「淡紫」：两处淡紫同名异义"
-            "（舌质=异常6 / 舌下=正常0），请确认字段归属"
+            "⚠️ body_color 与 sublingual_color 同时含「淡紫」：舌下=生理性正常 0；"
+            "舌质词表已删除「淡紫」（2026-10-20 五档化，归并到「紫暗」），"
+            "该值现按 0 分处理，请确认字段归属"
         )
 
     for dim in DIMENSIONS:

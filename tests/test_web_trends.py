@@ -176,3 +176,27 @@ def test_inquiry_denominator_dynamic_17(tmp_path, monkeypatch):
     assert f"问诊覆盖：17/{wizard_store.INQUIRY_TOTAL}" in text
     assert "17/17" in text
     assert "/16" not in text
+
+
+def test_report_guard_warns_formula_on_all_zero(tmp_path, monkeypatch):
+    """审查修复：平人出口第二道防线——全 0 无红线而报告含方剂剂量 → warning。"""
+    daily = tmp_path / "records" / "daily"
+    daily.mkdir(parents=True)
+    raw = {"date": "2026-10-20",
+           "observations": {"tongue": {"body": {"color": "淡红"}}},
+           "inquiry": {}}
+    (daily / "2026-10-20_analysis.json").write_text(
+        __import__("json").dumps(raw, ensure_ascii=False), encoding="utf-8")
+    import llm_client
+    monkeypatch.setattr(llm_client, "chat",
+                        lambda *a, **k: "辨证：建议桂枝汤 桂枝9克 白芍6克 煎服")
+    import trends_store
+    result = trends_store.generate_and_store_report(
+        str(daily), str(tmp_path / "records" / "_backup"),
+        "2026-10-20", lambda: ("m", "u", "k"))
+    assert result["ok"] is True, result
+    assert "平人出口" in result.get("warning", ""), result
+    # 报告仍落盘（告警不拦截，可诊断哲学）
+    saved = __import__("json").loads(
+        (daily / "2026-10-20_analysis.json").read_text(encoding="utf-8"))
+    assert "桂枝汤" in saved["diagnosis"]["report"]["markdown"]

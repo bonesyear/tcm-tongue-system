@@ -233,8 +233,8 @@ def test_inquiry_multiple_questions_written(client, data_root, monkeypatch):
     """15 项问诊放开：多问多答按模板契约写入（含手足温凉）。"""
     _finish_all_parts(client, monkeypatch)
     client.post("/wizard/inquiry", json={"question": "手足温凉", "answer": "厥冷（冰冷）"})
-    client.post("/wizard/inquiry", json={"question": "大便如何？", "answer": "便溏"})
-    client.post("/wizard/inquiry", json={"question": "口苦吗？", "answer": "无"})
+    client.post("/wizard/inquiry", json={"question": "大便？", "answer": "便溏"})
+    client.post("/wizard/inquiry", json={"question": "口苦？", "answer": "无"})
     resp = client.post("/wizard/submit", json={"mode": "new"})
     assert resp.get_json()["ok"] is True
     import records_store
@@ -242,10 +242,10 @@ def test_inquiry_multiple_questions_written(client, data_root, monkeypatch):
         os.path.join(data_root, "records", "daily"),
         resp.get_json()["date"]).raw
     assert raw["inquiry"]["手足温凉"]["answer"] == "厥冷（冰冷）"
-    assert raw["inquiry"]["大便如何？"] == {"asked": True, "answer": "便溏"}
-    assert raw["inquiry"]["口苦吗？"]["answer"] == "无"
+    assert raw["inquiry"]["大便？"] == {"asked": True, "answer": "便溏"}
+    assert raw["inquiry"]["口苦？"]["answer"] == "无"
     # 未答项不得出现（不编造）
-    assert "目眩吗？" not in raw["inquiry"]
+    assert "目眩？" not in raw["inquiry"]
 
 
 def test_tongue_score_max_dominant():
@@ -389,3 +389,10 @@ def test_inquiry_clear_all(client, data_root, monkeypatch):
     assert resp.get_json()["ok"] is True
     draft = wizard_store.load_draft(daily, today)
     assert draft["inquiry"] == {}
+
+
+def test_inquiry_unknown_question_rejected(client):
+    """审查修复：问诊键名白名单——任意键不得注入记录。"""
+    resp = client.post("/wizard/inquiry",
+                       json={"question": "随便编的问题", "answer": "x"})
+    assert resp.status_code == 400
