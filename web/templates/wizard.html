@@ -119,6 +119,7 @@
   <div class="inq-foot">
     <button class="btn btn-ghost btn-sm" id="inquiry-back">‹ 返回第 7 步</button>
     <span class="spacer"></span>
+    <button class="btn btn-ghost btn-sm" id="inquiry-clear-all" style="display:none;">清除全部已选</button>
     <button class="btn btn-subtle btn-sm" id="inquiry-skip-all">全部跳过（不答）</button>
   </div>
 </div>
@@ -291,6 +292,7 @@ function renderInquiry() {
   var n = Object.keys(ANSWERS).length;
   document.getElementById("inquiry-count").textContent = "已答 " + n + " / " + total;
   document.getElementById("inquiry-bar").style.width = (n / total * 100) + "%";
+  document.getElementById("inquiry-clear-all").style.display = n > 0 ? "" : "none";
 
   function mkChips(q, options) {
     var chips = document.createElement("div");
@@ -421,6 +423,22 @@ document.getElementById("inquiry-skip-all").addEventListener("click", function (
   this.disabled = true;
   this.textContent = "✓ 已跳过问诊";
   updateNav();
+});
+
+/* 清除全部已选：清空草稿里的问诊答案并复位按钮状态 */
+document.getElementById("inquiry-clear-all").addEventListener("click", function () {
+  if (!confirm("清除全部问诊已选项？")) return;
+  postJSON("/wizard/inquiry", {clear_all: true}).then(function (d) {
+    if (d.ok) {
+      ANSWERS = {};
+      inquiryAnswered = false;
+      var skipBtn = document.getElementById("inquiry-skip-all");
+      skipBtn.disabled = false;
+      skipBtn.textContent = "全部跳过（不答）";
+      renderInquiry();
+      updateNav();
+    }
+  });
 });
 
 function updateNav() {
