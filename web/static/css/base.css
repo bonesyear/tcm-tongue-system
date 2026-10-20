@@ -487,8 +487,9 @@ a:hover { color: var(--cinnabar-deep); }
 @media (max-width: 760px) {
   .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; }
   .appbar-inner { flex-wrap: wrap; }
-  .field-row { grid-template-columns: 84px 1fr; }
-  .field-row .badge { grid-column: 2; justify-self: start; }
+  /* 字段行窄屏仍保持单行三列（徽章/✎ 体积小，84+值+徽章在 360px 也排得下），
+     不要拆两行——旧规则假设徽章是网格直接子元素，现 DOM 下会让行动列整列掉行 */
+  .field-row { grid-template-columns: 84px 1fr auto; gap: 8px; }
   .brand-sub { display: none; }
 }
 

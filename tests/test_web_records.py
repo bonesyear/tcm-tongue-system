@@ -109,7 +109,9 @@ def test_uncovered_dim_does_not_count_as_zero(demo_client, data_root):
 
 
 def test_review_badges_shown(demo_client):
-    """待复核徽标：齿痕/腻腐/厚薄/面色/黄染/舌下络脉等字段应显示（P1）。"""
+    """待复核标记：齿痕/腻腐/厚薄/面色/黄染/舌下络脉等字段应有视觉标记（P1）。
+    2026-10-20 起机制改为：行加 review 类（淡黄底）+ 字段名后圆点（title 述原因）。"""
     html = demo_client.get("/record/2026-06-25").get_data(as_text=True)
-    assert "待复核" in html
-    assert html.count("待复核") >= 3  # fixture 中齿痕/厚薄/腻腐/面色/络脉迂曲均有值
+    assert 'class="field-row review"' in html
+    assert html.count('class="field-row review"') >= 3  # fixture 中齿痕/厚薄/腻腐/面色/络脉迂曲均有值
+    assert 'class="rv" title=' in html  # 圆点带复核原因 tooltip
