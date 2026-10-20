@@ -292,6 +292,11 @@ def create_app(env_file: str | None = None,
             return jsonify({"ok": True})
         answer = (body.get("answer") or "").strip()
         question = (body.get("question") or wizard_store.INQUIRY_SPEC["key"]).strip()
+        # 键名白名单：只接受 17 个既定问诊键（防任意键注入记录 inquiry）
+        known = {wizard_store.INQUIRY_SPEC["key"]} | {
+            i["q"] for i in wizard_store.INQUIRY_ITEMS}
+        if question not in known:
+            return jsonify({"ok": False, "error": f"未知问诊项: {question}"}), 400
         draft.setdefault("inquiry", {})
         if answer:
             draft["inquiry"][question] = answer

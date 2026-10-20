@@ -200,6 +200,21 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     except RuntimeError as e:
         return {"ok": False, "error": str(e)}
 
+    # 平人出口的代码侧第二道防线（模板出口是 prompt-only，模型可能不守）：
+    # 全 0 + 无红线而报告含方剂/剂量表述 → stderr 告警 + 响应带 warning。
+    # 不拦截（模型可能以「参考方」形式合理提及）——可诊断，不静默。
+    import re
+    import sys
+    warn = None
+    dim_scores = records_store._dim_scores(rec)
+    covered = [v for v in dim_scores.values() if v is not None]
+    if covered and all(v == 0 for v in covered) \
+            and not rec.get_triggered_danger_flags() \
+            and re.search(r"(汤|丸|散|饮)\b[^。]{0,20}\d+\s*(?:克|g)(?![a-z])", md):
+        warn = ("平人出口违规嫌疑：全 0 且无危险信号的记录，报告含方剂/剂量"
+                "表述，请人工复核")
+        print(f"[report][warn] {date_str}: {warn}", file=sys.stderr)
+
     # 存储约定：形状 A 的 diagnosis 容器（任务书 §3），报告为其下的 report 子键；
     # 形状 B 记录新增 diagnosis 键不影响形状探测（探测只认 observations）。
     diag = rec.raw.setdefault("diagnosis", {})
@@ -217,4 +232,7 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     records_store.backup_file(filepath, backup_dir)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(rec.raw, f, ensure_ascii=False, indent=2)
-    return {"ok": True, "date": date_str}
+    result = {"ok": True, "date": date_str}
+    if warn:
+        result["warning"] = warn
+    return result

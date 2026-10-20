@@ -289,12 +289,14 @@ var GENERIC_OPTS = {"无":1,"正常":1,"无不适":1,"无异常":1,"都不明显
 
 function renderInquiry() {
   var total = INQUIRY_ITEMS.length + 1;
-  var n = Object.keys(ANSWERS).length;
+  /* 计数只统计当前 17 键集合内的答案（草稿陈旧键/注入键不渲染也不计数） */
+  var KNOWN_QS = [INQUIRY.key].concat(INQUIRY_ITEMS.map(function (i) { return i.q; }));
+  var n = KNOWN_QS.filter(function (q) { return ANSWERS[q] !== undefined; }).length;
   document.getElementById("inquiry-count").textContent = "已答 " + n + " / " + total;
   document.getElementById("inquiry-bar").style.width = (n / total * 100) + "%";
   document.getElementById("inquiry-clear-all").style.display = n > 0 ? "" : "none";
 
-  function mkChips(q, options) {
+  function mkChips(q, options, lockMode) {
     var chips = document.createElement("div");
     chips.className = "inq-chips";
     options.forEach(function (opt) {
@@ -303,6 +305,9 @@ function renderInquiry() {
       b.className = "inq-chip" + (ANSWERS[q] === opt ? " on" : "");
       b.textContent = opt;
       if (GLOSSARY[opt]) b.title = GLOSSARY[opt];
+      /* 锁定态：仅「没有外感不适」保持可点（它正是为无表证用户设的出口，
+         化解门禁与退出项死锁）；其余 chip 禁用（含键盘，不只 CSS） */
+      if (lockMode && opt !== "没有外感不适") b.disabled = true;
       b.addEventListener("click", function () {
         postJSON("/wizard/inquiry", {question: q, answer: opt}).then(function (d) {
           if (d.ok) { delete SKIPS[q]; ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
@@ -393,7 +398,7 @@ function renderInquiry() {
       h2.textContent = disp.hint;
       it.appendChild(h2);
     }
-    it.appendChild(mkChips(q, item.options));
+    it.appendChild(mkChips(q, item.options, locked));
     if (locked) {
       var ln = document.createElement("div");
       ln.className = "inq-lock-note";
