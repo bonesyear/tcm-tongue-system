@@ -240,6 +240,17 @@ def create_app(env_file: str | None = None,
         status = 200 if result["ok"] else 400
         return jsonify(result), status
 
+    @app.post("/record/<date>/restore")
+    def record_restore(date):
+        """恢复为首次修正前的原始记录（最早备份 = LLM 原始输出；
+        恢复前当前状态自动备份，可再撤销）。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        if not _DATE_RE.match(date):
+            abort(404)
+        result = records_store.restore_original(daily_dir, backup_dir, date)
+        return jsonify(result), (200 if result["ok"] else 400)
+
     @app.get("/photos/<date>/<path:filename>")
     def photo(date, filename):
         """原图对照：仅服务 records/photos/<date>/ 下的图片文件。"""

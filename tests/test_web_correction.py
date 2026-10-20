@@ -238,3 +238,31 @@ def test_correction_meta_marks_unscored():
     assert meta["tongue"]["body.luster"]["scored"] is False
     assert meta["tongue"]["body.color"]["scored"] is True
     assert meta["hand"]["palm_temperature"]["scored"] is False
+
+
+# ---------------- 恢复原始数据（/record/<date>/restore） ----------------
+
+def test_restore_reverts_to_original(client, data_root):
+    """修正两个字段 → 恢复 → 全部回到 LLM 原始输出，manually_corrected 消失。"""
+    client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "tooth_marks", "value": "重度"})
+    client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "body_color", "value": "紫暗"})
+    raw = _read_raw(data_root)
+    assert raw["manually_corrected"] is True
+    resp = client.post("/record/2026-06-25/restore")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True and data["restored_from"]
+    raw = _read_raw(data_root)
+    assert raw["observations"]["tongue"]["body"]["tooth_marks"] == "轻度"  # 回原值
+    assert raw["observations"]["tongue"]["body"]["color"] != "紫暗"
+    assert not raw.get("manually_corrected")
+    # 恢复前当前状态已自动备份（可再撤销）
+    assert data["safety_backup"]
+
+
+def test_restore_without_prior_correction_400(client):
+    resp = client.post("/record/2026-06-25/restore")
+    assert resp.status_code == 400
+    assert "未被修正" in resp.get_json()["error"]
