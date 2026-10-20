@@ -257,6 +257,9 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
                                      # L2769），此前无词条被 fail-open 静默归零
                           "淡白": 4,            # 面色淡白 = 血虚（同书 L5565 唇甲
                                      # 淡黄或苍白为血少明证）；封闭词表含此值
+                          "红赤": 3,            # 2026-10-20：太阳面赤（热证表证），
+                                     # 分值 3 参照唇色「红:3」先例（待主人签认）；
+                                     # 识图 prompt 枚举词此前静默归零
                                      },
         "face_luster":   FACE_LUSTER_MAP,
         "face_edema":    {"明显浮肿": 4, "轻度浮肿": 2, "面目鲜泽": 4, "卧蚕": 4},
