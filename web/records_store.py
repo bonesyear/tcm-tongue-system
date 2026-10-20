@@ -262,6 +262,35 @@ def _field_options(dim, indicator: str):
         return opts
     return FIELD_OPTIONS.get(indicator)
 
+
+# 形状 B 嵌套首段的展示前缀（修正/复核卡片分组用）
+_B_GROUP_LABELS = {"body": "舌质", "coating": "舌苔", "sublingual": "舌下络脉",
+                   "face": "面域", "lips": "唇域", "nose": "鼻域"}
+
+
+def correction_meta() -> dict:
+    """修正选项元数据（向导第 8 步复核卡片 + 详情页共用数据源）：
+    {维度英文名: {点号 B 路径: {ind, label, opts, gloss}}}。
+    label 同名指标（如舌诊三个「颜色」）带组前缀消歧。"""
+    from src.record import _DIMENSION_INDICATORS
+    meta = {}
+    for dim in DIMENSIONS:
+        fields = {}
+        for ind, shapes in _DIMENSION_INDICATORS.get(dim, {}).items():
+            b_path = ".".join(shapes["B"])
+            prefix = _B_GROUP_LABELS.get(shapes["B"][0], "") \
+                if len(shapes["B"]) > 1 else ""
+            label = (prefix + "·" if prefix else "") + \
+                INDICATOR_LABELS.get(ind, ind)
+            opts = _field_options(dim, ind)
+            fields[b_path] = {
+                "ind": ind, "label": label, "opts": opts,
+                "gloss": {o: GLOSSARY[o] for o in opts
+                          if o in GLOSSARY} if opts else None,
+            }
+        meta[dim.english_name] = fields
+    return meta
+
 # 待复核字段：照常评分，但需肉眼签认（2026-10-16 P1 原著审查；
 # 手册 user-guide.md「识图结果需肉眼确认的体征」清单 + 原著危重鉴别点）
 REVIEW_FIELDS = {
