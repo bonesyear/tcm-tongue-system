@@ -115,9 +115,8 @@ def test_detail_exposes_scored_options(client, data_root):
     detail = records_store.record_detail(rec)
     tongue = next(d for d in detail["dims"] if d["key"] == "tongue")
     fields = {f["ind"]: f for g in tongue["groups"] for f in g["fields"]}
-    assert fields["body_color"]["opts"][:2] == ["淡红", "红润"]
-    assert "紫暗" in fields["body_color"]["opts"]
-    assert "未见异常" not in fields["body_color"]["opts"]  # 自带 0 分基线不补兜底
+    # 舌色并五档（OPTION_OVERRIDES）：修正选项收敛，旧词不出现在选项里
+    assert fields["body_color"]["opts"] == ["淡红", "淡白", "红", "红绛", "紫暗"]
     # 点刺：评分层退出，但留存词表复活为参考项选项
     assert fields["prickles"]["opts"] == ["无", "少量", "点刺", "芒刺"]
 

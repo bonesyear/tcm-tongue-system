@@ -49,6 +49,13 @@ FIELD_OPTIONS = {
 # 且不命中任何评分关键词 → 0 分 = 正常，方向正确。
 NORMAL_OPTION = "未见异常"
 
+# 修正选项覆盖（优先于评分词表枚举）：舌色并五档（2026-10-20 主人定）——
+# 九档超模型色分辨力（暗红/青紫/淡紫互相误判），枚举收敛为五档；
+# 旧词保留在评分词表中（历史档案值照评不误），只是不再作为新选项。
+OPTION_OVERRIDES = {
+    "body_color": ["淡红", "淡白", "红", "红绛", "紫暗"],
+}
+
 # 术语白话注解（修正选项悬浮提示用）：专业词汇对非专业用户是墙，
 # 注解口径与《中医诊断学》定义句一致，只解释词义不做诊断结论。
 GLOSSARY = {
@@ -254,6 +261,8 @@ GLOSSARY.update({
 
 def _field_options(dim, indicator: str):
     """修正 UI 的封闭选项；无词表且未人工指定时返回 None（回落自由文本）。"""
+    if indicator in OPTION_OVERRIDES:
+        return OPTION_OVERRIDES[indicator]
     rules = DIMENSION_RULES.get(dim, {}).get(indicator)
     if rules:
         opts = list(rules.keys())
