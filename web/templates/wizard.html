@@ -53,6 +53,24 @@
   .inq-spec .inq-chip { padding: 7px 17px; font-size: 14px; }
   .inq-foot { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
   @media (max-width: 760px) { .inq-grid { grid-template-columns: 1fr; } }
+
+  /* ---- 问诊步 · 大白话层与释义行 ---- */
+  .inq-hint2 { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin: -2px 0 7px; }
+  .inq-gloss { font-size: 11.5px; color: var(--ink-3); line-height: 1.6; margin-top: 6px; }
+  .inq-gloss b { color: var(--ink-2); font-weight: 600; }
+  .inq-skip { margin-left: auto; border: none; background: none; padding: 2px 4px;
+    font-size: 12px; color: var(--ink-3); cursor: pointer; font-family: var(--font-sans); }
+  .inq-skip:hover { color: var(--cinnabar-deep); }
+  .inq-item.skipped .inq-label .qt, .inq-item.skipped .no { color: var(--ink-3); }
+  .inq-item.skipped .inq-chips { opacity: .45; }
+  .inq-item.skipped .inq-gloss { display: none; }
+  .inq-item .skip-mark { margin-left: auto; font-size: 12px; color: var(--ink-3);
+    font-style: normal; }
+
+  /* ---- 条件激活：有汗/无汗题锁定态（2026-10-20 主人指定试点） ---- */
+  .inq-item.locked .inq-chips { opacity: .4; pointer-events: none; }
+  .inq-item.locked .inq-skip { display: none; }
+  .inq-lock-note { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin-top: 6px; }
 </style>
 
 <div>
@@ -92,7 +110,7 @@
   </div>
   <div class="inq-progress"><i id="inquiry-bar" style="width:0%;"></i></div>
   <p class="faint" style="font-size:12.5px; margin:8px 0 0;">
-    全部可跳过；答得越多，辨证越准。问诊不改变置信度等级，只在同一等级内提高判断精度。
+    全部可跳过——没有不适的题不答即可（未答 = 未提供，系统不会替你推测）；答得越多，辨证越准。问诊不改变置信度等级，只在同一等级内提高判断精度。
   </p>
 
   <div class="inq-spec" id="inquiry-spec" style="margin-top:14px;"></div>
@@ -239,6 +257,35 @@ var INQUIRY_ITEMS = {{ inquiry_items | tojson }};
 var ANSWERS = {{ state.inquiry | tojson }};
 var GLOSSARY = {{ glossary | tojson }};
 
+/* 大白话显示层（2026-10-20 主人决议）：记录层键名与模板 §2.1.2 逐字契约不变，
+   仅页面题干换成人人能自检的问法；键不匹配时回落原始题干，不影响提交。 */
+var DISPLAY = {
+  "手足温凉": {label: "手脚是温的还是凉的？"},
+  "恶寒or恶热？": {label: "怕冷还是怕热？",
+    hint: "想添衣盖被 = 怕冷（恶寒）；怕热喜凉 = 恶热；一阵冷一阵热 = 往来寒热"},
+  "有汗or无汗？": {label: "现在身上有汗吗？",
+    hint: "指生病状态下的出汗；运动、天热、吃饭时出汗不算"},
+  "头痛or身痛？": {label: "头痛或身上痛吗？"},
+  "口苦？": {label: "嘴里发苦吗？"},
+  "咽干？": {label: "嗓子干吗？"},
+  "目眩？": {label: "头晕吗？", hint: "「目眩」指天旋地转、站不稳的晕"},
+  "口渴？": {label: "口渴、想喝水吗？"},
+  "食欲？": {label: "吃饭胃口怎么样？"},
+  "大便？": {label: "大便怎么样？"},
+  "小便？": {label: "小便怎么样？", hint: "看颜色和尿量：色深量少或色淡量多都算异常"},
+  "睡眠？": {label: "睡眠怎么样？"},
+  "胸胁？": {label: "胸口或两胁有胀闷吗？"},
+  "腹部？": {label: "肚子有胀、痛或堵闷吗？"},
+  "听力？": {label: "耳朵有鸣响或听力下降吗？"},
+  "鼻部？": {label: "鼻子通气吗？", hint: "鼻塞、呼吸有声、鼻出血都算异常"},
+  "汗出时间特征？": {label: "出汗的时间有异常吗？",
+    hint: "白天不动也出汗 = 自汗；睡着出汗、醒就停 = 盗汗；大汗淋漓不止 = 绝汗（危重信号）"}
+};
+/* 「不答本题」是纯前端姿态：不入记录（未答 = 未提供），刷新后恢复未答态 */
+var SKIPS = {};
+/* 程度/通用词的词条语义自明，释义行不展示 */
+var GENERIC_OPTS = {"无":1,"正常":1,"无不适":1,"无异常":1,"都不明显":1,"轻微":1,"明显":1};
+
 function renderInquiry() {
   var total = INQUIRY_ITEMS.length + 1;
   var n = Object.keys(ANSWERS).length;
@@ -256,12 +303,30 @@ function renderInquiry() {
       if (GLOSSARY[opt]) b.title = GLOSSARY[opt];
       b.addEventListener("click", function () {
         postJSON("/wizard/inquiry", {question: q, answer: opt}).then(function (d) {
-          if (d.ok) { ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
+          if (d.ok) { delete SKIPS[q]; ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
         });
       });
       chips.appendChild(b);
     });
     return chips;
+  }
+
+  /* 释义行：术语选项的词条常驻展示，程度/通用词不展示 */
+  function glossLine(options) {
+    var parts = [];
+    options.forEach(function (o) {
+      if (GLOSSARY[o] && !GENERIC_OPTS[o]) parts.push("<b>" + o + "</b>：" + GLOSSARY[o]);
+    });
+    return parts.length ? parts.join("；") : "";
+  }
+
+  /* 「有汗or无汗」条件激活（2026-10-20 主人指定试点）：该题在模板中的本职是
+     「太阳中风vs伤寒唯一鉴别」，仅当第 1 题答了寒热（恶寒/恶热/往来寒热）
+     才有鉴别场景；无表证时锁定并写明原因。纯前端约束，不动契约；
+     已存在的答案始终保留展示（记录不删改）。 */
+  function sweatGateOpen() {
+    var a = ANSWERS["恶寒or恶热？"];
+    return a === "恶寒" || a === "恶热" || a === "往来寒热";
   }
 
   /* 第 0 项：手足温凉（必答推荐，置顶高亮） */
@@ -273,7 +338,7 @@ function renderInquiry() {
   spec.appendChild(why);
   var q0 = document.createElement("div");
   q0.className = "inq-q";
-  q0.textContent = INQUIRY.key + "？";
+  q0.textContent = (DISPLAY[INQUIRY.key] && DISPLAY[INQUIRY.key].label) || (INQUIRY.key + "？");
   spec.appendChild(q0);
   var hint = document.createElement("div");
   hint.className = "inq-hint";
@@ -285,8 +350,10 @@ function renderInquiry() {
   var grid = document.getElementById("inquiry-options");
   grid.innerHTML = "";
   INQUIRY_ITEMS.forEach(function (item, i) {
+    var q = item.q;
+    var locked = (q === "有汗or无汗？") && !ANSWERS[q] && !sweatGateOpen();
     var it = document.createElement("div");
-    it.className = "inq-item" + (ANSWERS[item.q] ? " answered" : "");
+    it.className = "inq-item" + (ANSWERS[q] ? " answered" : "") + (SKIPS[q] ? " skipped" : "") + (locked ? " locked" : "");
     var label = document.createElement("div");
     label.className = "inq-label";
     var no = document.createElement("span");
@@ -294,14 +361,50 @@ function renderInquiry() {
     no.textContent = ("0" + (i + 1)).slice(-2);
     label.appendChild(no);
     var qt = document.createElement("span");
-    qt.textContent = item.q;
+    qt.className = "qt";
+    var disp = DISPLAY[q];
+    qt.textContent = (disp && disp.label) || q;
     label.appendChild(qt);
-    var mark = document.createElement("span");
-    mark.className = "done-mark";
-    mark.textContent = "✓ 已答";
-    label.appendChild(mark);
+    if (ANSWERS[q]) {
+      var mark = document.createElement("span");
+      mark.className = "done-mark";
+      mark.textContent = "✓ 已答";
+      label.appendChild(mark);
+    } else if (SKIPS[q]) {
+      var sm = document.createElement("span");
+      sm.className = "skip-mark";
+      sm.textContent = "（已跳过）";
+      label.appendChild(sm);
+    } else if (!locked) {
+      var sk = document.createElement("button");
+      sk.type = "button";
+      sk.className = "inq-skip";
+      sk.textContent = "不答本题";
+      sk.title = "没有该不适时可不答；未答 = 未提供，不会记入记录";
+      sk.addEventListener("click", function () { SKIPS[q] = 1; renderInquiry(); });
+      label.appendChild(sk);
+    }
     it.appendChild(label);
-    it.appendChild(mkChips(item.q, item.options));
+    if (disp && disp.hint && !SKIPS[q] && !locked) {
+      var h2 = document.createElement("div");
+      h2.className = "inq-hint2";
+      h2.textContent = disp.hint;
+      it.appendChild(h2);
+    }
+    it.appendChild(mkChips(q, item.options));
+    if (locked) {
+      var ln = document.createElement("div");
+      ln.className = "inq-lock-note";
+      ln.textContent = "先答第 1 题「怕冷还是怕热？」——此题专用于外感（中风/伤寒）鉴别，无寒热表证时不适用。";
+      it.appendChild(ln);
+    }
+    var gloss = glossLine(item.options);
+    if (gloss && !locked) {
+      var g = document.createElement("div");
+      g.className = "inq-gloss";
+      g.innerHTML = gloss;
+      it.appendChild(g);
+    }
     grid.appendChild(it);
   });
 
