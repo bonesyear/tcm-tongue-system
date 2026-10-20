@@ -262,8 +262,7 @@ var GLOSSARY = {{ glossary | tojson }};
    仅页面题干换成人人能自检的问法；键不匹配时回落原始题干，不影响提交。 */
 var DISPLAY = {
   "手足温凉": {label: "手脚是温的还是凉的？"},
-  "恶寒or恶热？": {label: "怕冷还是怕热？",
-    hint: "想添衣盖被 = 怕冷（恶寒）；怕热喜凉 = 恶热；一阵冷一阵热 = 往来寒热"},
+  "恶寒or恶热？": {label: "怕冷还是怕热？"},
   "有汗or无汗？": {label: "现在身上有汗吗？",
     hint: "指生病状态下的出汗；运动、天热、吃饭时出汗不算"},
   "头痛or身痛？": {label: "头痛或身上痛吗？"},
@@ -405,7 +404,7 @@ function renderInquiry() {
       ln.textContent = "先答第 1 题「怕冷还是怕热？」——此题专用于外感（中风/伤寒）鉴别，无寒热表证时不适用。";
       it.appendChild(ln);
     }
-    var gloss = glossLine(item.options);
+    var gloss = (disp && disp.hint) ? "" : glossLine(item.options);
     if (gloss && !locked) {
       var g = document.createElement("div");
       g.className = "inq-gloss";
