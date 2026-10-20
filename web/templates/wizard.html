@@ -23,6 +23,36 @@
     border-radius: var(--radius-inner); padding: 10px 14px; max-height: 160px;
     overflow: auto; white-space: pre-wrap; }
   .step-status { font-size: 12.5px; }
+
+  /* ---- 问诊步 ---- */
+  .inq-progress { height: 6px; background: var(--card-sunken); border-radius: var(--radius-pill);
+    overflow: hidden; margin-top: 4px; }
+  .inq-progress > i { display: block; height: 100%; background: var(--cinnabar);
+    border-radius: var(--radius-pill); transition: width .25s; }
+  .inq-spec { border: 1px solid var(--cinnabar); border-left-width: 5px;
+    background: var(--cinnabar-tint); border-radius: var(--radius-inner);
+    padding: 14px 16px; }
+  .inq-why { font-size: 12px; color: var(--cinnabar-deep); letter-spacing: .1em;
+    font-family: var(--font-serif); margin-bottom: 3px; }
+  .inq-q { font-size: 15.5px; font-weight: 700; }
+  .inq-hint { font-size: 12.5px; color: var(--ink-2); line-height: 1.7; margin: 6px 0 10px; }
+  .inq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 26px; margin-top: 4px; }
+  .inq-item { padding: 10px 2px; border-bottom: 1px dashed var(--line); }
+  .inq-label { display: flex; align-items: baseline; gap: 8px; font-size: 14px; margin-bottom: 7px; }
+  .inq-label .no { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .inq-label .done-mark { margin-left: auto; font-size: 12px; color: var(--sev-0);
+    font-weight: 600; visibility: hidden; }
+  .inq-item.answered .done-mark { visibility: visible; }
+  .inq-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .inq-chip { border: 1px solid var(--line-strong); background: #fff; color: var(--ink-2);
+    border-radius: var(--radius-pill); padding: 5px 14px; font-size: 13px; cursor: pointer;
+    font-family: var(--font-sans); transition: border-color .15s, background .15s, color .15s; }
+  .inq-chip:hover { border-color: var(--cinnabar); color: var(--cinnabar-deep); }
+  .inq-chip.on { background: var(--cinnabar); border-color: var(--cinnabar); color: #fff8f3;
+    box-shadow: 0 0 0 3px var(--cinnabar-tint); }
+  .inq-spec .inq-chip { padding: 7px 17px; font-size: 14px; }
+  .inq-foot { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  @media (max-width: 760px) { .inq-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div>
@@ -55,11 +85,24 @@
 
 <div class="card" id="inquiry-card" style="display:none;">
   <div class="card-head">
-    <h2 id="inquiry-title"></h2>
+    <h2>第 8 / 8 步 · 问诊</h2>
     <span class="tag cinnabar">问诊</span>
+    <span class="spacer"></span>
+    <span class="faint num" id="inquiry-count" style="font-size:13px;"></span>
   </div>
-  <p class="muted" id="inquiry-hint" style="font-size:13.5px;"></p>
-  <div class="row wrap" id="inquiry-options" style="gap:10px; margin-top:12px;"></div>
+  <div class="inq-progress"><i id="inquiry-bar" style="width:0%;"></i></div>
+  <p class="faint" style="font-size:12.5px; margin:8px 0 0;">
+    全部可跳过；答得越多，辨证越准。问诊不改变置信度等级，只在同一等级内提高判断精度。
+  </p>
+
+  <div class="inq-spec" id="inquiry-spec" style="margin-top:14px;"></div>
+  <div class="inq-grid" id="inquiry-options"></div>
+
+  <div class="inq-foot">
+    <button class="btn btn-ghost btn-sm" id="inquiry-back">‹ 返回第 7 步</button>
+    <span class="spacer"></span>
+    <button class="btn btn-subtle btn-sm" id="inquiry-skip-all">全部跳过（不答）</button>
+  </div>
 </div>
 
 <div class="card">
@@ -163,7 +206,10 @@ function render() {
   document.querySelectorAll("#steps li").forEach(function (li, i) {
     li.className = ((PARTS[i] && PARTS[i].status !== "pending") || i === 7 && inquiryAnswered ? "done " : "") + (i === cur ? "current" : "");
   });
-  if (inInquiry) { renderInquiry(); updateNav(); return; }
+  if (inInquiry) {
+    document.getElementById("inquiry-back").textContent = "‹ 返回第 7 步 · " + PARTS[6].part;
+    renderInquiry(); updateNav(); return;
+  }
   var p = PARTS[cur];
   document.getElementById("step-title").textContent = "第 " + (cur + 1) + " / 8 步 · " + p.part;
   document.getElementById("step-dim").textContent = p.dim;
@@ -194,25 +240,18 @@ var ANSWERS = {{ state.inquiry | tojson }};
 var GLOSSARY = {{ glossary | tojson }};
 
 function renderInquiry() {
-  document.getElementById("inquiry-title").textContent = "第 8 / 8 步 · 问诊（" + Object.keys(ANSWERS).length + " / " + (INQUIRY_ITEMS.length + 1) + " 已答）";
-  document.getElementById("inquiry-hint").textContent = INQUIRY.hint;
-  var box = document.getElementById("inquiry-options");
-  box.innerHTML = "";
+  var total = INQUIRY_ITEMS.length + 1;
+  var n = Object.keys(ANSWERS).length;
+  document.getElementById("inquiry-count").textContent = "已答 " + n + " / " + total;
+  document.getElementById("inquiry-bar").style.width = (n / total * 100) + "%";
 
-  function mkRow(q, options, highlight) {
-    var row = document.createElement("div");
-    row.style.cssText = "padding:8px 0; border-bottom:1px dashed var(--line);";
-    var label = document.createElement("div");
-    label.style.cssText = "font-size:14px; margin-bottom:6px;" + (highlight ? "font-weight:600;" : "");
-    label.textContent = q;
-    row.appendChild(label);
+  function mkChips(q, options) {
     var chips = document.createElement("div");
-    chips.className = "row wrap";
-    chips.style.gap = "6px";
+    chips.className = "inq-chips";
     options.forEach(function (opt) {
       var b = document.createElement("button");
-      var on = ANSWERS[q] === opt;
-      b.className = "btn btn-sm " + (on ? "btn-primary" : "btn-ghost");
+      b.type = "button";
+      b.className = "inq-chip" + (ANSWERS[q] === opt ? " on" : "");
       b.textContent = opt;
       if (GLOSSARY[opt]) b.title = GLOSSARY[opt];
       b.addEventListener("click", function () {
@@ -222,26 +261,64 @@ function renderInquiry() {
       });
       chips.appendChild(b);
     });
-    row.appendChild(chips);
-    box.appendChild(row);
+    return chips;
   }
 
   /* 第 0 项：手足温凉（必答推荐，置顶高亮） */
-  mkRow(INQUIRY.key, INQUIRY.options, true);
-  /* 其余 16 项（全部可跳过） */
-  INQUIRY_ITEMS.forEach(function (item) { mkRow(item.q, item.options, false); });
+  var spec = document.getElementById("inquiry-spec");
+  spec.innerHTML = "";
+  var why = document.createElement("div");
+  why.className = "inq-why";
+  why.textContent = "必答推荐 · 三阴三阳最快捷鉴别";
+  spec.appendChild(why);
+  var q0 = document.createElement("div");
+  q0.className = "inq-q";
+  q0.textContent = INQUIRY.key + "？";
+  spec.appendChild(q0);
+  var hint = document.createElement("div");
+  hint.className = "inq-hint";
+  hint.textContent = INQUIRY.hint;
+  spec.appendChild(hint);
+  spec.appendChild(mkChips(INQUIRY.key, INQUIRY.options));
 
-  var skipAll = document.createElement("button");
-  skipAll.className = "btn btn-subtle btn-sm";
-  skipAll.textContent = "全部跳过（不答）";
-  skipAll.style.marginTop = "10px";
-  skipAll.addEventListener("click", function () {
-    inquiryAnswered = true;
-    renderInquiry();
-    updateNav();
+  /* 其余 16 项（全部可跳过），双列排布 */
+  var grid = document.getElementById("inquiry-options");
+  grid.innerHTML = "";
+  INQUIRY_ITEMS.forEach(function (item, i) {
+    var it = document.createElement("div");
+    it.className = "inq-item" + (ANSWERS[item.q] ? " answered" : "");
+    var label = document.createElement("div");
+    label.className = "inq-label";
+    var no = document.createElement("span");
+    no.className = "no";
+    no.textContent = ("0" + (i + 1)).slice(-2);
+    label.appendChild(no);
+    var qt = document.createElement("span");
+    qt.textContent = item.q;
+    label.appendChild(qt);
+    var mark = document.createElement("span");
+    mark.className = "done-mark";
+    mark.textContent = "✓ 已答";
+    label.appendChild(mark);
+    it.appendChild(label);
+    it.appendChild(mkChips(item.q, item.options));
+    grid.appendChild(it);
   });
-  box.appendChild(skipAll);
+
+  /* 跳过按钮状态：已有作答时恢复可点，避免「已跳过」与答案并存 */
+  var skipAllBtn = document.getElementById("inquiry-skip-all");
+  if (n > 0) { skipAllBtn.disabled = false; skipAllBtn.textContent = "全部跳过（不答）"; }
 }
+
+document.getElementById("inquiry-back").addEventListener("click", function () {
+  if (cur === 7) { cur = 6; render(); }
+});
+document.getElementById("inquiry-skip-all").addEventListener("click", function () {
+  inquiryAnswered = true;
+  this.disabled = true;
+  this.textContent = "✓ 已跳过问诊";
+  updateNav();
+});
 
 function updateNav() {
   document.getElementById("btn-prev").disabled = cur === 0;
