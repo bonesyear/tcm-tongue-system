@@ -470,12 +470,36 @@ def validate_candidate(raw: dict, workdir: str):
 
 
 def backup_file(filepath: str, backup_dir: str) -> str:
-    """把 filepath 复制到 backup_dir（原名 + 时间戳 .bak），返回备份路径。"""
+    """把 filepath 复制到 backup_dir（原名 + 时间戳 .bak），返回备份路径。
+    时间戳到微秒——同秒连续两次备份不得互相覆盖（首份备份 = 原始档，
+    恢复功能依赖其存活）。"""
     os.makedirs(backup_dir, exist_ok=True)
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     backup = os.path.join(backup_dir, f"{os.path.basename(filepath)}.{stamp}.bak")
     shutil.copyfile(filepath, backup)
     return backup
+
+
+def restore_original(daily_dir: str, backup_dir: str, date_str: str) -> dict:
+    """恢复为首次修正前的原始记录（LLM 原始输出）。
+
+    最早一份备份 = 第一次修正时备份的原始档。恢复前先把当前状态备份
+    （恢复本身也可再撤销）。无备份（从未修正过）返回错误。
+    """
+    filepath = _select_daily_file(daily_dir, date_str)
+    if not filepath:
+        return {"ok": False, "error": f"{date_str} 无记录"}
+    name = os.path.basename(filepath)
+    candidates = [b for b in glob.glob(os.path.join(backup_dir, f"{name}.*.bak"))
+                  if re.search(r"\.\d{8}-\d{6}(-\d+)?\.bak$", b)]
+    if not candidates:
+        return {"ok": False, "error": "无可用备份（该记录未被修正过）"}
+    oldest = min(candidates)  # 文件名含时间戳，字典序 = 时间序
+    safety = backup_file(filepath, backup_dir)
+    shutil.copyfile(oldest, filepath)
+    return {"ok": True,
+            "restored_from": os.path.basename(oldest),
+            "safety_backup": os.path.basename(safety)}
 
 
 def list_dates(daily_dir: str):

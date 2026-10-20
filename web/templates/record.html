@@ -74,6 +74,10 @@
       <div class="scorebar"><i class="{{ r.total_sev }}" style="width:{{ (r.total / 60 * 100) | round(1) }}%"></i></div>
     </div>
     <button class="btn btn-ghost" id="edit-toggle" title="显示/隐藏全部修正入口（触屏用）">✎ 修正观察值</button>
+    {% if r.corrected %}
+    <button class="btn btn-ghost" id="restore-btn"
+            title="放弃全部人工修正，恢复为识图模型最初输出的记录（当前状态会先自动备份）">↺ 恢复数据</button>
+    {% endif %}
   </div>
 </div>
 
@@ -239,6 +243,23 @@
   toggle.addEventListener("click", function () {
     document.body.classList.toggle("show-edits");
   });
+
+  var restoreBtn = document.getElementById("restore-btn");
+  if (restoreBtn) {
+    restoreBtn.addEventListener("click", async function () {
+      if (!confirm("放弃全部人工修正，恢复为识图模型最初输出的记录？\n（当前状态会先自动备份，可再撤销）")) return;
+      restoreBtn.disabled = true;
+      try {
+        var resp = await fetch("/record/" + RECORD_DATE + "/restore", {method: "POST"});
+        var data = await resp.json();
+        if (data.ok) { location.reload(); }
+        else { alertBox("恢复失败：" + (data.error || "未知错误"), true); }
+      } catch (e) {
+        alertBox("恢复失败：" + e, true);
+      }
+      restoreBtn.disabled = false;
+    });
+  }
 
   function alertBox(text, danger) {
     var box = document.getElementById("correction-alert");
