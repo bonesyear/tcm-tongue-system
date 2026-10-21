@@ -149,10 +149,12 @@ def test_report_contract_writes_structured_and_diet(client, data_root,
 
     html = client.get("/record/2026-06-25").get_data(as_text=True)
     assert "饮食建议" in html and "山药" in html
-    assert "此为药材，非日常食材" in html  # 药材层警示
     assert "忌口" in html and "生冷" in html
     assert "太阴病" in html  # 第一张卡的结构化六经
-    # 方剂块已从第一张卡移除（完整报告里的方剂只留在 markdown 卡）
+    # 四证 / 药食同源药材层 / 方剂块均不在第一张卡（细节只在完整报告卡）；
+    # 数据仍存档（上方 asserts），只是不渲染
+    assert "水证 · 有" not in html
+    assert "此为药材，非日常食材" not in html
     assert "方义：" not in html
     assert 'class="herbs"' not in html
 
