@@ -79,6 +79,19 @@
   .dose-slip .herb { border: 1px solid var(--line); }
   .dose-slip .herb span { color: var(--cinnabar-deep); font-weight: 600; }
   .dose-slip-warn { margin-top: 10px; font-size: 12.5px; color: var(--ink-3); line-height: 1.7; }
+  /* 煎服法：与剂量笺同族嵌条，紧随剂量笺之后；正文按句拆为序号步骤 */
+  .decoct-slip { margin-top: 8px; }
+  .decoct-steps { list-style: none; counter-reset: step; margin: 8px 0 0; padding: 0; }
+  .decoct-steps li {
+    counter-increment: step; position: relative; padding-left: 26px;
+    margin: 5px 0; font-size: 13px; color: var(--ink-2); line-height: 1.7;
+  }
+  .decoct-steps li::before {
+    content: counter(step); position: absolute; left: 0; top: 2px;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--cinnabar-tint); color: var(--cinnabar-deep);
+    font-size: 11px; line-height: 17px; text-align: center;
+  }
   .diet-table { border-collapse: collapse; margin: 8px 0 4px; font-size: 13.5px; width: 100%; }
   .diet-table th, .diet-table td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
   .diet-table th { background: var(--card-sunken); font-family: var(--font-serif); }
@@ -695,6 +708,36 @@
   var key = doseLi.closest(".md-key");
   doseLi.remove();
   if (key) { key.appendChild(slip); }
+
+  /* 煎服法升格为同族嵌条并紧随剂量笺（契约：- **煎服法**：…，
+     正文按句号拆句为序号步骤；解析失败保留原文字条目） */
+  var decoctLi = null;
+  slot.querySelectorAll(".md-key li").forEach(function (li) {
+    if (!decoctLi && /^\s*煎服法/.test(li.textContent)) decoctLi = li;
+  });
+  if (decoctLi) {
+    var dm = decoctLi.textContent.trim().match(/^煎服法[：:](.+)$/);
+    if (dm) {
+      var dSlip = document.createElement("div");
+      dSlip.className = "dose-slip decoct-slip";
+      var dh = document.createElement("div");
+      dh.className = "dose-slip-h";
+      dh.textContent = "煎服法";
+      dSlip.appendChild(dh);
+      var ol = document.createElement("ol");
+      ol.className = "decoct-steps";
+      dm[1].split("。").forEach(function (s) {
+        s = s.trim();
+        if (!s) return;
+        var stepLi = document.createElement("li");
+        stepLi.textContent = s;
+        ol.appendChild(stepLi);
+      });
+      dSlip.appendChild(ol);
+      decoctLi.remove();
+      slip.after(dSlip);
+    }
+  }
 })();
 </script>
 
