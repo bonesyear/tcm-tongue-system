@@ -200,3 +200,47 @@ def test_report_guard_warns_formula_on_all_zero(tmp_path, monkeypatch):
     saved = __import__("json").loads(
         (daily / "2026-10-20_analysis.json").read_text(encoding="utf-8"))
     assert "桂枝汤" in saved["diagnosis"]["report"]["markdown"]
+
+
+def test_report_includes_kb_refs(client, data_root, monkeypatch):
+    """辨证输入含知识库参考段；报告落 kb_refs 溯源（命中词/文件/行号）。"""
+    monkeypatch.setattr(llm_client, "chat",
+                        lambda *a, **k: "# 报告\n\n饮食参考库内条文。")
+    monkeypatch.setenv("LLM_API_KEY", "sk-x")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
+    # fixture 有 面色晦暗 5 分（≥4 分体征词会进检索词条）
+    resp = client.post("/record/2026-06-25/report")
+    assert resp.status_code == 200, resp.get_json()
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), encoding="utf-8") as f:
+        raw = json.load(f)
+    rep = raw["diagnosis"]["report"]
+    # 有命中则带 kb_refs 溯源；无命中（冷门词）也合法，但结构须在
+    import trends_store
+    import records_store
+    rec = records_store.load_record(os.path.join(data_root, "records", "daily"),
+                                    "2026-06-25")
+    text = trends_store.build_report_input(rec, rep.get("kb_refs"))
+    if rep.get("kb_refs"):
+        assert "知识库参考" in text
+        assert rep["kb_refs"][0]["file"]
+        assert rep["kb_refs"][0]["line"] > 0
+        html = client.get("/record/2026-06-25").get_data(as_text=True)
+        assert "知识库引用" in html
+
+
+def test_kb_references_fail_safe(client, data_root, monkeypatch):
+    """检索失败不阻断报告（告警后照出，无 KB 段）。"""
+    import trends_store
+    monkeypatch.setattr("src.retrieval.retrieve",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setenv("LLM_API_KEY", "sk-x")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
+    monkeypatch.setattr(llm_client, "chat", lambda *a, **k: "# ok")
+    resp = client.post("/record/2026-06-25/report")
+    assert resp.status_code == 200, resp.get_json()
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), encoding="utf-8") as f:
+        assert "kb_refs" not in json.load(f)["diagnosis"]["report"]

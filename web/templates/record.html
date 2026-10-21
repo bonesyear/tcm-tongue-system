@@ -245,6 +245,15 @@
     <span class="faint" style="font-size:12px;">{{ report.generated_at }}</span>
   </div>
   <div class="mdreport">{{ report.markdown | markdown | safe }}</div>
+  {% if report.kb_refs %}
+  <hr class="divider">
+  <div class="faint" style="font-size:12px; letter-spacing:.06em; margin-bottom:6px;">知识库引用（食疗/方义建议的库内出处）</div>
+  <div class="fields">
+    {% for ref in report.kb_refs %}
+    <div class="field-row"><span class="k">{{ ref.file }}:{{ ref.line }}</span><span class="v faint" style="font-size:12.5px;">「{{ ref.excerpt[:60] }}」（命中：{{ ref.term }}）</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 
