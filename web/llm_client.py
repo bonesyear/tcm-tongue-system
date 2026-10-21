@@ -137,8 +137,11 @@ def chat(user: str, system: str, model: str, base_url: str, api_key: str,
         raise RuntimeError(f"LLM API 响应缺少 choices: {str(data)[:200]}")
     content = (choices[0].get("message", {}) or {}).get("content") or ""
     if choices[0].get("finish_reason") == "length":
-        print(f"{WARN_PREFIX} 响应 finish_reason='length'：输出可能被截断，"
-              f"建议提高 max_tokens", file=sys.stderr)
+        # 截断输出不可用（辨证报告写一半等于没写）——失败要可诊断，不静默存档
+        raise RuntimeError(
+            "LLM 输出被截断（finish_reason=length）：报告不完整。"
+            "请提高 max_tokens（当前 %d，建议 ≥8000；思考型模型的"
+            "推理过程也占该额度）" % max_tokens)
     if not content.strip():
         raise RuntimeError("LLM 返回空内容（思考型模型可能吃满 max_tokens 额度）")
     return content

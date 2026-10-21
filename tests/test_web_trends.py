@@ -244,3 +244,29 @@ def test_kb_references_fail_safe(client, data_root, monkeypatch):
     with open(os.path.join(data_root, "records", "daily",
                            "2026-06-25_analysis.json"), encoding="utf-8") as f:
         assert "kb_refs" not in json.load(f)["diagnosis"]["report"]
+
+
+def test_chat_truncation_fails_loudly(monkeypatch):
+    """截断即失败（可诊断不静默）：finish_reason=length → RuntimeError 指明提额。"""
+    class TruncatedResp:
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": "写了一半"},
+                                            "finish_reason": "length"}]}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(llm_client.urllib.request, "urlopen",
+                        lambda req, timeout=None: TruncatedResp())
+    with pytest.raises(RuntimeError) as e:
+        llm_client.chat("hi", "", "m", "https://x.com/v1/chat/completions", "sk-x")
+    assert "截断" in str(e.value)
+    assert "max_tokens" in str(e.value)
+
+
+def test_mdmini_blockquote_and_hr_and_h4():
+    """mdmini 补齐：引用块/分割线/四级标题（LLM 报告常见结构）。"""
+    html = mdmini.render("> **声明**：只有望诊\n\n---\n\n#### 小节标题\n")
+    assert "<blockquote" in html and "只有望诊" in html
+    assert "<hr" in html
+    assert "<h5>" in html or "<h6>" in html  # #### → h5 以上
+    assert "####" not in html

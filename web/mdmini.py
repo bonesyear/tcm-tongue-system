@@ -46,11 +46,27 @@ def render(md: str) -> str:
                                + "</tr>" for r in body)
                            + "</tbody></table>")
             continue
-        m = re.match(r"^(#{1,3})\s+(.*)$", line)
+        m = re.match(r"^(#{1,6})\s+(.*)$", line)
         if m:
-            level = len(m.group(1)) + 2  # # → h3（页内层级从 h3 起）
+            level = min(len(m.group(1)) + 2, 6)  # # → h3 … #### → h6（页内层级）
             out.append(f"<h{level}>{_inline(html.escape(m.group(2)))}</h{level}>")
             i += 1
+            continue
+        if re.match(r"^\s*(---+|\*\*\*+)\s*$", line):
+            out.append('<hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">')
+            i += 1
+            continue
+        if line.lstrip().startswith(">"):
+            # 引用块：连续 > 行合并
+            block = []
+            while i < len(lines) and lines[i].lstrip().startswith(">"):
+                block.append(re.sub(r"^\s*>\s?", "", lines[i].rstrip()))
+                i += 1
+            inner = " ".join(b for b in block if b)
+            out.append(f'<blockquote style="margin:10px 0; padding:8px 14px; '
+                       f'border-left:4px solid var(--cinnabar); '
+                       f'background:var(--card-sunken); border-radius:8px;">'
+                       f'{_inline(html.escape(inner))}</blockquote>')
             continue
         if re.match(r"^[-*]\s+", line):
             items = []
