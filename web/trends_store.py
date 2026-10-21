@@ -111,8 +111,11 @@ def _all_evidence_values(rec):
             yield str(v.get("answer", ""))
 
 
-def build_report_input(rec) -> str:
-    """辨证 LLM 的用户输入：观察值 + 评分 + 危险信号 + 置信度。"""
+def build_report_input(rec, kb_refs: list | None = None) -> str:
+    """辨证 LLM 的用户输入：观察值 + 评分 + 危险信号 + 置信度 + 问诊 + 知识库参考。
+
+    kb_refs：_kb_references() 的命中条文，随输入一并喂给 LLM 并要求标注来源
+    （食疗/方义建议须有库内出处，防自由发挥违背经方口径）。"""
     from src.scoring import score, score_indicators
     lines = [f"日期：{rec.date}", ""]
     for dim in DIMENSIONS:
@@ -160,7 +163,54 @@ def build_report_input(rec) -> str:
                  f"（含手足温凉；未答项 = 未提供，不得推测）")
     for q, v in answered.items():
         lines.append(f"  - {q} {v['answer']}")
+    if kb_refs:
+        lines.append("")
+        lines.append("知识库参考（以下条文供引用；调理/饮食/方义建议须有库内出处，"
+                     "引用处在报告中标注来源文件与行号）：")
+        for h in kb_refs:
+            lines.append(f"  - 「{h['excerpt']}」（{h['file']}:{h['line']}，"
+                         f"命中词：{h['term']}）")
     return "\n".join(lines)
+
+
+def _kb_references(rec, max_hits: int = 8) -> list:
+    """按当日证候检索知识库，返回 [{file, line, excerpt, term}]。
+
+    词条来源：≥4 分的体征措辞 + 已触发红线中文名 + 「忌口」锚词
+    （锚词保证食疗表总能被捞到）。检索失败不阻断报告（stderr 告警）。
+    """
+    from src.scoring import score_indicators
+    terms = ["忌口"]  # 锚词置顶：保证食疗表不被体征词挤出名额
+    for dim in DIMENSIONS:
+        obs = rec.get_observation(dim)
+        if not dim.is_covered(obs) or records_store._is_declared_normal(obs):
+            continue
+        for ind, v in score_indicators(dim, obs).items():
+            if v >= 4 and obs.get(ind):
+                terms.append(obs[ind])
+    for k in rec.get_triggered_danger_flags():
+        terms.append(records_store.DANGER_FLAGS.get(k, {}).get("name", k))
+
+    if not terms:
+        return []
+
+    from src.retrieval import retrieve
+    hits = {}
+    try:
+        for term in terms:
+            r = retrieve(term, context_lines=1)
+            # 每词最多取 2 条：防单一高频词（如「红赤」）霸榜挤掉食疗锚词
+            for h in r.get("results", [])[:2]:
+                fkey = (h["file"], h["line"])
+                if fkey not in hits:
+                    hits[fkey] = {"file": h["file"], "line": h["line"],
+                                  "excerpt": h["content"].strip(), "term": term}
+    except Exception as e:  # 检索是增强不是门槛：失败只告警，报告照出
+        import sys
+        print(f"[web][trends][warn] 知识库检索失败（{e!r}），本次报告不含 KB 引用",
+              file=sys.stderr)
+        return []
+    return list(hits.values())[:max_hits]
 
 
 def _template_version(template_path: str) -> str:
@@ -194,8 +244,9 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         system_prompt = f.read()
 
     model, base_url, api_key = llm_cfg()
+    kb_refs = _kb_references(rec)
     try:
-        md = llm_client.chat(build_report_input(rec), system_prompt,
+        md = llm_client.chat(build_report_input(rec, kb_refs), system_prompt,
                              model, base_url, api_key)
     except RuntimeError as e:
         return {"ok": False, "error": str(e)}
@@ -225,6 +276,9 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "prompt_template_version": _template_version(template_path),
     }
+    if kb_refs:
+        # 知识库引用溯源：报告食疗/方义建议的库内出处（文件+行号+命中词）
+        diag["report"]["kb_refs"] = kb_refs
     errors, _ = records_store.validate_candidate(rec.raw, daily_dir)
     blocking = [e for e in errors if e.startswith("❌")]
     if blocking:
