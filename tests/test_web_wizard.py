@@ -268,7 +268,10 @@ def test_detect_danger_negation_guard():
 
 def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
     """辨证输入：问诊答案全量进入，分母固定 16，未答项不出现。"""
-    monkeypatch.setattr(llm_client, "chat", lambda *a, **k: "# ok")
+    monkeypatch.setattr(llm_client, "chat",
+                        lambda *a, **k: json.dumps(
+                            {"structured": {}, "markdown": "# ok"},
+                            ensure_ascii=False))
     monkeypatch.setenv("LLM_API_KEY", "sk-x")
     monkeypatch.setenv("LLM_MODEL", "m")
     monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
