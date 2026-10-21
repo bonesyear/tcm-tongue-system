@@ -68,6 +68,7 @@ def test_record_detail_renders_engine_scores(demo_client):
     assert "均未触发" in html              # danger_flags 未触发横幅
     assert "六经归属" in html              # 辨证报告卡：结构化结论仍在
     assert "示例方" not in html            # 方剂块已移出第一张卡（只留完整报告）
+    assert ">起居情志<" not in html        # 老记录无 lifestyle 字段：不显示、不回写伪造
     assert "参考项" in html                # 点刺/掌温降级字段
     assert "偏胖大" in html                # 观察值原文
 
