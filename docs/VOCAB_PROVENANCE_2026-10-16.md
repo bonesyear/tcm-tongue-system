@@ -136,13 +136,30 @@
 | edema 水肿 | 全身浮肿 / 凹陷 | 【诊 p088】阳水「遍及全身为特征」；凹陷【验】 |
 | dryness 干燥 | 龟裂 / 粗糙 | 【诊 p088】「干枯无华，甚至皲裂、脱屑」 |
 
+## 七、煎服法（knowledge_base/formulas/decoction-methods.md，2026-10-21 新增）
+
+| 条目 | 出处 |
+|---|---|
+| 常规汤剂范式（以水 X 升煮取 X 升、去滓温服） | 【源 L11631】葛根汤、【源 L17231】黄芪桂枝五物汤 |
+| 先煎（麻黄先煮去上沫） | 【源 L4381/L11123】麻黄汤 |
+| 渍泡（麻沸汤渍之，重取气轻忽味） | 【源 L5664/L5681】大黄黄连泻心汤 |
+| 去滓再煎 | 【源 L6714】小柴胡汤 |
+| 烊化/内化（内胶饴微火煎取） | 【源 L17612】大建中汤 |
+| 汗法将息（啜粥助药力/温覆取微汗/中病即止） | 【源 L806/L11726】桂枝汤 |
+| 非汗法不啜粥 | 【源 L4381】麻黄汤「不须啜粥」 |
+| 服饵法（汤粥交替、将息四体） | 【源 L1066】《千金》服饵 |
+| 散剂酒和（当归芍药散改汤剂之剂型换算） | 【源 L18257】 |
+| 现代操作层（浸泡 20–30 分钟/水过药面/二煎/日二服/忌铁铝）、后下通例 | 【验】现代药房通用惯例，非原文 |
+
 ## 复核方式
 
 ```bash
-# 《经方探源》锚点（行号可能漂移，以词复核）
-grep -n "唇甲暗黄或淡白" knowledge_base/jingfang_tanyuan_full.md   # → L5565
-grep -n "下睑淡白" knowledge_base/jingfang_tanyuan_full.md         # → L2763
-grep -n "肌肤甲错" knowledge_base/jingfang_tanyuan_full.md         # → L2763/L11650 等
-grep -n "舌强不能语" knowledge_base/jingfang_tanyuan_full.md       # → L709
+# 《经方探源》锚点（行号可能漂移，以词复核；原书 v1.8.7 起在 _books/，gitignored）
+grep -n "唇甲暗黄或淡白" _books/jingfang_tanyuan_full.md   # → L5565
+grep -n "下睑淡白" _books/jingfang_tanyuan_full.md         # → L2763
+grep -n "肌肤甲错" _books/jingfang_tanyuan_full.md         # → L2763/L11650 等
+grep -n "舌强不能语" _books/jingfang_tanyuan_full.md       # → L709
+grep -n "杵为散，取方寸匕，酒和" _books/jingfang_tanyuan_full.md  # → L18257（当归芍药散）
+grep -n "麻沸汤二升渍之" _books/jingfang_tanyuan_full.md   # → L5664（渍泡法）
 # 《中医诊断学》页码：PDF 渲染对应页图片肉眼复核（文本层乱码不可用）
 ```
