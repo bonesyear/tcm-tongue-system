@@ -2,13 +2,22 @@
 {% block title %}{{ r.date }} · 六维望诊{% endblock %}
 {% block content %}
 <style>
-  /* ---- 详情页私有（与 web/design/pages/record.html 一致） ---- */
-  #dims { align-items: start; }
-  /* 宽屏六维卡改多栏瀑布：舌诊体量远大于其他维度，网格同行对齐
-     会在短卡下留大片空白；多栏按内容自动平衡两列，卡片不跨列截断 */
+  /* ---- 详情页私有 ---- */
+  #dims { display: block; }
+  #dims .dim-card { margin-bottom: var(--gap); }
+  /* 窄屏：带/堆叠包装器透明，六卡单列直下 */
+  .dims-band, .dims-stack { display: contents; }
+  /* 宽屏两带两列：带1 = 舌诊 | [目/耳/手] 堆叠，带2 = 头面诊 | 皮肤诊；
+     网格项默认 stretch 到带高，堆叠侧末卡 flex:1 拉伸——两带内卡片
+     底边强制对齐（舌诊 vs 手诊、头面诊 vs 皮肤诊），任何记录下都规整 */
   @media (min-width: 761px) {
-    #dims { display: block; column-count: 2; column-gap: var(--gap); }
-    #dims .dim-card { break-inside: avoid; margin-bottom: var(--gap); }
+    .dims-band {
+      display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap);
+      align-items: stretch; margin-bottom: var(--gap);
+    }
+    .dims-band .dim-card { margin-bottom: 0; }
+    .dims-stack { display: flex; flex-direction: column; gap: var(--gap); }
+    .dims-stack > .dim-card:last-child { flex: 1; }
   }
   .dim-card h3 { font-size: 17px; letter-spacing: 0.06em; }
   .group-name {
@@ -193,8 +202,7 @@
   淡黄底、字段名带<i class="rv" style="margin:0 3px 1px;"></i>的为识图易抖动或危重鉴别相关项，建议对照下方原图肉眼复核（鼠标悬停圆点可见具体原因）。
 </p>
 
-<div class="grid cols-2" id="dims">
-  {% for dim in r.dims %}
+{% macro dim_card(dim) %}
   <section class="card dim-card">
     <div class="row">
       <h3>{{ dim.name }}</h3>
@@ -240,7 +248,23 @@
     </div>
     {% endfor %}
   </section>
-  {% endfor %}
+{% endmacro %}
+
+{# 两带布局：带1 = 舌诊 | [目/耳/手]，带2 = 头面诊 | 皮肤诊。
+   带内底边对齐（舌↔手、头面↔皮肤），顺序经主人裁决（2026-10-21） #}
+<div id="dims">
+  <div class="dims-band">
+    {{ dim_card(r.dims[0]) }}
+    <div class="dims-stack">
+      {{ dim_card(r.dims[2]) }}
+      {{ dim_card(r.dims[3]) }}
+      {{ dim_card(r.dims[4]) }}
+    </div>
+  </div>
+  <div class="dims-band">
+    {{ dim_card(r.dims[1]) }}
+    {{ dim_card(r.dims[5]) }}
+  </div>
 </div>
 
 <div class="card">
