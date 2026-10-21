@@ -15,7 +15,8 @@ knowledge_base/
 │   ├── constitution-types.md                    ← 九种体质分类与判定标准
 │   └── tongue-diagnostics-textbook.md           ← 舌诊知识拆解（《中医诊断学》整理笔记）
 ├── formulas/
-│   └── formula-system.md                         ← 方机体系/治法法则/药证/选方逻辑
+│   ├── formula-system.md                         ← 方机体系/治法法则/药证/选方逻辑
+│   └── decoction-methods.md                      ← 煎服法纲要（常规煎法/特殊煎法四类/将息法/剂型换算）
 ├── diet-lifestyle/
 │   └── diet-therapy.md                          ← 食疗方案（四气五味+忌口）
 ```
