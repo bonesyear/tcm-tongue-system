@@ -180,7 +180,7 @@ def _kb_references(rec, max_hits: int = 8) -> list:
     （锚词保证食疗表总能被捞到）。检索失败不阻断报告（stderr 告警）。
     """
     from src.scoring import score_indicators
-    terms = ["忌口"]  # 锚词置顶：保证食疗表不被体征词挤出名额
+    terms = ["忌口", "适宜", "食疗"]  # 锚词置顶：食疗宜忌表总能被捞到
     for dim in DIMENSIONS:
         obs = rec.get_observation(dim)
         if not dim.is_covered(obs) or records_store._is_declared_normal(obs):
