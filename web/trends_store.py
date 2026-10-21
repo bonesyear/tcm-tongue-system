@@ -247,7 +247,7 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     kb_refs = _kb_references(rec)
     # 辨证报告长输出：默认 8000（思考型模型的推理也占额度；截断即失败，见
     # llm_client.chat 的 finish_reason=length 处理）
-    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "") or 8000)
+    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "") or 16000)
     try:
         md = llm_client.chat(build_report_input(rec, kb_refs), system_prompt,
                              model, base_url, api_key, max_tokens=max_tokens)
