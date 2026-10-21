@@ -654,7 +654,8 @@
   var pairs = [];
   var ok = pairsPart.length > 0;
   pairsPart.split("、").forEach(function (seg) {
-    var mm = seg.trim().match(/^(\S+?)\s+([\d.]+g)$/);
+    /* 药名与剂量间空格有无皆兼容（LLM 实际输出两种都出现过） */
+    var mm = seg.trim().match(/^(\S+?)\s*([\d.]+g)$/);
     if (mm) { pairs.push({ n: mm[1], d: mm[2] }); } else { ok = false; }
   });
   if (!ok || pairs.length < 2) return;
