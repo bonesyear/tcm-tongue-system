@@ -61,6 +61,24 @@
   .herb { display: flex; justify-content: space-between; background: var(--card-sunken); border-radius: 8px; padding: 6px 12px; font-size: 13.5px; }
   .herb b { font-family: var(--font-serif); }
   .herb span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  /* 剂量建议处方笺：方剂建议块内的强调带（页尾 JS 从「剂量建议」条目解析生成，
+     解析失败保留原文）；纸底嵌条 + 药签网格，剂量数字朱砂加重 */
+  .dose-slip {
+    margin: 12px 0 2px; padding: 10px 14px 12px;
+    background: var(--paper); border: 1px solid var(--line-strong);
+    border-radius: var(--radius-inner);
+  }
+  .dose-slip-h {
+    font-family: var(--font-serif); font-size: 14.5px; letter-spacing: 0.08em;
+    color: var(--cinnabar-deep);
+  }
+  .dose-slip-sub {
+    font-family: var(--font-sans); font-size: 12px; letter-spacing: 0;
+    color: var(--ink-3); margin-left: 8px;
+  }
+  .dose-slip .herb { border: 1px solid var(--line); }
+  .dose-slip .herb span { color: var(--cinnabar-deep); font-weight: 600; }
+  .dose-slip-warn { margin-top: 10px; font-size: 12.5px; color: var(--ink-3); line-height: 1.7; }
   .diet-table { border-collapse: collapse; margin: 8px 0 4px; font-size: 13.5px; width: 100%; }
   .diet-table th, .diet-table td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
   .diet-table th { background: var(--card-sunken); font-family: var(--font-serif); }
@@ -68,13 +86,14 @@
   /* 窄屏：表在卡内局部横向滚动，不把页面顶宽 */
   .table-scroll { overflow-x: auto; margin: 8px 0 4px; }
   .table-scroll .diet-table { margin: 0; }
-  /* 窄屏防断字：五列表的名称/性味/功效/分量四个短列不换行，长文列（备注/注意）
-     给一个最小阅读宽度按 10 字左右折行；整表超出卡宽时在 .table-scroll 内局部横滚，
-     不挤压成逐字断行。忌口表首列是长描述短语，不锁换行，只给定宽保持两列比例 */
+  /* 窄屏防断字：名称/性味两个短列不换行；功效/分量保底最小宽度后允许折行
+     （功效约 6 字、分量约 7 字一道，长分量句如「每周 2–3 次」在空隙处自然折行）；
+     长文列（备注/注意）保底 10em。整表超出卡宽时在 .table-scroll 内局部横滚，
+     不顶宽页面。忌口表首列是长描述短语，不锁换行，只给定宽保持两列比例 */
   .diet-table:not(.avoid-table) th:nth-child(1), .diet-table:not(.avoid-table) td:nth-child(1),
-  .diet-table:not(.avoid-table) th:nth-child(2), .diet-table:not(.avoid-table) td:nth-child(2),
-  .diet-table:not(.avoid-table) th:nth-child(3), .diet-table:not(.avoid-table) td:nth-child(3),
-  .diet-table:not(.avoid-table) th:nth-child(4), .diet-table:not(.avoid-table) td:nth-child(4) { white-space: nowrap; }
+  .diet-table:not(.avoid-table) th:nth-child(2), .diet-table:not(.avoid-table) td:nth-child(2) { white-space: nowrap; }
+  .diet-table:not(.avoid-table) th:nth-child(3), .diet-table:not(.avoid-table) td:nth-child(3) { min-width: 6em; }
+  .diet-table:not(.avoid-table) th:nth-child(4), .diet-table:not(.avoid-table) td:nth-child(4) { min-width: 7em; }
   .diet-table:not(.avoid-table) th:nth-child(5), .diet-table:not(.avoid-table) td:nth-child(5) { min-width: 10em; }
   .avoid-table th:nth-child(1), .avoid-table td:nth-child(1) { width: 42%; }
   @media (max-width: 480px) {
@@ -149,7 +168,24 @@
   }
   .kb-refs[open] summary::before { transform: rotate(90deg); }
   .kb-refs summary .n { color: var(--ink-3); font-size: 12px; }
-  .kb-refs .fields { margin-top: 8px; }
+  /* 引用条目：来源徽标（文件:行号）+ 命中词胶囊 + 清理后的引文 */
+  .kb-list { list-style: none; margin: 10px 0 2px; padding: 0; }
+  .kb-item { padding: 9px 0 10px; border-bottom: 1px dashed var(--line); }
+  .kb-item:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .kb-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .kb-src {
+    font-family: "Consolas", "Courier New", monospace; font-size: 11.5px;
+    color: var(--ink-3); background: var(--paper); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 7px;
+  }
+  .kb-src i { font-style: normal; color: var(--cinnabar); }
+  .kb-term {
+    font-size: 11px; color: var(--cinnabar-deep); background: var(--cinnabar-tint);
+    border: 1px solid var(--cinnabar); border-radius: 999px; padding: 0 8px; line-height: 1.8;
+  }
+  .kb-term::before { content: "命中 "; color: var(--ink-3); }
+  .kb-ex { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.75; }
+  .kb-ex strong { color: var(--cinnabar-deep); font-weight: 600; }
 </style>
 
 <p style="margin: 0;"><a href="/">‹ 返回记录列表</a></p>
@@ -418,11 +454,17 @@
   {% if report.kb_refs %}
   <details class="kb-refs">
     <summary>知识库引用出处<span class="n">{{ report.kb_refs | length }} 条 · 食疗/方义建议的库内来源</span></summary>
-    <div class="fields">
+    <ol class="kb-list">
       {% for ref in report.kb_refs %}
-      <div class="field-row"><span class="k">{{ ref.file }}:{{ ref.line }}</span><span class="v faint" style="font-size:12.5px;">「{{ ref.excerpt[:60] }}」（命中：{{ ref.term }}）</span></div>
+      <li class="kb-item">
+        <div class="kb-meta">
+          <span class="kb-src">{{ ref.file }}<i>:{{ ref.line }}</i></span>
+          <span class="kb-term">{{ ref.term }}</span>
+        </div>
+        <p class="kb-ex">{{ ref.excerpt[:60] }}{% if ref.excerpt | length > 60 %}…{% endif %}</p>
+      </li>
       {% endfor %}
-    </div>
+    </ol>
   </details>
   {% endif %}
 </div>
@@ -576,7 +618,10 @@
 </script>
 
 <script>
-/* 方剂建议块迁入「方药与调护」区置顶（纯展示移位，不动记录内容）。 */
+/* 方剂建议块迁入「方药与调护」区置顶（纯展示移位，不动记录内容）；
+   再把「剂量建议」条目升格为处方笺（药名+剂量药签网格 + 警示行）。
+   剂量行格式由 prompt 模板锁定（剂量建议（…）：药名 Xg、药名 Xg。⚠ …），
+   解析失败时保留原文字条目，不破坏页面。 */
 (function () {
   var md = document.querySelector(".mdreport");
   var slot = document.getElementById("formula-slot");
@@ -593,6 +638,89 @@
       wrap.appendChild(wrap.nextElementSibling);
     }
     slot.appendChild(wrap);
+  });
+
+  var doseLi = null;
+  slot.querySelectorAll(".md-key li").forEach(function (li) {
+    if (!doseLi && /^\s*剂量建议/.test(li.textContent)) doseLi = li;
+  });
+  if (!doseLi) return;
+  var m = doseLi.textContent.trim().match(/^剂量建议(?:（([^）]*)）)?[：:](.+)$/);
+  if (!m) return;
+  var rest = m[2];
+  var dot = rest.indexOf("。");
+  var pairsPart = (dot >= 0 ? rest.slice(0, dot) : rest).trim();
+  var warn = dot >= 0 ? rest.slice(dot + 1).trim() : "";
+  var pairs = [];
+  var ok = pairsPart.length > 0;
+  pairsPart.split("、").forEach(function (seg) {
+    var mm = seg.trim().match(/^(\S+?)\s+([\d.]+g)$/);
+    if (mm) { pairs.push({ n: mm[1], d: mm[2] }); } else { ok = false; }
+  });
+  if (!ok || pairs.length < 2) return;
+
+  var slip = document.createElement("div");
+  slip.className = "dose-slip";
+  var head = document.createElement("div");
+  head.className = "dose-slip-h";
+  head.textContent = "剂量建议";
+  if (m[1]) {
+    var sub = document.createElement("span");
+    sub.className = "dose-slip-sub";
+    sub.textContent = m[1].replace(/，/g, " · ");
+    head.appendChild(sub);
+  }
+  slip.appendChild(head);
+  var grid = document.createElement("div");
+  grid.className = "herbs";
+  pairs.forEach(function (pr) {
+    var chip = document.createElement("div");
+    chip.className = "herb";
+    var b = document.createElement("b");
+    b.textContent = pr.n;
+    var sp = document.createElement("span");
+    sp.textContent = pr.d;
+    chip.appendChild(b);
+    chip.appendChild(sp);
+    grid.appendChild(chip);
+  });
+  slip.appendChild(grid);
+  if (warn) {
+    var w = document.createElement("div");
+    w.className = "dose-slip-warn";
+    w.textContent = warn;
+    slip.appendChild(w);
+  }
+  var key = doseLi.closest(".md-key");
+  doseLi.remove();
+  if (key) { key.appendChild(slip); }
+})();
+</script>
+
+<script>
+/* 知识库引用引文清理：excerpt 是知识库 markdown 原文片段，
+   去掉行首列表/标题/引用符号与表格残留竖线，**强调** 转为 <strong>，
+   再以「」包裹成引文。纯展示清理，不改记录内容。 */
+(function () {
+  document.querySelectorAll(".kb-refs .kb-ex").forEach(function (p) {
+    var t = p.textContent.trim();
+    /* 先配对剥离 **强调**（行首的 ** 不能被前缀清理误伤），再清理符号 */
+    t = t.replace(/^[\s\-#>]+/, "").replace(/^\s*\|\s*/, "").replace(/[\s|]+$/, "");
+    t = t.replace(/\s*\|\s*/g, " · ").trim();
+    var parts = t.split(/\*\*([^*]+)\*\*/g);
+    p.textContent = "";
+    p.appendChild(document.createTextNode("「"));
+    parts.forEach(function (seg, i) {
+      if (!seg) return;
+      if (i % 2 === 1) {
+        var st = document.createElement("strong");
+        st.textContent = seg;
+        p.appendChild(st);
+      } else {
+        p.appendChild(document.createTextNode(seg));
+      }
+    });
+    p.appendChild(document.createTextNode("」"));
   });
 })();
 </script>
