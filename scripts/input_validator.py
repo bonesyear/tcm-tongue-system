@@ -185,6 +185,25 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
             errors.append(
                 f"❌ danger_flags.{name} 应为对象，实际为 {type(flag).__name__}"
             )
+
+    # 探测一致性提示（src/danger.py，2026-10-21 下沉后可得）：
+    # 观察值文本里可探测到红线体征、但 danger_flags 未标记触发 → 提醒
+    # （只告警不改判：探测是初审提示，人工/LLM 写档方拥有最终裁决权）。
+    try:
+        from src.danger import detect_danger
+        from src.dimensions import DIMENSIONS
+        obs_text = {dim.english_name: record.get_observation(dim)
+                    for dim in DIMENSIONS}
+        detected = set(detect_danger(obs_text))
+        triggered = set(record.get_triggered_danger_flags())
+        missing = detected - triggered
+        if missing:
+            warnings.append(
+                f"⚠️ 观察值中可探测到红线体征但未标记触发: "
+                f"{sorted(missing)} —— 请人工复核是漏标还是探测误报"
+            )
+    except Exception:
+        pass  # 探测失败不影响校验主流程（探测是增强，不是门槛）
     return errors, warnings
 
 

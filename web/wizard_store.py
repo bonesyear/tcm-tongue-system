@@ -86,6 +86,7 @@ PART_BY_NAME = {p["part"]: p for p in PARTS}
 # 未收录的键不丢弃：进 <dim>._raw 保留并在 UI 告警（不静默丢数据）。
 OBSERVE_MAP = {
     "舌面": {
+        "危重舌象": ["critical_signs"],  # 红线出口：detect_danger 扫描全部叶子
         "舌质颜色": ["body", "color"], "舌质润燥": ["body", "luster"],
         "舌体.胖瘦": ["body", "shape"], "舌体.齿痕": ["body", "tooth_marks"],
         "舌体.裂纹": ["body", "cracks"], "舌体.点刺": ["body", "prickles"],
@@ -226,77 +227,11 @@ def observe_photo(part: str, img_path: str) -> tuple[dict, list]:
             f"模型可能未遵守「只输出 JSON」约定，请重试或更换模型")
 
 
-# 从观察值文本探测危险信号的保守词表（仅含照片可判且措辞特异的体征；
-# 识图封闭词表外的正常描述不含这些词，「无黄染」等否定式不会命中）。
-# 这是初审提示而非诊断——触发后由用户在拦截弹层里肉眼复核裁决。
-DANGER_PATTERNS = {
-    "daiyang": "面红如妆",
-    "tongue_rigid": "强硬",
-    "tongue_critical": "焦黑",
-    # 镜面舌探测：识图封闭词表只会报「剥落」类，故用「光剥无苔」；
-    # 不以裸「无苔」探测（「局部无苔」是花剥/地图舌，非镜面）
-    "mirror_tongue": "光剥无苔",
-    "acute_jaundice": "黄如橘皮",
-    "flesh_wasted": "大肉已脱",
-    "wind_stroke": "口不能言",
-    "skin_cold": "触之冰冷",
-    "throat_erosion": "狐惑",
-    # 2026-10-16 P1（原著审查）补两条红线探测（均为低特异但值得复核的表述）
-    "yangming_critical": "直视",
-    "collapse_yang": ("冷汗", "绝汗"),
-    # 2026-10-16 教材复查 P1：危重舌象 8 项文本探测（《中医诊断学》p117）
-    "pigkidney_tongue": "猪腰",
-    "sandy_tongue": "砂皮",
-    "litchi_tongue": "干荔",
-    "persimmon_tongue": "火柿",
-    "ochre_tongue": "赭黑",
-    "thin_coatless": "瘦薄无苔",
-    "retracted_tongue": "囊缩",
-    "blue_tongue": "蓝舌",
-}
+# 探测词表与 detect_danger 已下沉至 src/danger.py（2026-10-21 B 批）；
+# re-export 保持既有引用兼容（测试与 records_store/app.py 继续走本模块名）
+from src.danger import DANGER_PATTERNS, detect_danger  # noqa: F401
 
 
-def _leaf_texts(obj):
-    """递归产出对象内所有非空字符串叶子（generator）。
-
-    探测按叶子逐个扫描、否定窗口限制在叶子内部——拼接整串会让窗口
-    吃进前一字段的结尾字（「无汗」+「绝汗」跨字段误抑制红线漏报）。
-    """
-    if isinstance(obj, dict):
-        for v in obj.values():
-            yield from _leaf_texts(v)
-    elif isinstance(obj, list):
-        for v in obj:
-            yield from _leaf_texts(v)
-    elif obj is not None:
-        s = str(obj).strip()
-        if s:
-            yield s
-
-
-def detect_danger(observations: dict) -> list:
-    """扫描观察值文本，返回命中的危险信号键列表（无命中返回 []）。
-
-    带否定守卫（与评分层同原则）：「无苔」不命中「局部无苔」前的「无」，
-    「冷汗」不命中「无冷汗」——匹配位置前 4 字内含否定词即跳过。"""
-    out = []
-    for key, pats in DANGER_PATTERNS.items():
-        for pat in (pats if isinstance(pats, tuple) else (pats,)):
-            hit = False
-            for text in _leaf_texts(observations):
-                idx = text.find(pat)
-                while idx != -1:
-                    window = text[max(0, idx - 4):idx]
-                    if not any(n in window for n in ("无", "不", "未", "没")):
-                        hit = True
-                        break
-                    idx = text.find(pat, idx + 1)
-                if hit:
-                    break
-            if hit:
-                out.append(key)
-                break
-    return out
 
 
 def assemble_record(draft: dict, version: str,

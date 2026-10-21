@@ -359,55 +359,9 @@ DIM_GROUPS = {
     "skin": [("皮肤", ["color", "cuo", "yellow_sweat", "edema", "dryness"])],
 }
 
-# 危险信号字典（键对齐 templates/multi_dim_record_template.json，
-# 中文名对齐 templates/adaptive_analysis_prompt.md §4.5；
-# sign = 体征，拦截弹层与红线横幅展示用。
-# 注明：镜面舌/焦黑苔/舌体短缩「中风先兆」为通用诊断学概念，
-# 非《经方探源》本文（该书「舌强不能语」为中风已病，小续命汤证 L709）
-DANGER_FLAGS = {
-    "daiyang":         {"name": "戴阳证",
-                        "sign": "面红如妆 + 手足厥逆（可兼身反不恶寒、掀衣揭被、脉暴出）",
-                        "note": "真阳欲脱，严禁解表发汗，立即就医（原著救治方向：通脉四逆加猪胆汤，须医师面诊）"},
-    "skin_cold":       {"name": "肤冷脉微", "sign": "皮肤触之冰冷 + 脉微",
-                        "note": "真阳衰竭，立即就医"},
-    "flesh_wasted":    {"name": "大肉已脱", "sign": "大肉已脱 + 大骨陷下",
-                        "note": "精血枯竭，预后不良，建议就医"},
-    "tongue_rigid":    {"name": "舌体强硬", "sign": "舌体短缩强硬 + 言语不利",
-                        "note": "中风先兆（通用诊断学说法），立即就医"},
-    "tongue_critical": {"name": "舌象危重", "sign": "舌质紫暗 + 苔焦黑干裂",
-                        "note": "危重症（通用诊断学说法），立即就医"},
-    "mirror_tongue":   {"name": "镜面舌",   "sign": "舌面光剥无苔（镜面舌）+ 极度消瘦",
-                        "note": "重症消耗（通用诊断学说法），立即就医"},
-    "acute_jaundice":  {"name": "急性黄疸", "sign": "巩膜黄染 + 皮肤黄如橘皮",
-                        "note": "急性肝胆重症，紧急就医"},
-    "wind_stroke":     {"name": "中风重症", "sign": "口不能言 + 身体不收",
-                        "note": "中风重症（风痱），立即就医"},
-    "throat_erosion":  {"name": "狐惑重症",
-                        "sign": "默默欲眠、恶闻食臭、面目乍赤乍黑乍白、蚀喉声嗄",
-                        "note": "狐惑（厥阴本病，原著有甘草泻心汤方向），建议尽快就医"},
-    "yangming_critical": {"name": "阳明危重", "sign": "神昏谵语、循衣摸床、微喘直视",
-                        "note": "阳明病危重证（212条），紧急就医"},
-    "collapse_yang":   {"name": "脱阳前兆", "sign": "神识昏昧 + 冷汗如油",
-                        "note": "真阳外脱前兆，紧急就医"},
-    # 危重舌象 8 项（2026-10-16 教材复查 P1，《中医诊断学》p117 附篇全 10 项，
-    # 镜面舌/舌强语謇已有对应键 mirror_tongue/tongue_rigid，此处补齐其余 8 项）
-    "pigkidney_tongue": {"name": "猪腰舌", "sign": "舌面无苔，如去膜的猪腰",
-                        "note": "胃气将绝，主病危，立即就医"},
-    "sandy_tongue":    {"name": "砂皮舌", "sign": "舌粗糙有刺，如沙鱼皮，或干燥枯裂",
-                        "note": "津液枯竭，病危，立即就医"},
-    "litchi_tongue":   {"name": "干荔舌", "sign": "舌敛束而无津，形如干荔肉",
-                        "note": "热极津枯，病危，立即就医"},
-    "persimmon_tongue": {"name": "火柿舌", "sign": "舌如火柿色，或色紫而干晦如猪肝色",
-                        "note": "内脏败坏，病危，立即就医"},
-    "ochre_tongue":    {"name": "赭黑舌", "sign": "舌质色赭带黑",
-                        "note": "肾阴将绝，病危，立即就医"},
-    "thin_coatless":   {"name": "瘦薄无苔舌", "sign": "舌体瘦小薄嫩，光而无苔",
-                        "note": "胃气将绝，难治，立即就医"},
-    "retracted_tongue": {"name": "囊缩卷舌", "sign": "舌体卷缩，兼阴囊缩入",
-                        "note": "厥阴气绝，难治，立即就医（阴囊症状以自陈为准，不采集照片）"},
-    "blue_tongue":     {"name": "蓝舌", "sign": "舌质由淡紫转蓝，苔由淡灰转黑或白如霉点",
-                        "note": "病危重，难治，立即就医"},
-}
+# 危险信号字典已下沉至 src/danger.py（系统级单一事实来源，
+# 2026-10-21 DANGER_FLAGS_FIX_PLAN B 批）；此处 re-export 保持既有引用兼容
+from src.danger import DANGER_FLAGS, DANGER_PATTERNS, detect_danger  # noqa: F401
 
 _WEEKDAYS = "一二三四五六日"
 

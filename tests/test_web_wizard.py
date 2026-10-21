@@ -490,3 +490,21 @@ def test_wizard_field_adds_missing_field(client, data_root, monkeypatch):
         os.path.join(data_root, "records", "daily"),
         __import__("datetime").date.today().isoformat())
     assert draft["parts"]["舌面"]["observation"]["body"]["cracks"] == "深裂"
+
+
+def test_mirror_tongue_detectable_via_closed_vocab():
+    """A1：封闭枚举词「镜面」可触发镜面舌探测（核验文档发现的最深错位）。"""
+    from src.danger import detect_danger
+    assert detect_danger(
+        {"tongue": {"coating": {"peeling": "镜面"}}}) == ["mirror_tongue"]
+    assert detect_danger(
+        {"tongue": {"coating": {"peeling": "局部剥落"}}}) == []
+    assert detect_danger(
+        {"tongue": {"coating": {"peeling": "局部无苔"}}}) == []
+
+
+def test_sign_texts_match_textbook():
+    """A2/A3：舌强/镜面 sign 与《中医诊断学》p118 原文口径一致。"""
+    from src.danger import DANGER_FLAGS
+    assert DANGER_FLAGS["tongue_rigid"]["sign"] == "舌体强直，转动不灵，且语言謇涩"
+    assert "深绛无苔而光亮如镜" in DANGER_FLAGS["mirror_tongue"]["sign"]
