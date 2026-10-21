@@ -52,6 +52,10 @@
   .herb { display: flex; justify-content: space-between; background: var(--card-sunken); border-radius: 8px; padding: 6px 12px; font-size: 13.5px; }
   .herb b { font-family: var(--font-serif); }
   .herb span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .diet-table { border-collapse: collapse; margin: 8px 0 4px; font-size: 13.5px; width: 100%; }
+  .diet-table th, .diet-table td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
+  .diet-table th { background: var(--card-sunken); font-family: var(--font-serif); }
+  .diet-table td b { font-family: var(--font-serif); }
   /* Markdown 报告 */
   .mdreport h3 { font-size: 17px; margin: 16px 0 6px; }
   .mdreport h4 { font-size: 15px; margin: 14px 0 5px; }
@@ -216,20 +220,40 @@
     {% if r.diagnosis.pathomechanism %}<div class="field-row"><span class="k">核心病机</span><span class="v">{{ r.diagnosis.pathomechanism }}</span></div>{% endif %}
   </div>
 
-  {% if r.diagnosis.formula and r.diagnosis.formula.name %}
+  {% if report and report.diet_advice %}
   <hr class="divider">
-  <div class="row">
-    <h3 style="font-size:16px;">{{ r.diagnosis.formula.name }}</h3>
-    <span class="spacer"></span>
-    {% if r.diagnosis.formula.note %}<span class="faint" style="font-size:12.5px;">{{ r.diagnosis.formula.note }}</span>{% endif %}
+  <h3 style="font-size:16px; margin:0 0 4px;">饮食建议</h3>
+  {% if report.diet_advice.daily_foods %}
+  <table class="diet-table">
+    <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
+    <tbody>
+      {% for f in report.diet_advice.daily_foods %}
+      <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% if report.diet_advice.med_foods %}
+  <div class="row" style="margin:14px 0 2px;">
+    <h4 style="font-size:14.5px; margin:0;">药食同源药材</h4>
+    <span class="tag cinnabar">此为药材，非日常食材</span>
   </div>
-  <div class="herbs">
-    {% for h in r.diagnosis.formula.ingredients %}
-    <div class="herb"><b>{{ h.herb }}</b><span>{{ h.dosage }}</span></div>
+  <table class="diet-table">
+    <thead><tr><th>药材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
+    <tbody>
+      {% for f in report.diet_advice.med_foods %}
+      <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% if report.diet_advice.avoid %}
+  <h4 style="font-size:14.5px; margin:14px 0 4px;">忌口</h4>
+  <div class="fields">
+    {% for a in report.diet_advice.avoid %}
+    <div class="field-row"><span class="k">{{ a.item }}</span><span class="v">{{ a.reason }}</span></div>
     {% endfor %}
   </div>
-  {% if r.diagnosis.formula.rationale %}
-  <p class="muted" style="margin:12px 0 0; font-size:13.5px;">方义：{{ r.diagnosis.formula.rationale }}</p>
   {% endif %}
   {% endif %}
   {% else %}

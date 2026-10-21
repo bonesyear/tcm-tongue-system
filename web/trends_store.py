@@ -249,10 +249,26 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     # llm_client.chat 的 finish_reason=length 处理）
     max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "") or 16000)
     try:
-        md = llm_client.chat(build_report_input(rec, kb_refs), system_prompt,
-                             model, base_url, api_key, max_tokens=max_tokens)
+        raw_out = llm_client.chat(build_report_input(rec, kb_refs), system_prompt,
+                                  model, base_url, api_key, max_tokens=max_tokens)
     except RuntimeError as e:
         return {"ok": False, "error": str(e)}
+
+    # JSON 双件契约：{structured: {…结构化结论 + 饮食建议…}, markdown: …完整报告…}
+    candidate = raw_out.strip()
+    if candidate.startswith("```"):
+        candidate = candidate.split("\n", 1)[1] if "\n" in candidate else ""
+        candidate = candidate.rsplit("```", 1)[0].strip()
+    try:
+        payload = json.loads(candidate)
+        structured = payload["structured"]
+        md = payload["markdown"]
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        return {"ok": False,
+                "error": f"辨证输出不是约定的 JSON 双件结构（{e}）——"
+                         f"请重新生成；若模型持续不遵守契约，检查其 JSON 输出能力"}
+    if not isinstance(md, str) or not md.strip():
+        return {"ok": False, "error": "辨证输出缺 markdown 正文"}
 
     # 平人出口的代码侧第二道防线（模板出口是 prompt-only，模型可能不守）：
     # 全 0 + 无红线而报告含方剂/剂量表述 → stderr 告警 + 响应带 warning。
@@ -274,11 +290,24 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     diag = rec.raw.setdefault("diagnosis", {})
     if not isinstance(diag, dict):
         return {"ok": False, "error": "记录的 diagnosis 字段不是对象，写回中止"}
+
+    # 结构化结论回写 pattern_differentiation（第一张卡的数据源）——
+    # 键名与形状 B 既有约定一致（three_views/four_patterns/six_diseases/
+    # core_pathomechanism），饮食建议存为 report.diet_advice
+    pattern = {}
+    for k in ("three_views", "four_patterns", "six_diseases", "core_pathomechanism"):
+        if k in structured:
+            pattern[k] = structured[k]
+    if pattern:
+        rec.raw["pattern_differentiation"] = pattern
+
     diag["report"] = {
         "markdown": md,
         "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "prompt_template_version": _template_version(template_path),
     }
+    if isinstance(structured.get("diet_advice"), dict):
+        diag["report"]["diet_advice"] = structured["diet_advice"]
     if kb_refs:
         # 知识库引用溯源：报告食疗/方义建议的库内出处（文件+行号+命中词）
         diag["report"]["kb_refs"] = kb_refs
