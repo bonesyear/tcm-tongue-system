@@ -16,6 +16,10 @@
   python3 -m pytest tests/ -q
   ```
 - 设计哲学（不可违背）：
+  - **诊断体系以《经方探源》为主、《中医诊断学》为辅**（2026-10-21 主人拍板）：
+    辨证框架（三观→四证→六病/方证对应/红线）以探源为准绳；中诊只做
+    舌象体征的词汇与量化层。新增词条/判据先标出处再入库
+    （台账：`docs/VOCAB_PROVENANCE_2026-10-16.md`），不得伪托。
   - `src/` 核心模块（dimensions/record/scoring/confidence/retrieval）**仅用标准库**，
     不 import 任何 LLM SDK、不发起 HTTP 请求、不绑任何框架。
   - 失败要**可诊断**（stderr 告警），不静默吞错；同时正常路径**零告警**。
