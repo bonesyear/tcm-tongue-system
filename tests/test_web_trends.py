@@ -100,7 +100,7 @@ def test_report_generation_writes_back(client, data_root, monkeypatch):
     assert rep["generated_at"]
 
     html = client.get("/record/2026-06-25").get_data(as_text=True)
-    assert "辨证报告（LLM 生成）" in html
+    assert "辨证报告·全案" in html
     assert "<strong>太阴</strong>" in html  # mdmini 渲染生效
     # 旧版已备份
     assert os.listdir(os.path.join(data_root, "records", "_backup"))
