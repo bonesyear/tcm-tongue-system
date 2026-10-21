@@ -208,13 +208,6 @@
   </div>
   {% endif %}
 
-  {% if r.diagnosis.four_patterns %}
-  <div class="row wrap" style="gap:8px; margin-bottom:14px;">
-    <span class="muted" style="font-size:13px; letter-spacing:0.1em;">四证</span>
-    {% for p in r.diagnosis.four_patterns %}<span class="tag">{{ p.k }} · {{ p.v }}</span>{% endfor %}
-  </div>
-  {% endif %}
-
   <div class="fields">
     {% if r.diagnosis.six_diseases %}<div class="field-row"><span class="k">六经归属</span><span class="v">{{ r.diagnosis.six_diseases }}</span></div>{% endif %}
     {% if r.diagnosis.pathomechanism %}<div class="field-row"><span class="k">核心病机</span><span class="v">{{ r.diagnosis.pathomechanism }}</span></div>{% endif %}
@@ -228,20 +221,6 @@
     <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
     <tbody>
       {% for f in report.diet_advice.daily_foods %}
-      <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  {% if report.diet_advice.med_foods %}
-  <div class="row" style="margin:14px 0 2px;">
-    <h4 style="font-size:14.5px; margin:0;">药食同源药材</h4>
-    <span class="tag cinnabar">此为药材，非日常食材</span>
-  </div>
-  <table class="diet-table">
-    <thead><tr><th>药材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
-    <tbody>
-      {% for f in report.diet_advice.med_foods %}
       <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
       {% endfor %}
     </tbody>
