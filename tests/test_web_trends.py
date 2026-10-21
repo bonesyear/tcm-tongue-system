@@ -121,6 +121,9 @@ def test_report_contract_writes_structured_and_diet(client, data_root,
         "four_patterns": {"水证": "有", "火证": "无", "气证": "无", "血证": "无"},
         "six_diseases": "太阴病",
         "core_pathomechanism": "太阴虚寒，水饮内停",
+        "lifestyle": {"作息": "亥时前入睡，午后小憩半刻",
+                      "情志": "少思虑，饭后散步十五分钟",
+                      "预期改善": "舌体回缩、齿痕变浅"},
         "diet_advice": {
             "daily_foods": [{"name": "山药", "nature": "平", "purpose": "健脾",
                              "amount": "50-100克/日", "note": "煮粥"}],
@@ -145,18 +148,35 @@ def test_report_contract_writes_structured_and_diet(client, data_root,
     rep = raw["diagnosis"]["report"]
     assert rep["diet_advice"]["daily_foods"][0]["name"] == "山药"
     assert rep["diet_advice"]["med_foods"][0]["name"] == "黄芪"
+    assert rep["lifestyle"]["作息"] == "亥时前入睡，午后小憩半刻"
+    assert rep["lifestyle"]["预期改善"]
     assert "太阴" in rep["markdown"]
 
     html = client.get("/record/2026-06-25").get_data(as_text=True)
     assert "饮食建议" in html and "山药" in html
     assert "忌口" in html and "生冷" in html
     assert "太阴病" in html  # 第一张卡的结构化六经
+    # 起居情志由 structured.lifestyle 经 Jinja 渲染进提要卡
+    assert ">起居情志<" in html and "亥时前入睡" in html and "舌体回缩" in html
     # 四证 / 药食同源药材层 / 方剂块均不在第一张卡（细节只在完整报告卡）；
     # 数据仍存档（上方 asserts），只是不渲染
     assert "水证 · 有" not in html
     assert "此为药材，非日常食材" not in html
     assert "方义：" not in html
     assert 'class="herbs"' not in html
+
+
+def test_template_dose_single_value_and_flat_care():
+    """任务书收口（2026-10-21）：剂量确定量禁区间；调理建议段退出 markdown；
+    起居情志入 structured.lifestyle 契约。"""
+    with open(os.path.join(_ROOT, "templates", "adaptive_analysis_prompt.md"),
+              encoding="utf-8") as f:
+        t = f.read()
+    assert "[剂量范围]" not in t                    # 旧区间占位符已去
+    assert "确定剂量" in t and "X–Yg" in t          # 单值规则 + 区间禁令
+    assert "须执业中医师面诊后使用" in t             # 警示语保留且紧靠
+    assert "**调理建议**" not in t                   # markdown 不再输出调理段
+    assert '"lifestyle"' in t                        # 契约含起居情志字段
 
 
 def test_report_non_json_rejected(client, data_root, monkeypatch):

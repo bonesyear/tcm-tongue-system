@@ -310,6 +310,10 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     }
     if isinstance(structured.get("diet_advice"), dict):
         diag["report"]["diet_advice"] = structured["diet_advice"]
+    if isinstance(structured.get("lifestyle"), dict):
+        # 起居情志结构化（作息/情志/预期改善），提要卡据此渲染；
+        # 老记录无此字段时不显示该小节（不回写伪造）
+        diag["report"]["lifestyle"] = structured["lifestyle"]
     if kb_refs:
         # 知识库引用溯源：报告食疗/方义建议的库内出处（文件+行号+命中词）
         diag["report"]["kb_refs"] = kb_refs

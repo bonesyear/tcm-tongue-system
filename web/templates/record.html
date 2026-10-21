@@ -318,7 +318,15 @@
   </div>
   {% endif %}
   {% endif %}
-  <div id="lifestyle-slot"></div>
+  {% if report and report.lifestyle %}
+  <hr class="divider">
+  <h3 class="sect-h">起居情志</h3>
+  <div class="fields">
+    {% for k in ["作息", "情志", "预期改善"] %}
+    {% if report.lifestyle.get(k) %}<div class="field-row"><span class="k">{{ k }}</span><span class="v">{{ report.lifestyle.get(k) }}</span></div>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
   {% else %}
   <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
@@ -546,115 +554,24 @@
 </script>
 
 <script>
-/* 全案展示层增强（纯展示，不动记录内容）：
-   1) 把「方剂建议」「调理建议」（加粗引语段落 + 紧随列表）包成高亮块；
-   2) mdmini 暂不支持缩进嵌套列表，其漏网的「- 」裸段落就地修复为真正列表
-      ——临时脚手架，渲染器修复后自动无匹配失效（见 docs 任务书记录）；
-   3) 方剂建议块迁入「方药与调护」区置顶（zone 仅在含 diet_advice 时存在）；
-   4) 调理块里的「作息/情志」两条移入提要卡 #lifestyle-slot；
-      饮食文字与 JSON 表格重复，表格存在时整段剔除，只保留「预期改善」。 */
+/* 方剂建议块迁入「方药与调护」区置顶（纯展示移位，不动记录内容）。 */
 (function () {
   var md = document.querySelector(".mdreport");
-  if (!md) return;
-
-  document.querySelectorAll(".mdreport p > strong:first-child").forEach(function (s) {
-    if (!/^(方剂建议|调理建议)/.test(s.textContent)) return;
+  var slot = document.getElementById("formula-slot");
+  if (!md || !slot) return;
+  md.querySelectorAll("p > strong:first-child").forEach(function (s) {
+    if (!/^方剂建议/.test(s.textContent)) return;
     var p = s.parentElement;
     var wrap = document.createElement("div");
     wrap.className = "md-key";
-    wrap.dataset.kind = /^方剂建议/.test(s.textContent) ? "formula" : "care";
     p.parentNode.insertBefore(wrap, p);
     wrap.appendChild(p);
-    /* 引语后可能跟多个并列列表（作息/情志等），一并收入块内 */
+    /* 引语后的并列列表（主方/合方/剂量建议等）一并收入块内 */
     while (wrap.nextElementSibling && wrap.nextElementSibling.tagName === "UL") {
       wrap.appendChild(wrap.nextElementSibling);
     }
+    slot.appendChild(wrap);
   });
-
-  /* 裸「- 」段落修复：mdreport 直接子级里连续的 dash 段落合成一个 ul，
-     若紧跟在调理块后则收进该块 */
-  var DASH = /^\s*[-*]\s+/;
-  var node = md.firstElementChild;
-  while (node) {
-    if (node.tagName === "P" && DASH.test(node.textContent)) {
-      var ul = document.createElement("ul");
-      while (node && node.tagName === "P" && DASH.test(node.textContent)) {
-        var nxt = node.nextElementSibling;
-        var li = document.createElement("li");
-        li.innerHTML = node.innerHTML.replace(DASH, "");
-        ul.appendChild(li);
-        node.remove ? node.remove() : node.parentNode.removeChild(node);
-        node = nxt;
-      }
-      /* 插入点：ul 暂挂到当前 node 之前；随后若前一兄弟是调理块则收进去 */
-      if (node) { md.insertBefore(ul, node); } else { md.appendChild(ul); }
-      var prev = ul.previousElementSibling;
-      if (prev && prev.classList && prev.classList.contains("md-key") && prev.dataset.kind === "care") {
-        prev.appendChild(ul);
-      }
-    } else {
-      node = node.nextElementSibling;
-    }
-  }
-
-  var slot = document.getElementById("formula-slot");
-  if (slot) {
-    var fk = md.querySelector('.md-key[data-kind="formula"]');
-    if (fk) slot.appendChild(fk);
-  }
-
-  /* 起居情志分流 + 饮食文字去重（见头部注释 4)）。
-     剔除只针对「饮食：」起、到作息/情志/预期改善止的重复段；
-     尾部之后的未知条目不动，模板日后改版不至于误删。 */
-  var care = md.querySelector('.md-key[data-kind="care"]');
-  if (care) {
-    /* 作息/情志/预期改善在原文里是顶层真列表，中间隔着缩进裸段落，
-       首次收块时被截断留在了块外；按尾部标记补收进来 */
-    while (care.nextElementSibling && care.nextElementSibling.tagName === "UL"
-           && /^(作息|起居|情志|预期改善)\s*[:：]/.test(care.nextElementSibling.textContent.replace(/^\s+/, ""))) {
-      care.appendChild(care.nextElementSibling);
-    }
-    var hasTables = !!document.querySelector("#action-zone .diet-table");
-    var lifeRe = /^(作息|起居|情志)\s*[:：]\s*/;
-    var expectRe = /^预期改善\s*[:：]\s*/;
-    var slotLife = document.getElementById("lifestyle-slot");
-    var lifeRows = [];
-    var reachedTail = false;
-    care.querySelectorAll("li").forEach(function (li) {
-      var t = li.textContent.replace(/^\s+|\s+$/g, "");
-      var m = t.match(lifeRe);
-      if (m) {
-        reachedTail = true;
-        lifeRows.push({ k: m[1] === "起居" ? "作息" : m[1], v: t.replace(lifeRe, "") });
-        li.remove();
-        return;
-      }
-      if (expectRe.test(t)) {
-        reachedTail = true;
-        li.innerHTML = li.innerHTML.replace(/预期改善\s*[:：]\s*/, "");
-        li.dataset.kind = "expect";
-        return;
-      }
-      if (!reachedTail && hasTables) li.remove();
-    });
-    var left = care.querySelectorAll("li");
-    var headStrong = care.querySelector("p > strong");
-    if (left.length === 0) {
-      care.remove();
-    } else if (left.length === 1 && left[0].dataset.kind === "expect" && headStrong) {
-      headStrong.textContent = "预期改善";
-    }
-    if (lifeRows.length && slotLife) {
-      slotLife.innerHTML = '<hr class="divider"><h3 class="sect-h">起居情志</h3><div class="fields">'
-        + lifeRows.map(function () { return '<div class="field-row"><span class="k"></span><span class="v"></span></div>'; }).join("")
-        + "</div>";
-      var rows = slotLife.querySelectorAll(".field-row");
-      lifeRows.forEach(function (r, i) {
-        rows[i].querySelector(".k").textContent = r.k;
-        rows[i].querySelector(".v").textContent = r.v;
-      });
-    }
-  }
 })();
 </script>
 {% endblock %}
