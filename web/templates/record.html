@@ -56,16 +56,93 @@
   .diet-table th, .diet-table td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
   .diet-table th { background: var(--card-sunken); font-family: var(--font-serif); }
   .diet-table td b { font-family: var(--font-serif); }
-  /* Markdown 报告 */
-  .mdreport h3 { font-size: 17px; margin: 16px 0 6px; }
-  .mdreport h4 { font-size: 15px; margin: 14px 0 5px; }
-  .mdreport h5 { font-size: 14px; margin: 12px 0 4px; }
-  .mdreport p { margin: 6px 0; font-size: 14px; }
-  .mdreport ul, .mdreport ol { margin: 6px 0; padding-left: 22px; font-size: 14px; }
+  /* 窄屏：表在卡内局部横向滚动，不把页面顶宽 */
+  .table-scroll { overflow-x: auto; margin: 8px 0 4px; }
+  .table-scroll .diet-table { margin: 0; }
+  /* 窄屏防断字：五列表的名称/性味/功效/分量四个短列不换行，长文列（备注/注意）
+     给一个最小阅读宽度按 10 字左右折行；整表超出卡宽时在 .table-scroll 内局部横滚，
+     不挤压成逐字断行。忌口表首列是长描述短语，不锁换行，只给定宽保持两列比例 */
+  .diet-table:not(.avoid-table) th:nth-child(1), .diet-table:not(.avoid-table) td:nth-child(1),
+  .diet-table:not(.avoid-table) th:nth-child(2), .diet-table:not(.avoid-table) td:nth-child(2),
+  .diet-table:not(.avoid-table) th:nth-child(3), .diet-table:not(.avoid-table) td:nth-child(3),
+  .diet-table:not(.avoid-table) th:nth-child(4), .diet-table:not(.avoid-table) td:nth-child(4) { white-space: nowrap; }
+  .diet-table:not(.avoid-table) th:nth-child(5), .diet-table:not(.avoid-table) td:nth-child(5) { min-width: 10em; }
+  .avoid-table th:nth-child(1), .avoid-table td:nth-child(1) { width: 42%; }
+  @media (max-width: 480px) {
+    .diet-table { font-size: 13px; }
+    .diet-table th, .diet-table td { padding: 5px 7px; }
+  }
+  /* 全案文档排版（mdmini 标题降两级：md H1→h3、H2→h4、H3→h5）：
+     首个 h3 即文档大标题，与卡头重复故隐藏；章节（h4）宋体 + 朱砂左竖条；
+     阅读限宽 46em、行距 1.85，宽屏下长文仍可读。
+     限宽必须同时罩住正文、方药调护区、知识库引用——三者同为卡的直接子级，
+     只限正文会在宽屏下出现右缘不齐 */
+  .mdreport, .action-zone, .kb-refs { max-width: 46em; }
+  .mdreport > h3:first-child { display: none; }
+  .mdreport h4 {
+    font-family: var(--font-serif); font-size: 17px; letter-spacing: 0.04em;
+    color: var(--ink); border-left: 3px solid var(--cinnabar); padding-left: 10px;
+    margin: 26px 0 10px;
+  }
+  .mdreport h4:first-of-type { margin-top: 4px; }
+  .mdreport h5 { font-size: 15px; margin: 16px 0 6px; color: var(--ink-2); }
+  .mdreport h6 { font-size: 14px; margin: 12px 0 4px; color: var(--ink-2); }
+  .mdreport p { margin: 6px 0; font-size: 14px; line-height: 1.85; }
+  .mdreport ul, .mdreport ol { margin: 6px 0; padding-left: 22px; font-size: 14px; line-height: 1.85; }
   .mdreport table { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; width: 100%; }
   .mdreport th, .mdreport td { border: 1px solid var(--line-strong); padding: 6px 10px; text-align: left; }
   .mdreport th { background: var(--card-sunken); font-family: var(--font-serif); }
   .mdreport code { background: var(--card-sunken); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+  .mdreport hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+  /* 提要卡小节标题：宋体规范字距 */
+  .sect-h { font-family: var(--font-serif); font-size: 15.5px; letter-spacing: 0.08em; margin: 0 0 6px; }
+  /* 忌口表：朱砂浅底表头 + 标题取深色，警示但不告警 */
+  .avoid-h { color: var(--cinnabar-deep); font-size: 14.5px; margin-top: 14px; }
+  .avoid-table th { background: var(--cinnabar-tint); color: var(--cinnabar-deep); }
+  /* 全案重点块：方剂/调理建议（页尾 JS 按加粗引语识别并包裹） */
+  .md-key {
+    background: var(--card-sunken); border: 1px solid var(--line);
+    border-left: 4px solid var(--cinnabar); border-radius: var(--radius-inner);
+    padding: 12px 16px; margin: 14px 0;
+  }
+  .md-key > p:first-child {
+    margin: 0 0 8px; font-family: var(--font-serif); font-size: 15.5px;
+    letter-spacing: 0.05em; color: var(--cinnabar-deep); line-height: 1.6;
+  }
+  .md-key > ul:last-child { margin-bottom: 0; }
+  /* 行动建议区：全案的行动出口（方剂卡 JS 迁入 + 调理三表 JSON 渲染） */
+  .action-zone { border-top: 2px solid var(--cinnabar); margin-top: 24px; padding-top: 6px; }
+  .zone-h {
+    font-family: var(--font-serif); font-size: 17px; letter-spacing: 0.06em;
+    color: var(--cinnabar-deep); margin: 8px 0 4px;
+  }
+  .care-h {
+    font-family: var(--font-serif); font-size: 14.5px; letter-spacing: 0.06em;
+    color: var(--ink-2); margin: 18px 0 6px;
+  }
+  .med-h { color: var(--cinnabar-deep); }
+  .med-warn {
+    font-family: var(--font-sans); font-size: 12px; letter-spacing: 0;
+    color: var(--cinnabar); margin-left: 8px; font-weight: 400;
+  }
+  .med-table th { background: var(--cinnabar-tint); color: var(--cinnabar-deep); }
+  .avoid-h2 { color: var(--cinnabar-deep); }
+  .md-key li { margin: 3px 0; }
+  .md-key li > strong { color: var(--cinnabar-deep); }
+  /* 知识库引用：原生 details 折叠，默认收起 */
+  .kb-refs { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 10px; }
+  .kb-refs summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--ink-3); letter-spacing: 0.06em; user-select: none;
+  }
+  .kb-refs summary::-webkit-details-marker { display: none; }
+  .kb-refs summary::before {
+    content: "▸"; color: var(--cinnabar); font-size: 12px;
+    transition: transform 0.15s ease;
+  }
+  .kb-refs[open] summary::before { transform: rotate(90deg); }
+  .kb-refs summary .n { color: var(--ink-3); font-size: 12px; }
+  .kb-refs .fields { margin-top: 8px; }
 </style>
 
 <p style="margin: 0;"><a href="/">‹ 返回记录列表</a></p>
@@ -214,8 +291,9 @@
 
   {% if report and report.diet_advice %}
   <hr class="divider">
-  <h3 style="font-size:16px; margin:0 0 4px;">饮食建议</h3>
+  <h3 class="sect-h">饮食建议</h3>
   {% if report.diet_advice.daily_foods %}
+  <div class="table-scroll">
   <table class="diet-table">
     <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
     <tbody>
@@ -224,16 +302,23 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
   {% if report.diet_advice.avoid %}
-  <h4 style="font-size:14.5px; margin:14px 0 4px;">忌口</h4>
-  <div class="fields">
-    {% for a in report.diet_advice.avoid %}
-    <div class="field-row"><span class="k">{{ a.item }}</span><span class="v">{{ a.reason }}</span></div>
-    {% endfor %}
+  <h4 class="sect-h avoid-h">忌口</h4>
+  <div class="table-scroll">
+  <table class="diet-table avoid-table">
+    <thead><tr><th>忌口</th><th>原因</th></tr></thead>
+    <tbody>
+      {% for a in report.diet_advice.avoid %}
+      <tr><td><b>{{ a.item }}</b></td><td>{{ a.reason }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
   </div>
   {% endif %}
   {% endif %}
+  <div id="lifestyle-slot"></div>
   {% else %}
   <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
@@ -243,18 +328,72 @@
 <div class="card">
   <div class="card-head">
     <h2>辨证报告·全案</h2>
-    <span class="tag">模板 {{ report.prompt_template_version }}</span>
+    <span class="spacer"></span>
     <span class="faint" style="font-size:12px;">{{ report.generated_at }}</span>
   </div>
   <div class="mdreport">{{ report.markdown | markdown | safe }}</div>
-  {% if report.kb_refs %}
-  <hr class="divider">
-  <div class="faint" style="font-size:12px; letter-spacing:.06em; margin-bottom:6px;">知识库引用（食疗/方义建议的库内出处）</div>
-  <div class="fields">
-    {% for ref in report.kb_refs %}
-    <div class="field-row"><span class="k">{{ ref.file }}:{{ ref.line }}</span><span class="v faint" style="font-size:12.5px;">「{{ ref.excerpt[:60] }}」（命中：{{ ref.term }}）</span></div>
-    {% endfor %}
+
+  {% if report.diet_advice %}
+  <div class="action-zone" id="action-zone">
+    <h3 class="zone-h">方药与调护</h3>
+    <div id="formula-slot"></div>
+    {% if report.diet_advice.daily_foods %}
+    <div class="care-block">
+      <h4 class="care-h">调理 · 日常食材</h4>
+      <div class="table-scroll">
+      <table class="diet-table">
+        <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
+        <tbody>
+          {% for f in report.diet_advice.daily_foods %}
+          <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endif %}
+    {% if report.diet_advice.med_foods %}
+    <div class="care-block">
+      <h4 class="care-h med-h">调理 · 药食同源药材<span class="med-warn">⚠ 药材非日常食材，症状变化或加重时停用并咨询医师</span></h4>
+      <div class="table-scroll">
+      <table class="diet-table med-table">
+        <thead><tr><th>药材</th><th>性味</th><th>功效</th><th>分量</th><th>注意</th></tr></thead>
+        <tbody>
+          {% for f in report.diet_advice.med_foods %}
+          <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endif %}
+    {% if report.diet_advice.avoid %}
+    <div class="care-block">
+      <h4 class="care-h avoid-h2">调理 · 忌口</h4>
+      <div class="table-scroll">
+      <table class="diet-table avoid-table">
+        <thead><tr><th>忌口</th><th>原因</th></tr></thead>
+        <tbody>
+          {% for a in report.diet_advice.avoid %}
+          <tr><td><b>{{ a.item }}</b></td><td>{{ a.reason }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endif %}
   </div>
+  {% endif %}
+
+  {% if report.kb_refs %}
+  <details class="kb-refs">
+    <summary>知识库引用出处<span class="n">{{ report.kb_refs | length }} 条 · 食疗/方义建议的库内来源</span></summary>
+    <div class="fields">
+      {% for ref in report.kb_refs %}
+      <div class="field-row"><span class="k">{{ ref.file }}:{{ ref.line }}</span><span class="v faint" style="font-size:12.5px;">「{{ ref.excerpt[:60] }}」（命中：{{ ref.term }}）</span></div>
+      {% endfor %}
+    </div>
+  </details>
   {% endif %}
 </div>
 {% endif %}
@@ -402,6 +541,119 @@
       repBtn.disabled = false;
       repBtn.textContent = "重新生成";
     });
+  }
+})();
+</script>
+
+<script>
+/* 全案展示层增强（纯展示，不动记录内容）：
+   1) 把「方剂建议」「调理建议」（加粗引语段落 + 紧随列表）包成高亮块；
+   2) mdmini 暂不支持缩进嵌套列表，其漏网的「- 」裸段落就地修复为真正列表
+      ——临时脚手架，渲染器修复后自动无匹配失效（见 docs 任务书记录）；
+   3) 方剂建议块迁入「方药与调护」区置顶（zone 仅在含 diet_advice 时存在）；
+   4) 调理块里的「作息/情志」两条移入提要卡 #lifestyle-slot；
+      饮食文字与 JSON 表格重复，表格存在时整段剔除，只保留「预期改善」。 */
+(function () {
+  var md = document.querySelector(".mdreport");
+  if (!md) return;
+
+  document.querySelectorAll(".mdreport p > strong:first-child").forEach(function (s) {
+    if (!/^(方剂建议|调理建议)/.test(s.textContent)) return;
+    var p = s.parentElement;
+    var wrap = document.createElement("div");
+    wrap.className = "md-key";
+    wrap.dataset.kind = /^方剂建议/.test(s.textContent) ? "formula" : "care";
+    p.parentNode.insertBefore(wrap, p);
+    wrap.appendChild(p);
+    /* 引语后可能跟多个并列列表（作息/情志等），一并收入块内 */
+    while (wrap.nextElementSibling && wrap.nextElementSibling.tagName === "UL") {
+      wrap.appendChild(wrap.nextElementSibling);
+    }
+  });
+
+  /* 裸「- 」段落修复：mdreport 直接子级里连续的 dash 段落合成一个 ul，
+     若紧跟在调理块后则收进该块 */
+  var DASH = /^\s*[-*]\s+/;
+  var node = md.firstElementChild;
+  while (node) {
+    if (node.tagName === "P" && DASH.test(node.textContent)) {
+      var ul = document.createElement("ul");
+      while (node && node.tagName === "P" && DASH.test(node.textContent)) {
+        var nxt = node.nextElementSibling;
+        var li = document.createElement("li");
+        li.innerHTML = node.innerHTML.replace(DASH, "");
+        ul.appendChild(li);
+        node.remove ? node.remove() : node.parentNode.removeChild(node);
+        node = nxt;
+      }
+      /* 插入点：ul 暂挂到当前 node 之前；随后若前一兄弟是调理块则收进去 */
+      if (node) { md.insertBefore(ul, node); } else { md.appendChild(ul); }
+      var prev = ul.previousElementSibling;
+      if (prev && prev.classList && prev.classList.contains("md-key") && prev.dataset.kind === "care") {
+        prev.appendChild(ul);
+      }
+    } else {
+      node = node.nextElementSibling;
+    }
+  }
+
+  var slot = document.getElementById("formula-slot");
+  if (slot) {
+    var fk = md.querySelector('.md-key[data-kind="formula"]');
+    if (fk) slot.appendChild(fk);
+  }
+
+  /* 起居情志分流 + 饮食文字去重（见头部注释 4)）。
+     剔除只针对「饮食：」起、到作息/情志/预期改善止的重复段；
+     尾部之后的未知条目不动，模板日后改版不至于误删。 */
+  var care = md.querySelector('.md-key[data-kind="care"]');
+  if (care) {
+    /* 作息/情志/预期改善在原文里是顶层真列表，中间隔着缩进裸段落，
+       首次收块时被截断留在了块外；按尾部标记补收进来 */
+    while (care.nextElementSibling && care.nextElementSibling.tagName === "UL"
+           && /^(作息|起居|情志|预期改善)\s*[:：]/.test(care.nextElementSibling.textContent.replace(/^\s+/, ""))) {
+      care.appendChild(care.nextElementSibling);
+    }
+    var hasTables = !!document.querySelector("#action-zone .diet-table");
+    var lifeRe = /^(作息|起居|情志)\s*[:：]\s*/;
+    var expectRe = /^预期改善\s*[:：]\s*/;
+    var slotLife = document.getElementById("lifestyle-slot");
+    var lifeRows = [];
+    var reachedTail = false;
+    care.querySelectorAll("li").forEach(function (li) {
+      var t = li.textContent.replace(/^\s+|\s+$/g, "");
+      var m = t.match(lifeRe);
+      if (m) {
+        reachedTail = true;
+        lifeRows.push({ k: m[1] === "起居" ? "作息" : m[1], v: t.replace(lifeRe, "") });
+        li.remove();
+        return;
+      }
+      if (expectRe.test(t)) {
+        reachedTail = true;
+        li.innerHTML = li.innerHTML.replace(/预期改善\s*[:：]\s*/, "");
+        li.dataset.kind = "expect";
+        return;
+      }
+      if (!reachedTail && hasTables) li.remove();
+    });
+    var left = care.querySelectorAll("li");
+    var headStrong = care.querySelector("p > strong");
+    if (left.length === 0) {
+      care.remove();
+    } else if (left.length === 1 && left[0].dataset.kind === "expect" && headStrong) {
+      headStrong.textContent = "预期改善";
+    }
+    if (lifeRows.length && slotLife) {
+      slotLife.innerHTML = '<hr class="divider"><h3 class="sect-h">起居情志</h3><div class="fields">'
+        + lifeRows.map(function () { return '<div class="field-row"><span class="k"></span><span class="v"></span></div>'; }).join("")
+        + "</div>";
+      var rows = slotLife.querySelectorAll(".field-row");
+      lifeRows.forEach(function (r, i) {
+        rows[i].querySelector(".k").textContent = r.k;
+        rows[i].querySelector(".v").textContent = r.v;
+      });
+    }
   }
 })();
 </script>

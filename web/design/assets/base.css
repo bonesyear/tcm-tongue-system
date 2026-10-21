@@ -471,12 +471,14 @@ a:hover { color: var(--cinnabar-deep); }
 
 /* ---------------- 工具 ---------------- */
 
-/* 页面节奏容器：所有顶层区块统一 20px 间距，页面内不再用裸 spacer div */
-.stack { display: grid; gap: var(--gap); }
+/* 页面节奏容器：所有顶层区块统一 20px 间距，页面内不再用裸 spacer div。
+   轨道必须 minmax(0,1fr)：默认隐式轨道按 max-content 计宽，卡内出现
+   不换行内容（表格/长串）时会把整页撑出横向滚动条 */
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); }
 
 .grid { display: grid; gap: var(--gap); }
-.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
-.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .row { display: flex; align-items: center; gap: 10px; }
 .row.wrap { flex-wrap: wrap; }
