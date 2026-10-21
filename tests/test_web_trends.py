@@ -174,6 +174,7 @@ def test_template_dose_single_value_and_flat_care():
         t = f.read()
     assert "[剂量范围]" not in t                    # 旧区间占位符已去
     assert "确定剂量" in t and "X–Yg" in t          # 单值规则 + 区间禁令
+    assert "不得超过《中国药典》常用量上限" in t      # 药典上限硬约束（防汉制大换算）
     assert "须执业中医师面诊后使用" in t             # 警示语保留且紧靠
     assert "**调理建议**" not in t                   # markdown 不再输出调理段
     assert '"lifestyle"' in t                        # 契约含起居情志字段
