@@ -114,8 +114,9 @@ def _all_evidence_values(rec):
 def build_report_input(rec, kb_refs: list | None = None) -> str:
     """辨证 LLM 的用户输入：观察值 + 评分 + 危险信号 + 置信度 + 问诊 + 知识库参考。
 
-    kb_refs：_kb_references() 的命中条文，随输入一并喂给 LLM 并要求标注来源
-    （食疗/方义建议须有库内出处，防自由发挥违背经方口径）。"""
+    kb_refs：_kb_references() 的命中条文，随输入一并喂给 LLM 约束口径
+    （食疗/方义建议须与库内条文一致；正文不标注出处，由报告尾部
+    「知识库引用」专区统一列出）。"""
     from src.scoring import score, score_indicators
     lines = [f"日期：{rec.date}", ""]
     for dim in DIMENSIONS:
@@ -165,8 +166,9 @@ def build_report_input(rec, kb_refs: list | None = None) -> str:
         lines.append(f"  - {q} {v['answer']}")
     if kb_refs:
         lines.append("")
-        lines.append("知识库参考（以下条文供引用；调理/饮食/方义建议须有库内出处，"
-                     "引用处在报告中标注来源文件与行号）：")
+        lines.append("知识库参考（以下条文供参考；调理/饮食/方义建议须与库内条文"
+                     "口径一致，但报告中不要标注来源文件与行号——出处由系统在"
+                     "报告尾部「知识库引用」专区统一列出）：")
         for h in kb_refs:
             lines.append(f"  - 「{h['excerpt']}」（{h['file']}:{h['line']}，"
                          f"命中词：{h['term']}）")
