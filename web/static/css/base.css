@@ -30,7 +30,6 @@ a:hover { color: var(--cinnabar-deep); }
 
 .muted   { color: var(--ink-2); }
 .faint   { color: var(--ink-3); }
-.serif   { font-family: var(--font-serif); }
 .num     { font-variant-numeric: tabular-nums; }
 
 /* ---------------- 页面骨架 ---------------- */
@@ -351,8 +350,6 @@ a:hover { color: var(--cinnabar-deep); }
   padding: 26px 26px 22px;
 }
 
-.modal h3 { font-size: 19px; margin-bottom: 10px; }
-
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -449,25 +446,6 @@ a:hover { color: var(--cinnabar-deep); }
   background: var(--cinnabar);
   box-shadow: 0 0 0 4px var(--cinnabar-tint);
 }
-
-/* ---------------- 照片占位（设计稿专用，零图片资源） ---------------- */
-
-.photo-frame {
-  background: var(--card-sunken);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-inner);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--ink-3);
-  font-size: 13px;
-  aspect-ratio: 4 / 3;
-  letter-spacing: 0.05em;
-}
-
-.photo-frame svg { opacity: 0.5; }
 
 /* ---------------- 工具 ---------------- */
 

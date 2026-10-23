@@ -138,7 +138,7 @@
   /* 忌口表：朱砂浅底表头 + 标题取深色，警示但不告警 */
   .avoid-h { color: var(--cinnabar-deep); font-size: 14.5px; margin-top: 14px; }
   .avoid-table th { background: var(--cinnabar-tint); color: var(--cinnabar-deep); }
-  /* 全案重点块：方剂/调理建议（页尾 JS 按加粗引语识别并包裹） */
+  /* 全案重点块：方剂建议（页尾 JS 按加粗引语识别并包裹迁入方药区） */
   .md-key {
     background: var(--card-sunken); border: 1px solid var(--line);
     border-left: 4px solid var(--cinnabar); border-radius: var(--radius-inner);
@@ -653,64 +653,73 @@
     slot.appendChild(wrap);
   });
 
+  /* 剂量建议升格处方笺（解析失败保留原文字条目）。
+     与煎服法升格相互独立：任一失败不影响另一（2026-10-23 审查修复） */
+  var doseSlip = null;
   var doseLi = null;
   slot.querySelectorAll(".md-key li").forEach(function (li) {
     if (!doseLi && /^\s*剂量建议/.test(li.textContent)) doseLi = li;
   });
-  if (!doseLi) return;
-  var m = doseLi.textContent.trim().match(/^剂量建议(?:（([^）]*)）)?[：:](.+)$/);
-  if (!m) return;
-  var rest = m[2];
-  var dot = rest.indexOf("。");
-  var pairsPart = (dot >= 0 ? rest.slice(0, dot) : rest).trim();
-  var warn = dot >= 0 ? rest.slice(dot + 1).trim() : "";
-  var pairs = [];
-  var ok = pairsPart.length > 0;
-  pairsPart.split("、").forEach(function (seg) {
-    /* 药名与剂量间空格有无皆兼容（LLM 实际输出两种都出现过） */
-    var mm = seg.trim().match(/^(\S+?)\s*([\d.]+g)$/);
-    if (mm) { pairs.push({ n: mm[1], d: mm[2] }); } else { ok = false; }
-  });
-  if (!ok || pairs.length < 2) return;
-
-  var slip = document.createElement("div");
-  slip.className = "dose-slip";
-  var head = document.createElement("div");
-  head.className = "dose-slip-h";
-  head.textContent = "剂量建议";
-  if (m[1]) {
-    var sub = document.createElement("span");
-    sub.className = "dose-slip-sub";
-    sub.textContent = m[1].replace(/，/g, " · ");
-    head.appendChild(sub);
+  if (doseLi) {
+    var m = doseLi.textContent.trim().match(/^剂量建议(?:（([^）]*)）)?[：:](.+)$/);
+    if (m) {
+      var rest = m[2];
+      var dot = rest.indexOf("。");
+      var pairsPart = (dot >= 0 ? rest.slice(0, dot) : rest).trim();
+      var warn = dot >= 0 ? rest.slice(dot + 1).trim() : "";
+      var pairs = [];
+      var ok = pairsPart.length > 0;
+      pairsPart.split("、").forEach(function (seg) {
+        /* 药名与剂量间空格有无皆兼容（LLM 实际输出两种都出现过） */
+        var mm = seg.trim().match(/^(\S+?)\s*([\d.]+g)$/);
+        if (mm) { pairs.push({ n: mm[1], d: mm[2] }); } else { ok = false; }
+      });
+      if (ok && pairs.length >= 2) {
+        var slip = document.createElement("div");
+        slip.className = "dose-slip";
+        var head = document.createElement("div");
+        head.className = "dose-slip-h";
+        head.textContent = "剂量建议";
+        if (m[1]) {
+          var sub = document.createElement("span");
+          sub.className = "dose-slip-sub";
+          sub.textContent = m[1].replace(/，/g, " · ");
+          head.appendChild(sub);
+        }
+        slip.appendChild(head);
+        var grid = document.createElement("div");
+        grid.className = "herbs";
+        pairs.forEach(function (pr) {
+          var chip = document.createElement("div");
+          chip.className = "herb";
+          var b = document.createElement("b");
+          b.textContent = pr.n;
+          var sp = document.createElement("span");
+          sp.textContent = pr.d;
+          chip.appendChild(b);
+          chip.appendChild(sp);
+          grid.appendChild(chip);
+        });
+        slip.appendChild(grid);
+        if (warn) {
+          var w = document.createElement("div");
+          w.className = "dose-slip-warn";
+          w.textContent = warn;
+          slip.appendChild(w);
+        }
+        var key = doseLi.closest(".md-key");
+        if (key) {  /* 只在确能挂载时才删原文（防「删了不渲染」通道） */
+          key.appendChild(slip);
+          doseLi.remove();
+          doseSlip = slip;
+        }
+      }
+    }
   }
-  slip.appendChild(head);
-  var grid = document.createElement("div");
-  grid.className = "herbs";
-  pairs.forEach(function (pr) {
-    var chip = document.createElement("div");
-    chip.className = "herb";
-    var b = document.createElement("b");
-    b.textContent = pr.n;
-    var sp = document.createElement("span");
-    sp.textContent = pr.d;
-    chip.appendChild(b);
-    chip.appendChild(sp);
-    grid.appendChild(chip);
-  });
-  slip.appendChild(grid);
-  if (warn) {
-    var w = document.createElement("div");
-    w.className = "dose-slip-warn";
-    w.textContent = warn;
-    slip.appendChild(w);
-  }
-  var key = doseLi.closest(".md-key");
-  doseLi.remove();
-  if (key) { key.appendChild(slip); }
 
-  /* 煎服法升格为同族嵌条并紧随剂量笺（契约：- **煎服法**：…，
-     正文按句号拆句为序号步骤；解析失败保留原文字条目） */
+  /* 煎服法升格为同族嵌条（契约：- **煎服法**：…，正文按句号拆句为序号步骤）。
+     独立于剂量升格成败：有剂量笺则紧随其后，无则挂回 .md-key 容器尾部；
+     拆不出任何步骤时保留原文字条目 */
   var decoctLi = null;
   slot.querySelectorAll(".md-key li").forEach(function (li) {
     if (!decoctLi && /^\s*煎服法/.test(li.textContent)) decoctLi = li;
@@ -718,24 +727,37 @@
   if (decoctLi) {
     var dm = decoctLi.textContent.trim().match(/^煎服法[：:](.+)$/);
     if (dm) {
-      var dSlip = document.createElement("div");
-      dSlip.className = "dose-slip decoct-slip";
-      var dh = document.createElement("div");
-      dh.className = "dose-slip-h";
-      dh.textContent = "煎服法";
-      dSlip.appendChild(dh);
-      var ol = document.createElement("ol");
-      ol.className = "decoct-steps";
+      var steps = [];
       dm[1].split("。").forEach(function (s) {
         s = s.trim();
-        if (!s) return;
-        var stepLi = document.createElement("li");
-        stepLi.textContent = s;
-        ol.appendChild(stepLi);
+        if (s) steps.push(s);
       });
-      dSlip.appendChild(ol);
-      decoctLi.remove();
-      slip.after(dSlip);
+      if (steps.length > 0) {
+        var dSlip = document.createElement("div");
+        dSlip.className = "dose-slip decoct-slip";
+        var dh = document.createElement("div");
+        dh.className = "dose-slip-h";
+        dh.textContent = "煎服法";
+        dSlip.appendChild(dh);
+        var ol = document.createElement("ol");
+        ol.className = "decoct-steps";
+        steps.forEach(function (s) {
+          var stepLi = document.createElement("li");
+          stepLi.textContent = s;
+          ol.appendChild(stepLi);
+        });
+        dSlip.appendChild(ol);
+        if (doseSlip) {
+          doseSlip.after(dSlip);
+          decoctLi.remove();
+        } else {
+          var dKey = decoctLi.closest(".md-key");
+          if (dKey) {
+            dKey.appendChild(dSlip);
+            decoctLi.remove();
+          }
+        }
+      }
     }
   }
 })();
