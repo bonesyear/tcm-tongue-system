@@ -44,6 +44,17 @@
   }
   .switch-tip.show { opacity: 1; transform: translateX(0); }
   .switch-tip.err { color: var(--cinnabar); background: var(--sev-7-bg); border-color: var(--cinnabar); }
+  /* 顶部保存横幅：滑下→停驻→滑回 */
+  .top-toast {
+    position: fixed; top: 14px; left: 50%; z-index: 60;
+    transform: translate(-50%, -140%);
+    transition: transform .3s ease;
+    padding: 9px 18px; border-radius: 999px; font-size: 13.5px;
+    box-shadow: var(--shadow-card);
+    color: var(--sev-0); background: var(--sev-0-bg); border: 1px solid var(--sev-0);
+  }
+  .top-toast.show { transform: translate(-50%, 0); }
+  .top-toast.err { color: var(--cinnabar); background: var(--sev-7-bg); border-color: var(--cinnabar); }
 </style>
 
 <div>
@@ -241,7 +252,24 @@
 </div>
 
 <script>
-/* 模型启用滑动开关：切换 = 展开/折叠表单 + 后台保存（轻提示，不整页跳转） */
+/* 顶部横幅提示（保存等轻反馈共用） */
+var _toastTimer = null;
+function topToast(text, isErr) {
+  var el = document.getElementById("top-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "top-toast";
+    document.body.appendChild(el);
+  }
+  el.className = "top-toast" + (isErr ? " err" : "");
+  el.textContent = text;
+  void el.offsetWidth;
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2000);
+}
+
+/* 模型启用滑动开关：切换 = 展开/折叠表单 + 后台保存（顶部横幅轻提示） */
 [["form-vision"], ["form-llm"]].forEach(function ([fid]) {
   var form = document.getElementById(fid);
   var sw = document.querySelector('input[form="' + fid + '"]');
@@ -251,19 +279,10 @@
     if (sw.disabled) return;
     var fd = new FormData(form);
     sw.disabled = true;
-    var tip = document.createElement("span");
-    sw.closest(".switch").before(tip);  /* 开关左侧（spacer 之后），开关位置不动 */
     fetch("/settings", {method: "POST", body: fd}).then(function (r) {
-      tip.className = "switch-tip" + (r.ok ? "" : " err");
-      tip.textContent = r.ok ? "✓ 已保存" : "保存失败（HTTP " + r.status + "）";
-      void tip.offsetWidth;  /* 强制 reflow，让过渡从初始态起跑 */
-      tip.classList.add("show");
-      setTimeout(function () { tip.classList.remove("show"); }, 1800);
-      setTimeout(function () { tip.remove(); }, 2100);
+      topToast(r.ok ? "✓ 已保存" : "保存失败（HTTP " + r.status + "）", !r.ok);
     }).catch(function (e) {
-      tip.className = "switch-tip err show";
-      tip.textContent = "保存失败：" + e;
-      setTimeout(function () { tip.remove(); }, 3000);
+      topToast("保存失败：" + e, true);
     }).finally(function () { sw.disabled = false; });
   });
 });
