@@ -34,12 +34,12 @@
 
 <main class="page stack">
 {% if vision_missing and page != "welcome" %}
-<div class="alert-note warn-slide">
+<div class="alert-note warn-slide" id="banner-vision">
   ⚠ 未配置视觉模型 API Key，识图分析功能不可用（拍照页可改用手动录入）。请到 <a href="/settings">设置页</a> 填写 <code>VISION_API_KEY</code>。
 </div>
 {% endif %}
 {% if llm_missing and page != "welcome" %}
-<div class="alert-note warn-slide">
+<div class="alert-note warn-slide" id="banner-llm">
   ⚠ 未配置辨证模型（<code>LLM_API_KEY</code> / <code>LLM_MODEL</code> / <code>LLM_BASE_URL</code>），辨证报告生成功能不可用——详情页报告区改用本地规则「四证倾向速览」。请到 <a href="/settings">设置页</a> 配置，或在设置页关闭辨证模型开关。
 </div>
 {% endif %}

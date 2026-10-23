@@ -276,8 +276,18 @@ function topToast(text, isErr) {
       /* EnvDecodeError 走 302→/settings?env_error=…，r.ok 为真——看落点 URL 识破 */
       if (r.ok && r.url.indexOf("env_error") < 0) {
         topToast("✓ 已保存", false);
-        /* 警告条是服务端渲染的——刷新让「缺配警告」随开关状态即时显隐 */
-        setTimeout(function () { location.reload(); }, 600);
+        if (!sw.checked) {
+          /* 关闭方向：对应警告条直接滑出撤掉，无需整页刷新 */
+          var banner = document.getElementById(
+            fid === "form-vision" ? "banner-vision" : "banner-llm");
+          if (banner) {
+            banner.classList.add("slide-out");
+            banner.addEventListener("animationend", function () { banner.remove(); });
+          }
+        } else {
+          /* 打开方向：可能需补出警告条（服务端渲染），刷新取得正确状态 */
+          setTimeout(function () { location.reload(); }, 600);
+        }
       } else {
         revert();
         topToast(r.status === 403 ? "管理口令失效，请带 ?token= 重载页面"
