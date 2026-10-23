@@ -1,7 +1,12 @@
 # web/design — 六维望诊 Web 层设计稿
 
-静态 mockup，不是可运行产品。视觉系统与页面规格的单一来源，
-实现交接说明见 `docs/web-design-handoff.md`。
+静态 mockup，不是可运行产品。**时效声明（2026-10-23 审查补记）**：
+`assets/tokens.css` 令牌层（色板/字体/阴影/纸纹）仍是视觉规范的单一来源；
+`pages/` 中 **record 页规格已实质脱钩**（2026-09-30 快照：缺两带布局/全案卡/
+调理三表/kb-refs/dose-slip/煎服法嵌条，红线数与「声明正常」语义均为旧版），
+以 `web/templates/record.html` 为唯一事实；index/trends/wizard/settings 页
+大体仍相符。实现交接说明见 `docs/web-design-handoff.md`（其「声明正常计入
+覆盖度」「九项红线」两条同样已被后续版本修订，读时以代码与 CHANGELOG 为准）。
 
 ## 预览
 

@@ -313,7 +313,7 @@ REVIEW_FIELDS = {
 # 「未拍摄（用户声明正常）」占位检测（单一事实来源在 src/record.py）
 from src.record import DECLARED_NORMAL_MARK  # noqa: F401
 
-# 指标 → 页面中文短标签（与 web/design 设计稿一致）
+# 指标 → 页面中文短标签（本表为线上单一事实来源；design 稿已分叉，勿再对照）
 INDICATOR_LABELS = {
     "body_color": "颜色", "body_luster": "光泽", "body_size": "形态",
     "petechiae": "瘀斑瘀点", "tooth_marks": "齿痕", "fissure": "裂纹",
@@ -738,7 +738,8 @@ def record_detail(rec: DailyRecord) -> dict:
                     fields.append({**base, "s": scored[ind],
                                    "review": REVIEW_FIELDS.get(ind)})
                 else:
-                    # 有规则集之外的指标（如舌体动态/舌苔分布）：设计稿口径按 0 展示
+                    # 兜底：指标既不在评分规则也不在参考项（当前全集已被
+                    # 两者覆盖，此分支防御用——新增指标忘配规则时按 0 展示）
                     fields.append({**base, "s": 0})
             # 空组不展示（该维度未覆盖时整组无值）
             if any(f["v"] for f in fields):
@@ -756,32 +757,15 @@ def record_detail(rec: DailyRecord) -> dict:
     total = round(sum(d["score"] for d in dims if d["score"] is not None), 1)
     covered_n = sum(1 for d in dims if d["covered"])
 
-    # 辨证与方剂（形状 A/B/C 已由 DailyRecord 归一）
+    # 辨证结构化结论（形状 A/B/C 已由 DailyRecord 归一）
     pattern = rec.get_pattern_differentiation()
-    formula = rec.get_formula()
     diagnosis = None
-    if pattern or formula:
+    if pattern:
         tv = pattern.get("three_views") or pattern.get("三观") or {}
-        fp = pattern.get("four_patterns") or pattern.get("四证") or {}
-        ingredients = []
-        if isinstance(formula, dict):
-            for item in formula.get("ingredients") or []:
-                if isinstance(item, dict):
-                    ingredients.append({"herb": item.get("herb", ""),
-                                        "dosage": item.get("dosage", "")})
-                elif isinstance(item, (list, tuple)) and len(item) >= 2:
-                    ingredients.append({"herb": item[0], "dosage": item[1]})
         diagnosis = {
             "three_views": [{"k": k, "v": v} for k, v in tv.items()],
-            "four_patterns": [{"k": k, "v": v} for k, v in fp.items()],
             "six_diseases": pattern.get("six_diseases", ""),
             "pathomechanism": pattern.get("core_pathomechanism", ""),
-            "formula": {
-                "name": formula.get("name", "") if isinstance(formula, dict) else "",
-                "ingredients": ingredients,
-                "rationale": formula.get("rationale", "") if isinstance(formula, dict) else "",
-                "note": formula.get("note", "") if isinstance(formula, dict) else "",
-            } if formula else None,
         }
 
     triggered = rec.get_triggered_danger_flags()
@@ -801,6 +785,4 @@ def record_detail(rec: DailyRecord) -> dict:
             for k in triggered],
         "danger_all": [v["name"] for v in DANGER_FLAGS.values()],
         "diagnosis": diagnosis,
-        "template_version": rec.raw.get("prompt_template_version")
-            or rec.get_version(),
     }

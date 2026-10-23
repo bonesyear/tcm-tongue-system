@@ -17,7 +17,7 @@
 - **定性→定量评分**：从自然语言描述到 0-10 分的映射引擎
 - **置信度与安全边界**：覆盖度→置信度→方剂建议安全控制
 - **知识检索**：Grep 优先 + 别名词典展开 + RAG 兜底的混合检索
-- **结构化知识库**：7 个 Markdown/YAML 文件，涵盖辨证框架、方剂体系、体质分型、食疗等
+- **结构化知识库**：8 个 Markdown/YAML 文件，涵盖辨证框架、方剂体系、煎服法、体质分型、食疗等
 
 **它不做什么**：不调用 LLM API、不接收或上传图片、不发起任何 HTTP 请求——以上均由外层 Agent 负责。
 
@@ -52,7 +52,7 @@
 | `src/confidence.py` | `from_coverage(n)`、`allows_formula(level)`、`allows_dosage(level)`、`is_consistent` | 覆盖度→置信度→安全边界 |
 | `src/paths.py` | `REPO_ROOT`、`DATA_ROOT`、`ensure_data_dirs()` | 路径配置（`TCM_DATA_ROOT` 环境变量覆盖） |
 | `src/retrieval/` | `retrieve(query)` → 结果列表 + 来源标注 | Grep + 同义词 + RAG 混合检索。⚠️ `search()` 接受原始正则，不受信输入请一律走 `retrieve()` |
-| `knowledge_base/` | 7 个 Markdown/YAML 文件 | 辨证框架、方剂体系、体质分型、食疗、别名词典 |
+| `knowledge_base/` | 8 个 Markdown/YAML 文件 | 辨证框架、方剂体系、煎服法、体质分型、食疗、别名词典 |
 | `templates/` | prompt 模板 + JSON 记录模板 | LLM 分析指令、多维记录 schema |
 
 四个核心 module（`dimensions` / `record` / `scoring` / `confidence`）仅依赖 Python 标准库。
@@ -188,6 +188,8 @@ scripts/
   vision_client.py         # 识图统一入口（OpenAI 兼容视觉模型，可用环境变量插拔）
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
 templates/                 # Prompt 模板 + JSON schema
+web/                       # Flask Web 入口（welcome 门禁/记录/详情/趋势/拍照向导/设置，
+                           # `python web/app.py` 启动，--lan 开局域网）
 tests/                    # pytest 套件（fixtures/ 内置脱敏样例记录；数量随开发变化，以实际运行为准）
 knowledge_base/            # 经方体系知识库（含版权说明见其 README）
 docs/                      # 用户指南、架构分析、审查报告

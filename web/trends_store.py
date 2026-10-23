@@ -175,14 +175,15 @@ def build_report_input(rec, kb_refs: list | None = None) -> str:
     return "\n".join(lines)
 
 
-def _kb_references(rec, max_hits: int = 8) -> list:
+def _kb_references(rec, max_hits: int = 10) -> list:
     """按当日证候检索知识库，返回 [{file, line, excerpt, term}]。
 
-    词条来源：≥4 分的体征措辞 + 已触发红线中文名 + 「忌口」锚词
-    （锚词保证食疗表总能被捞到）。检索失败不阻断报告（stderr 告警）。
+    词条来源：≥4 分的体征措辞 + 已触发红线中文名 + 锚词置顶
+    （「忌口/适宜/食疗」保证食疗表、「煎服/温覆」保证煎服法纲要
+    总能被捞到）。检索失败不阻断报告（stderr 告警）。
     """
     from src.scoring import score_indicators
-    terms = ["忌口", "适宜", "食疗"]  # 锚词置顶：食疗宜忌表总能被捞到
+    terms = ["忌口", "适宜", "食疗", "煎服", "温覆"]  # 锚词置顶
     for dim in DIMENSIONS:
         obs = rec.get_observation(dim)
         if not dim.is_covered(obs) or records_store._is_declared_normal(obs):
@@ -203,9 +204,9 @@ def _kb_references(rec, max_hits: int = 8) -> list:
             r = retrieve(term, context_lines=1)
             # 每词最多取 2 条：防单一高频词（如「红赤」）霸榜挤掉食疗锚词
             for h in r.get("results", [])[:2]:
-                fkey = (h["file"], h["line"])
+                fkey = (h["file"].replace("\\", "/"), h["line"])  # grep/rag 路径分隔符归一
                 if fkey not in hits:
-                    hits[fkey] = {"file": h["file"], "line": h["line"],
+                    hits[fkey] = {"file": fkey[0], "line": h["line"],
                                   "excerpt": h["content"].strip(), "term": term}
     except Exception as e:  # 检索是增强不是门槛：失败只告警，报告照出
         import sys
