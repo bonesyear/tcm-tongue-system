@@ -634,11 +634,13 @@ def create_app(env_file: str | None = None,
                   "VISION_TIMEOUT", "LLM_MODEL", "LLM_BASE_URL"):
             if k in f:
                 updates[k] = f[k].strip()
-        # 辨证模型启用开关（checkbox：未勾 = 缺席 → 记关闭）
-        if "LLM_BASE_URL" in f:
+        # 启用开关（checkbox：未勾 = 缺席 → 记关闭）。门禁用各表单自带的
+        # 隐藏标记（FORM_VISION/FORM_LLM）识别表单来源——不能靠 BASE_URL
+        # 在不在提交里：BASE_URL 被环境变量锁定时输入框 disabled，
+        # 浏览器根本不提交它（v1.8.31 曾因此开关失效）
+        if "FORM_LLM" in f:
             updates["LLM_DISABLED"] = "" if f.get("LLM_ENABLED") else "1"
-        # 视觉模型启用开关（同上；关闭后拍照页改手动录入）
-        if "VISION_BASE_URL" in f:
+        if "FORM_VISION" in f:
             updates["VISION_DISABLED"] = "" if f.get("VISION_ENABLED") else "1"
         if "WEB_HOST" in f:
             updates["WEB_HOST"] = f["WEB_HOST"].strip() or "127.0.0.1"

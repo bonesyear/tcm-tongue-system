@@ -83,6 +83,7 @@
   </p>
   <form method="post" action="/settings">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
+    <input type="hidden" name="FORM_VISION" value="1">
     <div class="form-grid">
       <label>API Key</label>
       {{ secret_input("VISION_API_KEY", "sk-…") }}
@@ -142,6 +143,7 @@
   </p>
   <form method="post" action="/settings">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
+    <input type="hidden" name="FORM_LLM" value="1">
     <div class="form-grid">
       <label>API Key</label>
       {{ secret_input("LLM_API_KEY", "sk-…") }}
