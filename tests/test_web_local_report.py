@@ -62,18 +62,35 @@ def test_pattern_overview_aggregates_fixture():
     blood = ov["directions"][1]
     assert any(e["label"] == "面色" and e["v"] == "晦暗" and "KB L97" in e["note"]
                for e in blood["signs"])
-    # 皮肤干燥（2 分）刻意未映射——positive_n 不含它（宁缺毋滥）
+    # 皮肤干燥（2 分）四证刻意未映射——positive_n 不含它（宁缺毋滥）
     all_labels = [e["label"] for d in ov["directions"] for e in d["signs"]]
     assert "干燥" not in all_labels
 
 
+def test_pattern_overview_constitution_diet_inquiry():
+    """①体质格局两轴陈述；②饮食宜忌带行号出处；③问诊优先项跳过已答。"""
+    ov = _fixture_overview()
+    zx = ov["constitution"]["zheng_xie"]
+    assert "虚" in zx["text"] and "正虚证据" in zx["detail"] and "邪实证据" in zx["detail"]
+    fl = ov["constitution"]["fluid"]
+    assert fl["text"] == "水饮内停，津不上承"  # 水停 11 + 津亏 10 双轴皆在
+    diet = {d["name"]: d for d in ov["diet"]}
+    assert diet["水证"]["宜"].startswith("甘淡利湿")
+    assert "diet-therapy.md:52" in diet["水证"]["src"]
+    assert set(diet) == {"水证", "血证", "火证", "气证"}
+    qs = [i["q"] for i in ov["inquiry"]]
+    assert len(qs) <= 3 and "口渴？" in qs  # 水/血两名倾向的鉴别项
+    assert all(i["why"] for i in ov["inquiry"])
+
+
 def test_pattern_overview_all_zero_is_empty():
-    """平人记录：无阳性归入 → directions 空（页面显示「未见阳性倾向」）。"""
+    """平人记录：四段皆空（页面只显示「未见阳性倾向」）。"""
     rec = DailyRecord({"date": "2026-10-23",
                        "observations": {"tongue": {"body": {"color": "淡红"}}},
                        "inquiry": {}})
     ov = local_report.build_pattern_overview(rec)
     assert ov["directions"] == [] and ov["positive_n"] == 0
+    assert ov["constitution"] is None and ov["diet"] == []
 
 
 def test_settings_toggle_persists(client, tmp_path):
@@ -97,8 +114,11 @@ def test_detail_local_mode_replaces_report_cards(client, tmp_path):
     html = client.get("/record/2026-06-25").get_data(as_text=True)
     assert ">四证倾向速览<" in html
     assert "本地规则引擎" in html and "不是辨证结论" in html
+    assert "体质格局倾向" in html and "正邪观" in html and "津液观" in html
     assert "水证倾向" in html and "血证倾向" in html
     assert "偏胖大" in html and "KB L50" in html  # 证据行带出处注记
+    assert "饮食宜忌方向" in html and "甘淡利湿" in html
+    assert "明日问诊优先项" in html and "口渴？" in html
     assert "辨证报告·提要" not in html and "辨证报告·全案" not in html
     assert 'id="btn-report"' not in html
 
