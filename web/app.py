@@ -629,7 +629,10 @@ def create_app(env_file: str | None = None,
                                    values=settings_values(),
                                    env_locked=_env_locked(),
                                    read_only=True, token_arg="", welcome=False,
-                                   saved=False,
+                                   saved=False, host_changed=False,
+                                   vision_disabled=vision_disabled(),
+                                   llm_disabled=llm_disabled(),
+                                   lan_ip=_lan_ip(),
                                    env_error="无权限：局域网访问需正确管理口令"), 403
         f = request.form
         updates = {}
@@ -648,9 +651,9 @@ def create_app(env_file: str | None = None,
         # 隐藏标记（FORM_VISION/FORM_LLM）识别表单来源——不能靠 BASE_URL
         # 在不在提交里：BASE_URL 被环境变量锁定时输入框 disabled，
         # 浏览器根本不提交它（v1.8.31 曾因此开关失效）
-        if "FORM_LLM" in f:
+        if "FORM_LLM" in f and "LLM_DISABLED" not in boot_env:
             updates["LLM_DISABLED"] = "" if f.get("LLM_ENABLED") else "1"
-        if "FORM_VISION" in f:
+        if "FORM_VISION" in f and "VISION_DISABLED" not in boot_env:
             updates["VISION_DISABLED"] = "" if f.get("VISION_ENABLED") else "1"
         # 监听地址提示只在真改了 WEB_HOST 时出现——必须先读旧值再写回
         host_flag = ""
