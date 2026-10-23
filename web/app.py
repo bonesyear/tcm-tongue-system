@@ -93,6 +93,14 @@ def create_app(env_file: str | None = None,
     def vision_configured() -> bool:
         return bool(cfg("VISION_API_KEY"))
 
+    def vision_disabled() -> bool:
+        """设置页「启用视觉模型」开关：关闭后拍照页改走手动录入。"""
+        return cfg("VISION_DISABLED") == "1"
+
+    def vision_ready() -> bool:
+        """可实际调用视觉模型：开关启用且已配置 key。"""
+        return not vision_disabled() and vision_configured()
+
     def llm_disabled() -> bool:
         """设置页「启用辨证模型」开关：关闭后报告区改走本地规则速览。"""
         return cfg("LLM_DISABLED") == "1"
@@ -312,6 +320,7 @@ def create_app(env_file: str | None = None,
             danger_flags=records_store.DANGER_FLAGS,
             glossary=records_store.GLOSSARY,
             correction_meta=records_store.correction_meta(),
+            manual_mode=not vision_ready(),
         )
 
     # 部位 → 可写的 B 路径前缀（舌面/舌底共享舌诊维度，防止跨部位写
@@ -353,12 +362,12 @@ def create_app(env_file: str | None = None,
         today = datetime.date.today().isoformat()
         draft = wizard_store.load_draft(daily_dir, today)
         st = draft["parts"].get(part, {})
-        # 只允许修订已识图部位——防凭空造「无照片伪观察」（虚增覆盖度/
-        # photo_coverage/confidence），也保住「声明正常」的审计痕迹
-        if st.get("status") != "observed" or not isinstance(
+        # 只允许修订已识图/已手动录入部位——防凭空造「无来源伪观察」
+        # （虚增覆盖度/photo_coverage/confidence），也保住「声明正常」的审计痕迹
+        if st.get("status") not in ("observed", "manual") or not isinstance(
                 st.get("observation"), dict):
             return jsonify({"ok": False, "error":
-                            "该部位未识图，无观察值可修正"}), 400
+                            "该部位未识图/未录入，无观察值可修正"}), 400
         node = st["observation"]
         for k in shapes["B"][:-1]:
             node = node.setdefault(k, {})
@@ -367,6 +376,59 @@ def create_app(env_file: str | None = None,
         node[shapes["B"][-1]] = value
         wizard_store.save_draft(daily_dir, draft)
         # 即时红线反馈（全草稿 + 问诊答案，与 assemble 探测同口径）
+        all_obs = {pt: s.get("observation")
+                   for pt, s in draft["parts"].items() if s.get("observation")}
+        all_obs["inquiry"] = draft.get("inquiry") or {}
+        danger = wizard_store.detect_danger(all_obs)
+        return jsonify({"ok": True, "danger": danger,
+                        "danger_names": [records_store.DANGER_FLAGS.get(
+                            k, {}).get("name", k) for k in danger]})
+
+    @app.post("/wizard/manual")
+    def wizard_manual_field():
+        """手动录入一个观察值（视觉模型未启用时的录入通道，状态 manual）。
+
+        校验链与 /wizard/field 同口径（部位/指标/B 路径前缀/封闭词表），
+        空值不写入（留空字段 = 未检出）；危险信号提交组装时统一重探。"""
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = request.json or {}
+        part = str(body.get("part", ""))
+        indicator = str(body.get("indicator", ""))
+        value = str(body.get("value", "")).strip()
+        p = wizard_store.PART_BY_NAME.get(part)
+        if not p:
+            return jsonify({"ok": False, "error": f"未知部位: {part}"}), 400
+        from src.dimensions import from_chinese
+        from src.record import _DIMENSION_INDICATORS
+        dim = from_chinese(p["dim"])
+        shapes = _DIMENSION_INDICATORS.get(dim, {}).get(indicator)
+        if shapes is None:
+            return jsonify({"ok": False, "error":
+                            f"未知指标: {part}/{indicator}"}), 400
+        b_path = ".".join(shapes["B"])
+        prefixes = _PART_B_PREFIX.get(part)
+        if prefixes and not b_path.startswith(prefixes):
+            return jsonify({"ok": False, "error":
+                            f"{part} 不可写指标 {indicator}"}), 400
+        if not value:
+            return jsonify({"ok": False, "error": "值不能为空"}), 400
+        opts = records_store._field_options(dim, indicator)
+        if opts and value not in opts:
+            return jsonify({"ok": False, "error":
+                            f"值不在封闭词表内: {value}"}), 400
+        today = datetime.date.today().isoformat()
+        draft = wizard_store.load_draft(daily_dir, today)
+        st = draft["parts"].setdefault(part, {})
+        if st.get("status") not in (None, "manual"):
+            return jsonify({"ok": False, "error":
+                            f"{part} 已是「{st.get('status')}」状态，不可手动录入"}), 400
+        st["status"] = "manual"
+        node = st.setdefault("observation", {})
+        for k in shapes["B"][:-1]:
+            node = node.setdefault(k, {})
+        node[shapes["B"][-1]] = value
+        wizard_store.save_draft(daily_dir, draft)
         all_obs = {pt: s.get("observation")
                    for pt, s in draft["parts"].items() if s.get("observation")}
         all_obs["inquiry"] = draft.get("inquiry") or {}
@@ -421,9 +483,9 @@ def create_app(env_file: str | None = None,
         img_path = os.path.join(day_dir, f"{part}{ext}")
         file.save(img_path)
 
-        if not vision_configured():
+        if not vision_ready():
             return jsonify({"ok": False, "photo_saved": True,
-                            "error": "照片已保存，但未配置视觉模型——请到设置页配置后重试识图"}), 400
+                            "error": "照片已保存，但视觉模型未启用——请在设置页启用后重试识图，或直接使用手动录入"}), 400
         _configure_vision()
         try:
             observe_json, _ = wizard_store.observe_photo(part, img_path)
@@ -546,6 +608,7 @@ def create_app(env_file: str | None = None,
             saved=request.args.get("saved") == "1",
             env_error=request.args.get("env_error", ""),
             llm_disabled=llm_disabled(),
+            vision_disabled=vision_disabled(),
             lan_ip=_lan_ip(),
         )
 
@@ -574,6 +637,9 @@ def create_app(env_file: str | None = None,
         # 辨证模型启用开关（checkbox：未勾 = 缺席 → 记关闭）
         if "LLM_BASE_URL" in f:
             updates["LLM_DISABLED"] = "" if f.get("LLM_ENABLED") else "1"
+        # 视觉模型启用开关（同上；关闭后拍照页改手动录入）
+        if "VISION_BASE_URL" in f:
+            updates["VISION_DISABLED"] = "" if f.get("VISION_ENABLED") else "1"
         if "WEB_HOST" in f:
             updates["WEB_HOST"] = f["WEB_HOST"].strip() or "127.0.0.1"
         try:

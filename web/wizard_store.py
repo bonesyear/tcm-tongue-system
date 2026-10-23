@@ -265,7 +265,7 @@ def assemble_record(draft: dict, version: str,
             rec = DailyRecord(existing_raw)
             if dim.is_covered(rec.get_observation(dim)):
                 continue  # 已覆盖维度不动
-        if status == "observed" and st.get("observation"):
+        if status in ("observed", "manual") and st.get("observation"):
             node = observations.setdefault(dim_en, {})
             for k, v in st["observation"].items():
                 if isinstance(v, dict) and k in node and isinstance(node[k], dict):
@@ -308,6 +308,14 @@ def assemble_record(draft: dict, version: str,
         (raw.get("photo_coverage") or []) +
         [from_chinese(PART_BY_NAME[pt]["dim"]).english_name
          for pt, st in draft["parts"].items() if st.get("status") == "observed"]))
+    # 手动录入审计标记：哪些维度是用户肉眼手动录入（非识图）——
+    # photo_coverage 只认 observed，手动录入不计入（防伪观察语义不变）
+    manual_dims = sorted(set(
+        (raw.get("manual_entry") or []) +
+        [from_chinese(PART_BY_NAME[pt]["dim"]).english_name
+         for pt, st in draft["parts"].items() if st.get("status") == "manual"]))
+    if manual_dims:
+        raw["manual_entry"] = manual_dims
     raw["observations"] = observations
 
     # 问诊步答案：模板 inquiry 契约 {问题: {asked, answer}}
