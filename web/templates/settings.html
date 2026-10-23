@@ -76,6 +76,11 @@
     <h2>视觉模型</h2>
     <span class="sec-tag">识图 · 七部位照片分析</span>
   </div>
+  <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
+    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口，必须配置</strong>。
+    其后的评分、安全红线探测、趋势图均由本地规则引擎完成，不再经过模型。
+    需用具备图像理解能力的多模态视觉模型。
+  </p>
   <form method="post" action="/settings">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
     <div class="form-grid">
@@ -119,6 +124,12 @@
     <h2>辨证模型</h2>
     <span class="sec-tag">六经辨证 · 报告生成</span>
   </div>
+  <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
+    作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、
+    饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置时仅详情页「重新生成」按钮不可用，
+    拍照记录、评分、红线、趋势全部照常。任何文本模型均可担任；
+    也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
+  </p>
   <form method="post" action="/settings">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
     <div class="form-grid">
