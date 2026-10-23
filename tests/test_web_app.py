@@ -417,3 +417,19 @@ def test_saved_banner_host_sentence_conditional(client, env_path):
     # 真改 WEB_HOST → 跳转带标记
     resp = client.post("/settings", data={"WEB_HOST": "0.0.0.0"})
     assert "host_changed=1" in resp.headers["Location"]
+
+
+def test_llm_missing_banner(client):
+    """辨证模型启用但未配置 → 全站警告；关闭开关后不再警告。"""
+    html = client.get("/").get_data(as_text=True)
+    assert "LLM_API_KEY" in html  # 默认启用、未配置 → 警告
+    client.post("/settings", data={"FORM_LLM": "1"})  # 关开关
+    html = client.get("/").get_data(as_text=True)
+    assert "LLM_API_KEY" not in html  # 主动关闭 → 不警告
+
+
+def test_vision_disabled_no_banner(client, env_path):
+    """视觉模型主动关闭 → 不再弹「未配置」警告。"""
+    client.post("/settings", data={"FORM_VISION": "1"})
+    html = client.get("/").get_data(as_text=True)
+    assert "VISION_API_KEY" not in html

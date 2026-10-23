@@ -125,7 +125,11 @@ def create_app(env_file: str | None = None,
 
     @app.context_processor
     def inject_flags():
-        return {"vision_missing": not vision_configured()}
+        # 开关主动关闭 = 有意不用，不弹警告；启用但配置不全才提示
+        return {
+            "vision_missing": not vision_disabled() and not vision_configured(),
+            "llm_missing": not llm_disabled() and not llm_ready(),
+        }
 
     @app.get("/welcome")
     def welcome():
