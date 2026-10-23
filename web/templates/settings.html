@@ -276,6 +276,8 @@ function topToast(text, isErr) {
       /* EnvDecodeError 走 302→/settings?env_error=…，r.ok 为真——看落点 URL 识破 */
       if (r.ok && r.url.indexOf("env_error") < 0) {
         topToast("✓ 已保存", false);
+        /* 警告条是服务端渲染的——刷新让「缺配警告」随开关状态即时显隐 */
+        setTimeout(function () { location.reload(); }, 600);
       } else {
         revert();
         topToast(r.status === 403 ? "管理口令失效，请带 ?token= 重载页面"
