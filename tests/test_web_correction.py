@@ -266,3 +266,17 @@ def test_restore_without_prior_correction_400(client):
     resp = client.post("/record/2026-06-25/restore")
     assert resp.status_code == 400
     assert "未被修正" in resp.get_json()["error"]
+
+
+def test_display_dedup_keeps_scoring_intact():
+    """同义异形词显示去重（剥落/剥脱、紫暗/暗紫），评分双词兜底不变。"""
+    import records_store
+    from src.scoring import DIMENSION_RULES, score_indicators
+    from src.dimensions import VisionDimension as V
+    assert "剥脱" not in records_store._field_options(V.TONGUE, "coating_peeling")
+    assert "剥落" in records_store._field_options(V.TONGUE, "coating_peeling")
+    assert "暗紫" not in records_store._field_options(V.HAND, "nail_color")
+    # 评分层不受影响
+    assert DIMENSION_RULES[V.TONGUE]["coating_peeling"]["剥脱"] == 6
+    assert DIMENSION_RULES[V.HAND]["nail_color"]["暗紫"] == 4
+    assert score_indicators(V.TONGUE, {"coating_peeling": "剥脱"})["coating_peeling"] == 6

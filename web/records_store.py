@@ -259,14 +259,23 @@ GLOSSARY.update({
 })
 
 
+# 显示层去重（评分层双词兜底不动）：同义异形词只保留一个显示选项，
+# 避免用户以为「剥落/剥脱」「紫暗/暗紫」是两种程度。
+_DISPLAY_HIDE = {
+    "coating_peeling": {"剥脱"},   # 剥落=剥脱（同分同义，保留「剥落」）
+    "nail_color": {"暗紫"},        # 紫暗=暗紫（同分同义，保留「紫暗」）
+}
+
+
 def _field_options(dim, indicator: str):
     """修正 UI 的封闭选项；无词表且未人工指定时返回 None（回落自由文本）。"""
+    hide = _DISPLAY_HIDE.get(indicator, set())
     rules = DIMENSION_RULES.get(dim, {}).get(indicator)
     if rules:
         opts = list(rules.keys())
         if not any(v == 0 for v in rules.values()):
             opts.insert(0, NORMAL_OPTION)
-        return opts
+        return [o for o in opts if o not in hide]
     return FIELD_OPTIONS.get(indicator)
 
 
