@@ -119,9 +119,7 @@
     {% if 'VISION_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
   </div>
   <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
-    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口</strong>。
-    未配置或在下方关闭时，拍照页改用<strong>手动录入模式</strong>（肉眼观察后逐项选择，评分/红线/趋势照常由本地引擎完成）。
-    需用具备图像理解能力的多模态视觉模型。
+    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口</strong>。未配置或在下方关闭时，拍照页改用<strong>手动录入模式</strong>（肉眼观察后逐项选择，评分/红线/趋势照常由本地引擎完成）。需用具备图像理解能力的多模态视觉模型。
   </p>
   <form method="post" action="/settings" id="form-vision"
         {% if vision_disabled %}style="display:none;"{% endif %}>
@@ -177,10 +175,7 @@
     {% if 'LLM_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
   </div>
   <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
-    作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、
-    饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置或在下方关闭时，
-    详情页报告区改用本地规则「四证倾向速览」，拍照记录、评分、红线、趋势全部照常。
-    任何文本模型均可担任；也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
+    作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置或在下方关闭时，详情页报告区改用本地规则「四证倾向速览」，拍照记录、评分、红线、趋势全部照常。任何文本模型均可担任；也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
   </p>
   <form method="post" action="/settings" id="form-llm"
         {% if llm_disabled %}style="display:none;"{% endif %}>
