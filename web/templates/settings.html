@@ -32,6 +32,13 @@
   .switch input:checked + .slider { background: var(--cinnabar); }
   .switch input:checked + .slider::before { transform: translateX(20px); }
   .switch input:disabled + .slider { opacity: .5; }
+  /* 可折叠卡片（访问与安全）：头部箭头旋转指示 */
+  .collapse-head { cursor: pointer; user-select: none; }
+  .collapse-head .chev {
+    display: inline-block; transition: transform .2s ease;
+    color: var(--ink-3); font-size: 13px;
+  }
+  .collapse-head .chev.open { transform: rotate(90deg); }
   /* 顶部保存横幅：滑下→停驻→滑回 */
   .top-toast {
     position: fixed; top: 14px; left: 50%; z-index: 110;
@@ -209,8 +216,14 @@
 
 <!-- 访问与安全 -->
 <div class="card">
-  <div class="card-head"><h2>访问与安全</h2></div>
-  <form method="post" action="/settings">
+  <div class="card-head collapse-head" id="access-head" role="button" tabindex="0"
+       aria-expanded="false" title="点击展开/折叠">
+    <h2>访问与安全</h2>
+    <span class="faint" style="font-size:12.5px;">局域网开关与管理口令</span>
+    <span class="spacer"></span>
+    <span class="chev" id="access-chev">▶</span>
+  </div>
+  <form method="post" action="/settings" id="form-access" style="display:none;">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
     <div class="form-grid">
       <label>监听地址</label>
@@ -240,6 +253,24 @@
 </div>
 
 <script>
+/* 访问与安全卡片：点头部折叠/展开 */
+(function () {
+  var head = document.getElementById("access-head");
+  var form = document.getElementById("form-access");
+  var chev = document.getElementById("access-chev");
+  if (!head || !form) return;
+  function toggle() {
+    var open = form.style.display !== "none";
+    form.style.display = open ? "none" : "";
+    chev.classList.toggle("open", !open);
+    head.setAttribute("aria-expanded", String(!open));
+  }
+  head.addEventListener("click", toggle);
+  head.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+  });
+})();
+
 /* 顶部横幅提示（保存等轻反馈共用） */
 var _toastTimer = null;
 function topToast(text, isErr) {
