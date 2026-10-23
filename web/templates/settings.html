@@ -252,7 +252,7 @@
     var fd = new FormData(form);
     sw.disabled = true;
     var tip = document.createElement("span");
-    sw.closest(".switch").appendChild(tip);  /* 滑轨右侧（label 内联尾端），不推挤开关 */
+    sw.closest(".switch").before(tip);  /* 开关左侧（spacer 之后），开关位置不动 */
     fetch("/settings", {method: "POST", body: fd}).then(function (r) {
       tip.className = "switch-tip" + (r.ok ? "" : " err");
       tip.textContent = r.ok ? "✓ 已保存" : "保存失败（HTTP " + r.status + "）";
