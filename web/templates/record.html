@@ -335,6 +335,42 @@
   {% endif %}
 </div>
 
+{% if local_mode %}
+{# 本地规则模式：未启用/未配置辨证模型 —— 四证倾向速览（现场计算，非辨证结论） #}
+<div class="card">
+  <div class="card-head">
+    <h2>四证倾向速览</h2>
+    <span class="tag">本地规则引擎</span>
+    <span class="spacer"></span>
+    <span class="faint" style="font-size:12px;">辨证模型未启用</span>
+  </div>
+  <p class="muted" style="font-size:13px; margin:2px 0 12px; line-height:1.7;">
+    以下为阳性体征按 水/火/气/血 四个方向的确定性聚类（本地规则，指标→方向映射见知识库），<strong>不是辨证结论</strong>。
+    在设置页启用辨证模型后，此处显示完整辨证报告（三观/四证/六经 + 饮食起居 + 方药）。
+  </p>
+  {% if local_overview.directions %}
+  {% for d in local_overview.directions %}
+  <div style="margin-bottom:14px;">
+    <div class="row" style="gap:8px; margin-bottom:4px;">
+      <h3 class="sect-h">{{ d.name }}倾向</h3>
+      <span class="badge {{ sev(d.total) }} num">{{ d.total }}</span>
+    </div>
+    <div class="fields">
+      {% for e in d.signs %}
+      <div class="field-row">
+        <span class="k">{{ e.dim }}·{{ e.label }}</span>
+        <span class="v">{{ e.v }}<span class="faint" style="font-size:12px;">（{{ e.note }}）</span></span>
+        <span class="badge {{ sev(e.s) }} num">{{ e.s }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="faint">六维未见阳性倾向（本地规则）。</p>
+  {% endif %}
+</div>
+{% else %}
 <div class="card">
   <div class="card-head">
     <h2>辨证报告·提要</h2>
@@ -481,6 +517,7 @@
   </details>
   {% endif %}
 </div>
+{% endif %}
 {% endif %}
 
 <script>

@@ -126,9 +126,9 @@
   </div>
   <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
     作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、
-    饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置时仅详情页「重新生成」按钮不可用，
-    拍照记录、评分、红线、趋势全部照常。任何文本模型均可担任；
-    也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
+    饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置或在下方关闭时，
+    详情页报告区改用本地规则「四证倾向速览」，拍照记录、评分、红线、趋势全部照常。
+    任何文本模型均可担任；也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
   </p>
   <form method="post" action="/settings">
     <input type="hidden" name="admin_token" value="{{ token_arg }}">
@@ -149,6 +149,16 @@
                 {% if read_only %}disabled{% endif %}>获取列表</button>
       </div>
       <div class="form-hint"><span class="env-note">LLM_MODEL</span> · 先填端点再点「获取列表」从端点拉取可选模型<span id="models-llm-hint"></span></div>
+
+      <label>启用</label>
+      <div>
+        <label style="font-weight:400; display:flex; gap:8px; align-items:center;">
+          <input type="checkbox" name="LLM_ENABLED" value="1"
+                 {% if not llm_disabled %}checked{% endif %} {% if read_only %}disabled{% endif %}>
+          启用辨证模型
+        </label>
+      </div>
+      <div class="form-hint">关闭后不再调用 LLM 生成报告，详情页报告区改用本地规则「四证倾向速览」（阳性体征的方向聚类，非辨证结论）；已生成的历史报告保留在记录中不动，重新启用后恢复显示</div>
     </div>
     <hr class="divider">
     <div class="row">

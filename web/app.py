@@ -31,6 +31,7 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, \
 
 import envfile
 import llm_client
+import local_report
 import mdmini
 import records_store
 import trends_store
@@ -91,6 +92,15 @@ def create_app(env_file: str | None = None,
 
     def vision_configured() -> bool:
         return bool(cfg("VISION_API_KEY"))
+
+    def llm_disabled() -> bool:
+        """设置页「启用辨证模型」开关：关闭后报告区改走本地规则速览。"""
+        return cfg("LLM_DISABLED") == "1"
+
+    def llm_ready() -> bool:
+        """可实际调用辨证 LLM：开关启用且三要素齐全。"""
+        return (not llm_disabled() and bool(cfg("LLM_API_KEY")
+                and cfg("LLM_MODEL") and cfg("LLM_BASE_URL")))
 
     # 每次进程启动生成新口令 → 重启后声明页必重新确认
     boot_token = secrets.token_hex(8)
@@ -182,12 +192,24 @@ def create_app(env_file: str | None = None,
         if rec is None:
             abort(404)
         diag = rec.raw.get("diagnosis")
+        # 报告区模式：
+        #  - 启用且配置齐全 → LLM 模式（提要/全案 + 重新生成）
+        #  - 设置页关闭   → 本地规则速览（历史内容隐藏，重新启用恢复）
+        #  - 未配置未关闭 → 记录里已有 LLM 期内容（报告或结构化结论）则照旧
+        #                   展示（仅不能生成新的）；全无则本地规则速览
+        has_llm_content = (isinstance(diag, dict)
+                           and isinstance(diag.get("report"), dict)) \
+            or bool(rec.get_pattern_differentiation())
+        local_mode = llm_disabled() or (not llm_ready() and not has_llm_content)
         return render_template(
             "record.html", page="index",
             r=records_store.record_detail(rec),
-            report=(diag.get("report") if isinstance(diag, dict) else None),
-            llm_configured=bool(cfg("LLM_API_KEY") and cfg("LLM_MODEL")
-                                and cfg("LLM_BASE_URL")),
+            report=None if local_mode else (
+                diag.get("report") if isinstance(diag, dict) else None),
+            llm_configured=llm_ready(),
+            local_mode=local_mode,
+            local_overview=(local_report.build_pattern_overview(rec)
+                            if local_mode else None),
             photos=records_store.list_photos(photos_dir, date),
             sev=records_store.sev_class,
         )
@@ -199,6 +221,9 @@ def create_app(env_file: str | None = None,
             return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
         if not _DATE_RE.match(date):
             abort(404)
+        if llm_disabled():
+            return jsonify({"ok": False,
+                            "error": "辨证模型已在设置页关闭（本地速览模式）"}), 400
         result = trends_store.generate_and_store_report(
             daily_dir, backup_dir, date,
             lambda: (cfg("LLM_MODEL"), cfg("LLM_BASE_URL"), cfg("LLM_API_KEY")))
@@ -520,6 +545,7 @@ def create_app(env_file: str | None = None,
             welcome=request.args.get("welcome") == "1",
             saved=request.args.get("saved") == "1",
             env_error=request.args.get("env_error", ""),
+            llm_disabled=llm_disabled(),
             lan_ip=_lan_ip(),
         )
 
@@ -545,6 +571,9 @@ def create_app(env_file: str | None = None,
                   "VISION_TIMEOUT", "LLM_MODEL", "LLM_BASE_URL"):
             if k in f:
                 updates[k] = f[k].strip()
+        # 辨证模型启用开关（checkbox：未勾 = 缺席 → 记关闭）
+        if "LLM_BASE_URL" in f:
+            updates["LLM_DISABLED"] = "" if f.get("LLM_ENABLED") else "1"
         if "WEB_HOST" in f:
             updates["WEB_HOST"] = f["WEB_HOST"].strip() or "127.0.0.1"
         try:
