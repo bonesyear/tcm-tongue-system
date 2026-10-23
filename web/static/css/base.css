@@ -308,6 +308,11 @@ a:hover { color: var(--cinnabar-deep); }
   to { opacity: 1; transform: translateY(0); }
 }
 .warn-slide { animation: warn-slide-in .3s ease; }
+@keyframes warn-slide-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+.warn-slide.slide-out { animation: warn-slide-out .25s ease forwards; }
 
 /* ---------------- 危险警示 ---------------- */
 
