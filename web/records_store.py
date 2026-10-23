@@ -265,6 +265,7 @@ GLOSSARY.update({
 _DISPLAY_HIDE = {
     "coating_peeling": {"剥脱"},   # 剥落=剥脱（同分同义，保留「剥落」）
     "nail_color": {"暗紫"},        # 紫暗=暗紫（同分同义，保留「紫暗」）
+    "color": {"橘皮"},             # 黄如橘皮=橘皮（同分同义，保留教材全句「黄如橘皮」）
 }
 
 
