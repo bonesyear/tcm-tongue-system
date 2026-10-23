@@ -301,7 +301,7 @@ a:hover { color: var(--cinnabar-deep); }
 
 .field-row .v { color: var(--ink); }
 
-/* ---------------- 顶部缺配警告滑入（出现动画；消失由刷新后不渲染完成） ---------------- */
+/* ---------------- 顶部缺配警告滑动（滑入渲染；关闭方向客户端滑出移除，其余随刷新不再渲染） ---------------- */
 
 @keyframes warn-slide-in {
   from { opacity: 0; transform: translateY(-10px); }

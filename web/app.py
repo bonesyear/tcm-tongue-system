@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import sys
 import tempfile
 
@@ -112,6 +113,8 @@ def create_app(env_file: str | None = None,
 
     # 每次进程启动生成新口令 → 重启后声明页必重新确认
     boot_token = secrets.token_hex(8)
+    # write_env 读-改-写非原子，开关 fetch 并发会互踩——串行化
+    env_lock = threading.Lock()
 
     @app.before_request
     def require_boot_ack():
@@ -668,7 +671,8 @@ def create_app(env_file: str | None = None,
             if new_v != cur:
                 host_flag = "&host_changed=1"
         try:
-            envfile.write_env(env_path, updates)
+            with env_lock:
+                envfile.write_env(env_path, updates)
         except envfile.EnvDecodeError as e:
             return redirect(f"/settings?env_error={str(e)}")
         suffix = f"&token={f.get('admin_token')}" if f.get("admin_token") else ""

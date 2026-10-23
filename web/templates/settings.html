@@ -212,7 +212,7 @@
 <!-- 访问与安全 -->
 <div class="card">
   <div class="card-head collapse-head" id="access-head" role="button" tabindex="0"
-       aria-expanded="false" title="点击展开/折叠">
+       aria-expanded="false" aria-controls="form-access" title="点击展开/折叠">
     <h2>访问与安全</h2>
     <span class="faint" style="font-size:12.5px;">局域网开关与管理口令</span>
     <span class="spacer"></span>
@@ -268,6 +268,7 @@
 
 /* 顶部横幅提示（保存等轻反馈共用） */
 var _toastTimer = null;
+var _reloadTimer = null;
 function topToast(text, isErr) {
   var el = document.getElementById("top-toast");
   if (!el) {
@@ -293,7 +294,7 @@ function topToast(text, isErr) {
     if (sw.disabled) return;
     var fd = new FormData(form);
     sw.disabled = true;
-    var prevChecked = sw.checked;
+    var prevChecked = !sw.checked;  /* change 触发时已是新值，前值取反 */
     var revert = function () {
       sw.checked = prevChecked;
       form.style.display = prevChecked ? "" : "none";
@@ -312,7 +313,8 @@ function topToast(text, isErr) {
           }
         } else {
           /* 打开方向：可能需补出警告条（服务端渲染），刷新取得正确状态 */
-          setTimeout(function () { location.reload(); }, 600);
+          clearTimeout(_reloadTimer);  /* 连切两个开关时取消上一笔的待刷新 */
+          _reloadTimer = setTimeout(function () { location.reload(); }, 600);
         }
       } else {
         revert();
