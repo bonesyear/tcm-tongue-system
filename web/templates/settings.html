@@ -46,7 +46,7 @@
 {% endif %}
 {% if saved %}
 <div class="alert-note" style="border-color: var(--sev-0); background: var(--sev-0-bg);">
-  <strong>已保存。</strong>配置已写入 .env；监听地址的变更在下次启动服务后生效。
+  <strong>已保存。</strong>配置已写入 .env。{% if host_changed %}监听地址的变更在下次启动服务后生效。{% endif %}
 </div>
 {% endif %}
 {% if env_error %}
@@ -228,14 +228,25 @@
 </div>
 
 <script>
-/* 模型启用滑动开关：切换 = 展开/折叠表单 + 立即保存（开关状态写 .env） */
+/* 模型启用滑动开关：切换 = 展开/折叠表单 + 后台保存（轻提示，不整页跳转） */
 [["form-vision"], ["form-llm"]].forEach(function ([fid]) {
   var form = document.getElementById(fid);
   var sw = document.querySelector('input[form="' + fid + '"]');
   if (!form || !sw) return;
   sw.addEventListener("change", function () {
     form.style.display = sw.checked ? "" : "none";
-    if (!sw.disabled) form.submit();
+    if (sw.disabled) return;
+    var fd = new FormData(form);
+    sw.disabled = true;
+    fetch("/settings", {method: "POST", body: fd}).then(function (r) {
+      var tip = document.createElement("span");
+      tip.className = "faint";
+      tip.style.cssText = "font-size:12.5px; margin-left:8px;";
+      tip.textContent = r.ok ? "已保存" : "保存失败（HTTP " + r.status + "）";
+      sw.closest(".card-head").appendChild(tip);
+      setTimeout(function () { tip.remove(); }, 2000);
+    }).catch(function (e) { alert("保存失败：" + e); })
+      .finally(function () { sw.disabled = false; });
   });
 });
 

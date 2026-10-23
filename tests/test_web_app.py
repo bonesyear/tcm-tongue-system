@@ -403,3 +403,17 @@ def test_inquiry_options_glossary_full_coverage():
         opts.update(item["options"])
     missing = sorted(o for o in opts if o not in records_store.GLOSSARY)
     assert missing == [], f"缺词条: {missing}"
+
+
+def test_saved_banner_host_sentence_conditional(client, env_path):
+    """监听地址提示只在真改了 WEB_HOST 时出现。"""
+    resp = client.post("/settings", data={"VISION_MODEL": "m"})
+    assert resp.headers["Location"].startswith("/settings?saved=1")
+    assert "host_changed" not in resp.headers["Location"]
+    html = client.get("/settings?saved=1").get_data(as_text=True)
+    assert "监听地址的变更" not in html
+    html2 = client.get("/settings?saved=1&host_changed=1").get_data(as_text=True)
+    assert "监听地址的变更" in html2
+    # 真改 WEB_HOST → 跳转带标记
+    resp = client.post("/settings", data={"WEB_HOST": "0.0.0.0"})
+    assert "host_changed=1" in resp.headers["Location"]

@@ -615,6 +615,7 @@ def create_app(env_file: str | None = None,
             token_arg=request.args.get("token", ""),
             welcome=request.args.get("welcome") == "1",
             saved=request.args.get("saved") == "1",
+            host_changed=request.args.get("host_changed") == "1",
             env_error=request.args.get("env_error", ""),
             llm_disabled=llm_disabled(),
             vision_disabled=vision_disabled(),
@@ -651,14 +652,20 @@ def create_app(env_file: str | None = None,
             updates["LLM_DISABLED"] = "" if f.get("LLM_ENABLED") else "1"
         if "FORM_VISION" in f:
             updates["VISION_DISABLED"] = "" if f.get("VISION_ENABLED") else "1"
+        # 监听地址提示只在真改了 WEB_HOST 时出现——必须先读旧值再写回
+        host_flag = ""
         if "WEB_HOST" in f:
-            updates["WEB_HOST"] = f["WEB_HOST"].strip() or "127.0.0.1"
+            cur = envfile.effective("WEB_HOST", env_path, "127.0.0.1")
+            new_v = f["WEB_HOST"].strip() or "127.0.0.1"
+            updates["WEB_HOST"] = new_v
+            if new_v != cur:
+                host_flag = "&host_changed=1"
         try:
             envfile.write_env(env_path, updates)
         except envfile.EnvDecodeError as e:
             return redirect(f"/settings?env_error={str(e)}")
         suffix = f"&token={f.get('admin_token')}" if f.get("admin_token") else ""
-        return redirect(f"/settings?saved=1{suffix}")
+        return redirect(f"/settings?saved=1{host_flag}{suffix}")
 
     @app.post("/settings/models")
     def settings_models():
