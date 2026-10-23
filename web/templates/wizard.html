@@ -92,6 +92,20 @@
 </div>
 {% endif %}
 
+{% if manual_mode %}
+<div class="card" style="border-left:4px solid var(--cinnabar);">
+  <div class="card-head">
+    <h2>手动录入模式</h2>
+    <span class="tag cinnabar">视觉模型未启用</span>
+  </div>
+  <p class="muted" style="font-size:13.5px; line-height:1.8; margin:4px 0 0;">
+    视觉模型已关闭或未配置，拍照识图不可用。请<strong>用肉眼逐项观察</strong>，在每一步为你能确认的指标选择最接近的选项
+    （拿不准的指标留空 = 未检出；整维无法判断时用下方「跳过」）。
+    提交后评分、安全红线、趋势均由本地引擎照常计算；到「设置」页启用视觉模型即可恢复拍照识图。
+  </p>
+</div>
+{% endif %}
+
 <div class="card">
   <ol class="steps" id="steps">
     {% for p in state.parts %}
@@ -164,6 +178,12 @@
     <div class="obs-preview" id="obs-preview"></div>
   </div>
 
+  <div id="manual-box" style="display:none; margin-top:12px;">
+    <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:6px; font-family:var(--font-serif);">手动录入（肉眼判断，逐项选择；留空 = 未检出）</div>
+    <div id="manual-danger" class="alert-danger" style="display:none; margin-bottom:8px;"></div>
+    <div id="manual-rows" class="fields"></div>
+  </div>
+
   <hr class="divider">
 
   <div class="row wrap">
@@ -212,6 +232,7 @@
 
 <script>
 var STATE = {{ state | tojson }};
+var MANUAL_MODE = {{ manual_mode | tojson }};
 var DANGER_FLAGS = {{ danger_flags | tojson }};
 var PARTS = STATE.parts;
 var cur = 0;
@@ -245,8 +266,14 @@ function render() {
   document.getElementById("step-dim").textContent = p.dim;
   document.getElementById("step-status").textContent =
     p.status === "observed" ? "✓ 已识图" :
+    p.status === "manual" ? "✓ 已手动录入" :
     p.status === "skip_normal" ? "✓ 跳过（声明正常）" :
     p.status === "skip_uncovered" ? "✓ 跳过（未覆盖）" : "";
+  /* 手动模式：隐藏拍照区/拍摄纪律/指南链接，显示手动录入卡 */
+  document.getElementById("capture").style.display = MANUAL_MODE ? "none" : "";
+  document.getElementById("tips").closest("div").style.display = MANUAL_MODE ? "none" : "";
+  document.getElementById("manual-box").style.display = MANUAL_MODE ? "" : "none";
+  if (MANUAL_MODE) renderManual(p);
   document.getElementById("tips").innerHTML = p.tips.map(function (t) {
     return '<li class="' + (isWarnTip(t) ? "warn" : "") + '">' + t.replace("⚠️ ", "") + "</li>";
   }).join("");
@@ -261,6 +288,91 @@ function render() {
     obsBox.style.display = "none";
   }
   updateNav();
+}
+
+/* ---- 手动录入通道（MANUAL_MODE 开启时）：逐项肉眼选择，写 /wizard/manual ---- */
+var MANUAL_B_PREFIX = {"舌面": ["body.", "coating."], "舌底": ["sublingual."]};
+
+function renderManual(p) {
+  var box = document.getElementById("manual-rows");
+  box.innerHTML = "";
+  var meta = CORRECTION_META[DIM_EN[p.dim]] || {};
+  var prefixes = MANUAL_B_PREFIX[p.part];
+  Object.keys(meta).forEach(function (path) {
+    if (prefixes && prefixes.indexOf(path.split(".")[0] + ".") < 0) return;
+    var m = meta[path];
+    var curVal = p.observation ? digPath(p.observation, path) : "";
+    var row = document.createElement("div");
+    row.className = "field-row";
+    var k = document.createElement("span");
+    k.className = "k";
+    k.textContent = m.label;
+    if (m.scored === false) {
+      var ref = document.createElement("span");
+      ref.className = "ref";
+      ref.title = "不参与评分，仅供辨证";
+      ref.textContent = "参考项";
+      k.appendChild(document.createTextNode(" "));
+      k.appendChild(ref);
+    }
+    var v = document.createElement("span");
+    v.className = "v";
+    var opts = m.opts || [];
+    if (opts.length) {
+      var chips = document.createElement("div");
+      chips.className = "inq-chips";
+      opts.forEach(function (opt) {
+        var c = document.createElement("button");
+        c.type = "button";
+        c.className = "inq-chip" + (opt === curVal ? " on" : "");
+        c.textContent = opt;
+        if (m.gloss && m.gloss[opt]) c.title = m.gloss[opt];
+        c.addEventListener("click", function () { manualSave(p, path, m.ind, opt); });
+        chips.appendChild(c);
+      });
+      v.appendChild(chips);
+    } else {
+      var wrap = document.createElement("div");
+      wrap.className = "row";
+      var inp = document.createElement("input");
+      inp.value = curVal;
+      inp.placeholder = "肉眼所见（留空 = 未检出）";
+      inp.setAttribute("aria-label", m.label);
+      inp.style.maxWidth = "220px";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-subtle btn-sm";
+      btn.textContent = "保存";
+      btn.addEventListener("click", function () { manualSave(p, path, m.ind, inp.value); });
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      v.appendChild(wrap);
+    }
+    row.appendChild(k);
+    row.appendChild(v);
+    box.appendChild(row);
+  });
+}
+
+function manualSave(p, path, ind, value) {
+  value = (value || "").trim();
+  if (!value) return;
+  postJSON("/wizard/manual", {part: p.part, indicator: ind, value: value})
+    .then(function (d) {
+      if (!d.ok) { alert(d.error || "保存失败"); return; }
+      if (!p.observation) p.observation = {};
+      setPath(p.observation, path, value);
+      p.status = "manual";
+      var md = document.getElementById("manual-danger");
+      if (d.danger_names && d.danger_names.length) {
+        md.innerHTML = "<strong>⚠ 触发危险信号：" + d.danger_names.join("、") +
+          "</strong>——提交时会出现拦截确认，请逐项复核";
+        md.style.display = "";
+      } else {
+        md.style.display = "none";
+      }
+      render();
+    });
 }
 
 var inquiryAnswered = {{ (state.inquiry | length > 0) | tojson }};

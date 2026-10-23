@@ -77,8 +77,8 @@
     <span class="sec-tag">识图 · 七部位照片分析</span>
   </div>
   <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
-    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口，必须配置</strong>。
-    其后的评分、安全红线探测、趋势图均由本地规则引擎完成，不再经过模型。
+    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口</strong>。
+    未配置或在下方关闭时，拍照页改用<strong>手动录入模式</strong>（肉眼观察后逐项选择，评分/红线/趋势照常由本地引擎完成）。
     需用具备图像理解能力的多模态视觉模型。
   </p>
   <form method="post" action="/settings">
@@ -108,6 +108,16 @@
       <label>超时（秒）</label>
       <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TIMEOUT' in env_locked %}disabled{% endif %}>
       <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span> · <strong>推荐 150–300</strong>：识图是大请求（照片 base64 + 结构化输出），过短会中途超时失败；思考型模型取大些。留空则用代码默认 150</div>
+
+      <label>启用</label>
+      <div>
+        <label style="font-weight:400; display:flex; gap:8px; align-items:center;">
+          <input type="checkbox" name="VISION_ENABLED" value="1"
+                 {% if not vision_disabled %}checked{% endif %} {% if read_only %}disabled{% endif %}>
+          启用视觉模型
+        </label>
+      </div>
+      <div class="form-hint">关闭后拍照页不再调用识图 API，改用手动录入模式（逐部位肉眼判断、选项化录入）；已生成的历史记录不受影响</div>
     </div>
     <hr class="divider">
     <div class="row">
