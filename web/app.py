@@ -411,23 +411,31 @@ def create_app(env_file: str | None = None,
         if prefixes and not b_path.startswith(prefixes):
             return jsonify({"ok": False, "error":
                             f"{part} 不可写指标 {indicator}"}), 400
-        if not value:
-            return jsonify({"ok": False, "error": "值不能为空"}), 400
         opts = records_store._field_options(dim, indicator)
-        if opts and value not in opts:
+        if value and opts and value not in opts:
             return jsonify({"ok": False, "error":
                             f"值不在封闭词表内: {value}"}), 400
         today = datetime.date.today().isoformat()
         draft = wizard_store.load_draft(daily_dir, today)
         st = draft["parts"].setdefault(part, {})
-        if st.get("status") not in (None, "manual"):
+        # 可写状态：未开始/已手动录入/已跳过（跳过后改主意允许用真实值覆盖——
+        # 真实录入优先于声明，审计语义更好，也给误点跳过留逃生口）
+        if st.get("status") not in (None, "manual", "skip_normal", "skip_uncovered"):
             return jsonify({"ok": False, "error":
                             f"{part} 已是「{st.get('status')}」状态，不可手动录入"}), 400
         st["status"] = "manual"
-        node = st.setdefault("observation", {})
+        if not isinstance(st.get("observation"), dict):
+            st["observation"] = {}
+        node = st["observation"]
         for k in shapes["B"][:-1]:
-            node = node.setdefault(k, {})
-        node[shapes["B"][-1]] = value
+            cur = node.setdefault(k, {})
+            if not isinstance(cur, dict):
+                return jsonify({"ok": False, "error": "草稿结构异常"}), 400
+            node = cur
+        if value:
+            node[shapes["B"][-1]] = value
+        else:
+            node.pop(shapes["B"][-1], None)  # 空值 = 撤销该项（回到未检出）
         wizard_store.save_draft(daily_dir, draft)
         all_obs = {pt: s.get("observation")
                    for pt, s in draft["parts"].items() if s.get("observation")}
@@ -594,7 +602,8 @@ def create_app(env_file: str | None = None,
         return values
 
     def _env_locked():
-        return [k for k in VISION_KEYS + LLM_KEYS + ["WEB_ADMIN_TOKEN", "WEB_HOST"]
+        return [k for k in VISION_KEYS + LLM_KEYS +
+                ["WEB_ADMIN_TOKEN", "WEB_HOST", "VISION_DISABLED", "LLM_DISABLED"]
                 if boot_env.get(k)]
 
     @app.get("/settings")

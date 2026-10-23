@@ -473,8 +473,11 @@ def load_record(daily_dir: str, date_str: str):
         return None
     try:
         with open(filepath, encoding="utf-8") as f:
-            return DailyRecord(json.load(f))
-    except (OSError, json.JSONDecodeError) as e:
+            raw = json.load(f)
+        if not isinstance(raw, dict):
+            raise TypeError(f"记录根节点不是对象（{type(raw).__name__}）")
+        return DailyRecord(raw)
+    except (OSError, json.JSONDecodeError, TypeError) as e:
         print(f"⚠️ 警告: 记录 {filepath} 解析失败: {e}", file=sys.stderr)
         return None
 

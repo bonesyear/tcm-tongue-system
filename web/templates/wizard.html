@@ -179,7 +179,7 @@
   </div>
 
   <div id="manual-box" style="display:none; margin-top:12px;">
-    <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:6px; font-family:var(--font-serif);">手动录入（肉眼判断，逐项选择；留空 = 未检出）</div>
+    <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:6px; font-family:var(--font-serif);">手动录入（肉眼判断，逐项选择；留空 = 未检出，再点一次选中项 = 撤销）</div>
     <div id="manual-danger" class="alert-danger" style="display:none; margin-bottom:8px;"></div>
     <div id="manual-rows" class="fields"></div>
   </div>
@@ -221,7 +221,7 @@
       </div>
     </div>
     <p class="muted" style="font-size:13px; margin:10px 0 0;">
-      模型判读可能误判。请先肉眼复核照片与实际情况；确认无误请选择保留警示，误判请选择修正。
+      {% if manual_mode %}录入值可能有误。请先逐项复核；确认无误请选择保留警示，误判请选择修正。{% else %}模型判读可能误判。请先肉眼复核照片与实际情况；确认无误请选择保留警示，误判请选择修正。{% endif %}
     </p>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="danger-fix">误判，去修正观察值</button>
@@ -327,7 +327,10 @@ function renderManual(p) {
         c.className = "inq-chip" + (opt === curVal ? " on" : "");
         c.textContent = opt;
         if (m.gloss && m.gloss[opt]) c.title = m.gloss[opt];
-        c.addEventListener("click", function () { manualSave(p, path, m.ind, opt); });
+        c.addEventListener("click", function () {
+          /* 再点一次已选中项 = 撤销该项（回未检出） */
+          manualSave(p, path, m.ind, opt === curVal ? "" : opt);
+        });
         chips.appendChild(c);
       });
       v.appendChild(chips);
@@ -356,12 +359,11 @@ function renderManual(p) {
 
 function manualSave(p, path, ind, value) {
   value = (value || "").trim();
-  if (!value) return;
   postJSON("/wizard/manual", {part: p.part, indicator: ind, value: value})
     .then(function (d) {
       if (!d.ok) { alert(d.error || "保存失败"); return; }
       if (!p.observation) p.observation = {};
-      setPath(p.observation, path, value);
+      setPath(p.observation, path, value);  // 空值 = 撤销该项（服务端同步删除叶子键）
       p.status = "manual";
       var md = document.getElementById("manual-danger");
       if (d.danger_names && d.danger_names.length) {
@@ -484,7 +486,7 @@ function renderReview() {
   var PART_PREFIX = {"舌面": ["body.", "coating."], "舌底": ["sublingual."]};
   var any = false;
   PARTS.forEach(function (p) {
-    if (p.status !== "observed" || !p.observation) return;
+    if ((p.status !== "observed" && p.status !== "manual") || !p.observation) return;
     var fields = CORRECTION_META[DIM_EN[p.dim]] || {};
     var prefixes = PART_PREFIX[p.part];
     var rows = [];
@@ -705,6 +707,9 @@ function postJSON(url, body) {
 document.getElementById("skip-normal").addEventListener("click", function () { skip("normal"); });
 document.getElementById("skip-uncovered").addEventListener("click", function () { skip("uncovered"); });
 function skip(m) {
+  var obs = PARTS[cur].observation;
+  var n = obs && typeof obs === "object" ? Object.keys(obs).length : 0;
+  if (n > 0 && !confirm("「" + PARTS[cur].part + "」已录入 " + n + " 组数据，跳过将丢弃它们。确定？")) return;
   postJSON("/wizard/skip", {part: PARTS[cur].part, mode: m}).then(function (d) {
     if (d.ok) { PARTS[cur].status = "skip_" + m; PARTS[cur].observation = null; render(); }
   });

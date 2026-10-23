@@ -127,3 +127,74 @@ def test_photo_refused_when_vision_disabled(client, tmp_path):
         content_type="multipart/form-data")
     assert resp.status_code == 400
     assert "未启用" in resp.get_json()["error"]
+
+
+def test_manual_overrides_skip_status(client, data_root):
+    """跳过后改主意：允许用真实录入覆盖（真实值优先于声明，也留逃生口）。"""
+    client.post("/wizard/skip", json={"part": "舌面", "mode": "normal"})
+    resp = client.post("/wizard/manual", json={
+        "part": "舌面", "indicator": "body_color", "value": "淡红"})
+    assert resp.status_code == 200, resp.get_json()
+    st = _draft(data_root)["parts"]["舌面"]
+    assert st["status"] == "manual"
+    assert st["observation"]["body"]["color"] == "淡红"
+
+
+def test_manual_clear_value_removes_leaf(client, data_root):
+    """空值 = 撤销该项（回未检出；banner 承诺的留空语义）。"""
+    client.post("/wizard/manual", json={
+        "part": "舌面", "indicator": "body_color", "value": "淡红"})
+    resp = client.post("/wizard/manual", json={
+        "part": "舌面", "indicator": "body_color", "value": ""})
+    assert resp.status_code == 200, resp.get_json()
+    node = _draft(data_root)["parts"]["舌面"]["observation"]
+    assert "color" not in node.get("body", {})
+
+
+def test_manual_malformed_draft_guard(client, data_root):
+    """草稿 observation 被篡改为非 dict：400 草稿结构异常，不得 500。"""
+    today = datetime.date.today().isoformat()
+    draft = _draft(data_root)
+    draft["parts"]["舌面"] = {"status": "manual", "observation": "坏掉的"}
+    wizard_store.save_draft(os.path.join(data_root, "records", "daily"), draft)
+    resp = client.post("/wizard/manual", json={
+        "part": "舌面", "indicator": "body_color", "value": "淡红"})
+    assert resp.status_code == 200, resp.get_json()  # 非 dict 直接重建，不崩
+    # 中间节点为字符串的篡改：应 400 结构异常
+    draft["parts"]["舌面"] = {"status": "manual",
+                              "observation": {"body": "还是坏的"}}
+    wizard_store.save_draft(os.path.join(data_root, "records", "daily"), draft)
+    resp = client.post("/wizard/manual", json={
+        "part": "舌面", "indicator": "body_color", "value": "淡红"})
+    assert resp.status_code == 400
+    assert "结构异常" in resp.get_json()["error"]
+
+
+def test_assemble_merge_writes_through_declared_placeholder():
+    """merge（补充未覆盖维度）：声明正常占位不算覆盖——新值必须写入且进审计
+    （审查 P0：原 is_covered 把占位当覆盖，新值被静默吞掉）。"""
+    from src.record import DECLARED_NORMAL_MARK
+    existing = {"date": "2026-10-23",
+                "observations": {"eye": {"color": DECLARED_NORMAL_MARK}}}
+    draft = {"date": "2026-10-23",
+             "parts": {"目": {"status": "manual", "observation": {"color": "无"}}},
+             "inquiry": {}}
+    raw = wizard_store.assemble_record(draft, "1.8.33", existing,
+                                       merge_only_uncovered=True)
+    assert raw["observations"]["eye"]["color"] == "无"  # 新值写入，占位被替换
+    assert raw["manual_entry"] == ["eye"]               # 审计与数据一致
+
+
+def test_settings_disabled_key_env_locked(tmp_path, data_root, monkeypatch):
+    """VISION_DISABLED 被 OS 环境变量锁定时：开关禁用并提示（防可点假锁定）。"""
+    monkeypatch.setenv("VISION_API_KEY", "sk-test")
+    monkeypatch.setenv("VISION_DISABLED", "1")
+    app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
+    app.config["TESTING"] = True
+    c = app.test_client()
+    c.post("/welcome")
+    html = c.get("/settings").get_data(as_text=True)
+    import re
+    m = re.search(r'<input[^>]*name="VISION_ENABLED"[^>]*>', html)
+    assert m and "disabled" in m.group(0)
+    assert "开关状态来自环境变量" in html
