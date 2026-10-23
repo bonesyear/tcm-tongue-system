@@ -280,3 +280,14 @@ def test_display_dedup_keeps_scoring_intact():
     assert DIMENSION_RULES[V.TONGUE]["coating_peeling"]["剥脱"] == 6
     assert DIMENSION_RULES[V.HAND]["nail_color"]["暗紫"] == 4
     assert score_indicators(V.TONGUE, {"coating_peeling": "剥脱"})["coating_peeling"] == 6
+
+
+def test_skin_color_dedup_keeps_full_phrase():
+    """肤色选项保留「黄如橘皮」全句，隐藏缩写「橘皮」，评分兜底不变。"""
+    import records_store
+    from src.scoring import DIMENSION_RULES, score_indicators
+    from src.dimensions import VisionDimension as V
+    opts = records_store._field_options(V.SKIN, "color")
+    assert "橘皮" not in opts and "黄如橘皮" in opts
+    assert DIMENSION_RULES[V.SKIN]["color"]["橘皮"] == 8
+    assert score_indicators(V.SKIN, {"color": "橘皮"})["color"] == 8
