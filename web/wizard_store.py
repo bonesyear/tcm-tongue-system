@@ -256,6 +256,7 @@ def assemble_record(draft: dict, version: str,
         observations = {}
 
     skipped_declared, skipped_uncovered = [], []
+    written_observed, written_manual = [], []
     for p in PARTS:
         st = draft["parts"].get(p["part"], {})
         status = st.get("status")
@@ -263,7 +264,9 @@ def assemble_record(draft: dict, version: str,
         dim_en = dim.english_name
         if merge_only_uncovered and existing_raw:
             rec = DailyRecord(existing_raw)
-            if dim.is_covered(rec.get_observation(dim)):
+            # 「声明正常」占位不算覆盖（与 get_dimension_coverage 同口径）——
+            # 否则补充流程会跳过该维、新录入值被静默丢弃（2026-10-23 审查 P0）
+            if rec.get_dimension_coverage().get(dim, False):
                 continue  # 已覆盖维度不动
         if status in ("observed", "manual") and st.get("observation"):
             node = observations.setdefault(dim_en, {})
@@ -272,6 +275,8 @@ def assemble_record(draft: dict, version: str,
                     node[k].update(v)
                 else:
                     node[k] = v
+            (written_observed if status == "observed" else written_manual
+             ).append(dim_en)
         elif status == "skip_normal":
             skipped_declared.append(dim_en)
             node = observations.setdefault(dim_en, {})
@@ -304,16 +309,11 @@ def assemble_record(draft: dict, version: str,
             "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
             "version": version,
         })
+    # 识图/手动覆盖与审计只认「本轮真正写入」的维度（merge 跳过的维度不计，
+    # 空 observation 不计——防审计标注与实际数据脱钩）
     raw["photo_coverage"] = sorted(set(
-        (raw.get("photo_coverage") or []) +
-        [from_chinese(PART_BY_NAME[pt]["dim"]).english_name
-         for pt, st in draft["parts"].items() if st.get("status") == "observed"]))
-    # 手动录入审计标记：哪些维度是用户肉眼手动录入（非识图）——
-    # photo_coverage 只认 observed，手动录入不计入（防伪观察语义不变）
-    manual_dims = sorted(set(
-        (raw.get("manual_entry") or []) +
-        [from_chinese(PART_BY_NAME[pt]["dim"]).english_name
-         for pt, st in draft["parts"].items() if st.get("status") == "manual"]))
+        (raw.get("photo_coverage") or []) + written_observed))
+    manual_dims = sorted(set((raw.get("manual_entry") or []) + written_manual))
     if manual_dims:
         raw["manual_entry"] = manual_dims
     raw["observations"] = observations

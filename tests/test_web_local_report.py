@@ -93,6 +93,74 @@ def test_pattern_overview_all_zero_is_empty():
     assert ov["constitution"] is None and ov["diet"] == []
 
 
+def _rec(obs_tongue=None, **extra_dims):
+    obs = {}
+    if obs_tongue is not None:
+        obs["tongue"] = obs_tongue
+    obs.update(extra_dims)
+    return DailyRecord({"date": "2026-10-23", "observations": obs, "inquiry": {}})
+
+
+def test_thickness_direction_split():
+    """苔厚薄按值分向：无苔=气证正（胃气阴伤）、焦黑=火证邪（热极）、白厚=水证——
+    钉住审查 P0（原 catch-all 全部反向记水证邪实）。"""
+    cases = {"无苔": ("气证", "正"), "焦黑": ("火证", "邪"), "白厚": ("水证", "邪")}
+    for v, (pat, zx) in cases.items():
+        ov = local_report.build_pattern_overview(
+            _rec({"coating": {"thickness": v}}))
+        assert ov["directions"][0]["name"] == pat, (v, ov["directions"])
+        assert ov["directions"][0]["signs"][0]["rule"][2] == zx
+
+
+def test_body_size_split():
+    """瘦小→血证·正+津亏（原 catch-all 记水证邪实+水停，双重反向）。"""
+    ov = local_report.build_pattern_overview(_rec({"body": {"shape": "瘦小"}}))
+    assert ov["directions"][0]["name"] == "血证"
+    assert ov["directions"][0]["signs"][0]["rule"][2] == "正"
+    assert ov["constitution"]["fluid"]["text"] == "津液不足"  # 瘦小 6 分 ≥ 强度阈值
+
+
+def test_moisture_vocab_current():
+    """苔润燥按现行词表：滑→水证+水停；干裂→火证+津亏。"""
+    ov = local_report.build_pattern_overview(_rec({"coating": {"moisture": "滑"}}))
+    assert ov["directions"][0]["name"] == "水证"
+    assert "水停" in ov["constitution"]["fluid"]["detail"]
+    ov2 = local_report.build_pattern_overview(_rec({"coating": {"moisture": "干裂"}}))
+    assert ov2["directions"][0]["name"] == "火证"
+    assert "津亏" in ov2["constitution"]["fluid"]["text"] or \
+        "津亏" in ov2["constitution"]["fluid"]["detail"]
+
+
+def test_statement_single_side_light():
+    """单边弱证据：给「倾向（轻）」，不称「为主」也不称「夹杂」（措辞对称钉住）。"""
+    ov = local_report.build_pattern_overview(
+        _rec(None, hand={"palm_color": "淡白"}))
+    # palm 淡白 2 分 → 血证·正，单边正虚
+    assert ov["constitution"]["zheng_xie"]["text"] == "正虚倾向（轻）"
+    ov2 = local_report.build_pattern_overview(
+        _rec(None, ear={"color": "红赤"}))
+    assert ov2["constitution"]["zheng_xie"]["text"] == "邪实倾向（轻）"
+
+
+def test_inquiry_non_dict_no_500():
+    """inquiry 为字符串/列表等畸形时聚合不崩（审查 P1-7）。"""
+    rec = DailyRecord({"date": "2026-10-23",
+                       "observations": {"tongue": {"body": {"shape": "胖大"}}},
+                       "inquiry": "无"})
+    ov = local_report.build_pattern_overview(rec)
+    assert ov["directions"][0]["name"] == "水证" and ov["inquiry"]
+
+
+def test_inquiry_shape_c_answered_skipped():
+    """形状 C 扁平问答（{问: "答"}）计为已答，不再重复推荐。"""
+    rec = DailyRecord({"date": "2026-10-23",
+                       "observations": {"tongue": {"body": {"shape": "胖大"}}},
+                       "inquiry": {"小便？": "正常", "口渴？": "口不渴",
+                                   "大便？": "正常"}})
+    ov = local_report.build_pattern_overview(rec)
+    assert ov["inquiry"] == []  # 水证鉴别三问皆已答
+
+
 def test_settings_toggle_persists(client, tmp_path):
     """启用开关：不勾 → LLM_DISABLED=1；勾选 → 置空（恢复启用）。"""
     env_path = str(tmp_path / ".env")

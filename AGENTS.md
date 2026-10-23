@@ -67,6 +67,16 @@
    局域网开启需口令（`WEB_ADMIN_TOKEN`），未设则局域网对设置页只读。
 
 ### 关键语义
+- **双模型均可选**（2026-10-23 起，设置页开关写回 .env）：
+  - `VISION_DISABLED=1` → 拍照页进**手动录入模式**（全指标选项化录入，
+    草稿状态 `manual`，记录打 `manual_entry` 审计；`photo_coverage` 只认
+    真实识图）。skip 后改主意允许真实录入覆盖（真实值优先于声明）。
+  - `LLM_DISABLED=1` → 详情页报告区改**本地规则速览**（`web/local_report.py`：
+    体质格局/四证聚类/饮食宜忌/问诊优先，确定性聚类+库内查表，非辨证结论）。
+  - 模式语义：启用且配置齐全走模型；关闭走本地；未配置未关闭时，
+    记录已有模型期内容照旧展示、全无则走本地。
+  - 设置页表单用隐藏标记 `FORM_VISION/FORM_LLM` 识别来源（BASE_URL 被
+    环境变量锁定时输入框 disabled 不提交，不能靠它判断表单）。
 - **修正**：改观察值 → 自动重评分 → 覆盖保存，旧版自动备份到 `records/_backup/`，
   JSON 里打 `manually_corrected: true` + 时间戳。保存前必须复用
   `scripts/input_validator.py` 的 `validate_record()`。

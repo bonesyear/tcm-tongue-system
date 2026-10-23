@@ -114,11 +114,11 @@
       <div>
         <label style="font-weight:400; display:flex; gap:8px; align-items:center;">
           <input type="checkbox" name="VISION_ENABLED" value="1"
-                 {% if not vision_disabled %}checked{% endif %} {% if read_only %}disabled{% endif %}>
+                 {% if not vision_disabled %}checked{% endif %} {% if read_only or 'VISION_DISABLED' in env_locked %}disabled{% endif %}>
           启用视觉模型
         </label>
       </div>
-      <div class="form-hint">关闭后拍照页不再调用识图 API，改用手动录入模式（逐部位肉眼判断、选项化录入）；已生成的历史记录不受影响</div>
+      <div class="form-hint">关闭后拍照页不再调用识图 API，改用手动录入模式（逐部位肉眼判断、选项化录入）；已生成的历史记录不受影响{% if 'VISION_DISABLED' in env_locked %} · <strong>开关状态来自环境变量，页面不可改</strong>{% endif %}</div>
     </div>
     <hr class="divider">
     <div class="row">
@@ -166,11 +166,11 @@
       <div>
         <label style="font-weight:400; display:flex; gap:8px; align-items:center;">
           <input type="checkbox" name="LLM_ENABLED" value="1"
-                 {% if not llm_disabled %}checked{% endif %} {% if read_only %}disabled{% endif %}>
+                 {% if not llm_disabled %}checked{% endif %} {% if read_only or 'LLM_DISABLED' in env_locked %}disabled{% endif %}>
           启用辨证模型
         </label>
       </div>
-      <div class="form-hint">关闭后不再调用 LLM 生成报告，详情页报告区改用本地规则「四证倾向速览」（阳性体征的方向聚类，非辨证结论）；已生成的历史报告保留在记录中不动，重新启用后恢复显示</div>
+      <div class="form-hint">关闭后不再调用 LLM 生成报告，详情页报告区改用本地规则「四证倾向速览」（阳性体征的方向聚类，非辨证结论）；已生成的历史报告保留在记录中不动，重新启用后恢复显示{% if 'LLM_DISABLED' in env_locked %} · <strong>开关状态来自环境变量，页面不可改</strong>{% endif %}</div>
     </div>
     <hr class="divider">
     <div class="row">

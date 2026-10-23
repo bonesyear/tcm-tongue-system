@@ -19,16 +19,23 @@
 # match_values 为 None 时任意阳性措辞都归入；正邪用于体质格局两轴聚合。
 PATTERN_MAP = {
     "tongue": {
-        "body_color": [({"红", "红绛"}, "火证", "邪", "舌红苔黄燥→火【KB L51】"),
+        "body_color": [({"红", "红绛", "暗红"}, "火证", "邪", "舌红苔黄燥→火【KB L51】（暗红为五档化前旧值，归并红绛）"),
                        ({"淡白"}, "气证", "正", "舌淡嫩薄白→气【KB L52】"),
                        ({"紫暗"}, "血证", "邪", "舌紫暗瘀斑→血（瘀）【KB L53】")],
-        "body_size": [(None, "水证", "邪", "舌淡胖齿痕苔滑→水【KB L50】")],
+        "body_size": [({"稍胖", "偏胖", "胖大", "肿胀", "偏胖大"}, "水证", "邪",
+                       "舌淡胖齿痕苔滑→水【KB L50】（偏胖大为词表前旧值）"),
+                      ({"略瘦", "偏瘦", "瘦小"}, "血证", "正", "瘦薄舌→气血两虚【验】")],
         "tooth_marks": [(None, "水证", "邪", "舌淡胖齿痕苔滑→水【KB L50】")],
         "petechiae": [(None, "血证", "邪", "舌紫暗瘀斑→血（瘀）【KB L53】")],
         "coating_color": [({"黄", "黄腻"}, "火证", "邪", "舌红苔黄燥→火【KB L51】")],
-        "coating_moisture": [({"偏干", "干", "燥"}, "火证", "邪", "苔燥→热盛津亏【KB L51】")],
+        # 灰/黑/灰黑苔：黑苔寒热两极，方向不唯一，宁缺毋滥不映射
+        "coating_moisture": [({"滑"}, "水证", "邪", "苔滑→水湿内停【KB L50】"),
+                             ({"燥", "干裂"}, "火证", "邪", "苔燥裂→热盛津亏【KB L51 语境】")],
         "coating_greasy": [(None, "水证", "邪", "苔滑腻→水湿内停【KB L50 语境】")],
-        "coating_thickness": [(None, "水证", "邪", "苔厚→湿浊偏盛【验】")],
+        "coating_thickness": [({"略厚", "稍厚", "偏厚", "白厚", "厚腻"}, "水证", "邪", "苔厚腻→湿浊偏盛【验】"),
+                              ({"薄黄", "黄厚"}, "火证", "邪", "苔黄厚→热邪【验】"),
+                              ({"焦黑"}, "火证", "邪", "苔焦黑→热极【验】"),
+                              ({"无苔"}, "气证", "正", "无苔→胃气阴两伤【验】")],
         "coating_peeling": [(None, "气证", "正", "剥落苔→胃气虚【验】")],
         "sublingual_color": [(None, "血证", "邪", "舌下络脉色深→血行不利【KB L53 语境】")],
         "sublingual_thickness": [(None, "血证", "邪", "舌下络脉粗张→血行不利【KB L53 语境】")],
@@ -37,12 +44,12 @@ PATTERN_MAP = {
     },
     "head_face": {
         "face_color": [({"红赤"}, "火证", "邪", "面赤（缘缘正赤）→火【KB L95】"),
-                       ({"黄", "黄肿"}, "水证", "邪", "面黄/黄肿→水【KB L96】"),
-                       ({"晦暗", "萎黄", "淡白", "苍白"}, "血证", "正",
-                        "面萎黄/苍白→伤营【KB L97】【台账】")],
+                       ({"晦暗", "萎黄", "淡白", "苍白", "㿠白"}, "血证", "正",
+                        "面萎黄/苍白/㿠白→伤营血少【KB L97】【台账】【源 L2769 语境】")],
+        # 黧黑/青灰（寒凝血瘀多义）、红如妆（戴阳红线，走危险信号通道）不映射
         "face_edema": [(None, "水证", "邪", "面肿→津液不化【KB L96】")],
-        "lip_color": [({"淡白", "苍白"}, "血证", "正", "唇淡白→血少【KB L97】"),
-                      ({"紫暗"}, "血证", "邪", "唇紫暗→瘀血【KB L99】"),
+        "lip_color": [({"淡白", "苍白", "暗黄"}, "血证", "正", "唇淡白/暗黄→血少【KB L97】【台账 L5565】"),
+                      ({"紫暗", "青紫"}, "血证", "邪", "唇紫暗/青紫→瘀血【KB L99】"),
                       ({"红赤", "鲜红"}, "火证", "邪", "唇鲜红→热盛【KB L99 语境】")],
         "nose_flare": [(None, "气证", "邪", "鼻翼煽动→肺气不利【KB L100】")],
     },
@@ -54,15 +61,18 @@ PATTERN_MAP = {
         "lower_lid": [(None, "血证", "正", "下睑淡白→血少【台账】")],
     },
     "ear": {
-        "color": [({"红赤"}, "火证", "邪", "耳色红赤→少阳郁火【KB L134 语境】")],
+        "color": [({"红赤"}, "火证", "邪", "耳色红赤→少阳郁火【KB L134 语境】"),
+                  ({"淡白"}, "血证", "正", "耳色淡白→血少【验】")],
     },
     "hand": {
-        "palm_color": [({"淡白", "偏淡白"}, "血证", "正", "掌色淡白→血少【台账】")],
+        "palm_color": [({"淡白", "偏淡白"}, "血证", "正", "掌色淡白→血少【台账】"),
+                       ({"紫暗"}, "血证", "邪", "掌色紫暗→血行不利【KB L53 语境】")],
         "nail_color": [({"淡白"}, "血证", "正", "甲床淡白→血少【台账】"),
-                       ({"紫暗"}, "血证", "邪", "甲紫暗→瘀【KB L99 语境】")],
+                       ({"紫暗", "暗紫"}, "血证", "邪", "甲紫暗→瘀【KB L99 语境】")],
+        "ecchymosis": [(None, "血证", "邪", "手掌瘀斑→血行不利【KB L53 语境】")],
     },
     "skin": {
-        "color": [({"黄如橘皮"}, "火证", "邪", "阳黄→湿热【验】"),
+        "color": [({"黄如橘皮", "橘皮"}, "火证", "邪", "阳黄→湿热【验】"),
                   ({"烟熏"}, "水证", "邪", "阴黄→寒湿【验】"),
                   ({"萎黄"}, "血证", "正", "萎黄→血少不荣【验】")],
         "cuo": [(None, "血证", "邪", "肌肤甲错→干血/伤营【台账】")],
@@ -75,15 +85,17 @@ PATTERN_MAP = {
 # 津液观轴：水停 vs 津亏（独立于四证，指标维度）
 FLUID_MAP = {
     "tongue": {
-        "body_size": [(None, "水停", "舌胖大→水停【KB L50】")],
+        "body_size": [({"稍胖", "偏胖", "胖大", "肿胀", "偏胖大"}, "水停", "舌胖大→水停【KB L50】"),
+                      ({"略瘦", "偏瘦", "瘦小"}, "津亏", "瘦薄舌→阴血不足【验】")],
         "tooth_marks": [(None, "水停", "齿痕→水停【KB L50】")],
         "coating_greasy": [(None, "水停", "苔腻→水湿【KB L50 语境】")],
-        "coating_moisture": [({"偏干", "干", "燥"}, "津亏", "苔燥→津亏【KB L51】")],
+        "coating_moisture": [({"滑"}, "水停", "苔滑→水停【KB L50】"),
+                             ({"燥", "干裂"}, "津亏", "苔燥裂→津亏【KB L51 语境】")],
         "coating_peeling": [(None, "津亏", "剥落→胃津不足【验】")],
     },
     "head_face": {
         "face_edema": [(None, "水停", "面肿→水【KB L96】")],
-        "lip_moisture": [({"偏干", "干", "燥"}, "津亏", "唇干→津不上承【验】")],
+        "lip_moisture": [({"稍干", "偏干", "干燥", "燥裂", "干枯"}, "津亏", "唇干→津不上承【验】")],
     },
     "eye": {
         "edema": [(None, "水停", "睑肿→水【KB L135】")],
@@ -158,14 +170,15 @@ def _statement(zheng, xie):
     if not zn and not xn:
         return None
     detail = f"正虚证据 {len(zheng)} 项 {zn:g} 分 · 邪实证据 {len(xie)} 项 {xn:g} 分"
-    if zn >= max(4, xn * 2):
+    strong = 4  # 「为主」的最小强度；不足时只给「倾向（轻）」，不夸大
+    if zn >= max(strong, xn * 2):
         text = "正虚为主"
-    elif xn >= max(4, zn * 2):
+    elif xn >= max(strong, zn * 2):
         text = "邪实为主"
-    elif zn >= xn:
-        text = "虚实夹杂，正虚为显" if xn else "正虚为主"
-    else:
-        text = "虚实夹杂，邪实为显"
+    elif zn and xn:
+        text = "虚实夹杂，正虚为显" if zn >= xn else "虚实夹杂，邪实为显"
+    else:  # 单边且强度不足「为主」：措辞对称、不称「夹杂」
+        text = "正虚倾向（轻）" if zn else "邪实倾向（轻）"
     return {"text": text, "detail": detail, "zheng_n": zn, "xie_n": xn}
 
 
@@ -174,12 +187,13 @@ def _fluid_statement(water, depletion):
     if not wn and not dn:
         return None
     detail = f"水停证据 {len(water)} 项 {wn:g} 分 · 津亏证据 {len(depletion)} 项 {dn:g} 分"
+    strong = 4
     if wn and dn:
         text = "水饮内停，津不上承"
     elif wn:
-        text = "水饮内停"
+        text = "水饮内停" if wn >= strong else "水停倾向（轻）"
     else:
-        text = "津液不足"
+        text = "津液不足" if dn >= strong else "津亏倾向（轻）"
     return {"text": text, "detail": detail}
 
 
@@ -212,9 +226,14 @@ def build_pattern_overview(rec) -> dict:
     diet = [{"name": d["name"], **DIET_MAP[d["name"]]} for d in directions]
 
     # ---- 明日问诊优先项（前两名倾向 × 未答 × 去重 ≤3）----
-    inquiry_raw = rec.raw.get("inquiry") or {}
-    answered = {q for q, v in inquiry_raw.items()
-                if isinstance(v, dict) and v.get("asked") and v.get("answer")}
+    inquiry_raw = rec.raw.get("inquiry")
+    answered = set()
+    if isinstance(inquiry_raw, dict):
+        for q, v in inquiry_raw.items():
+            if isinstance(v, dict) and v.get("asked") and v.get("answer"):
+                answered.add(q)
+            elif isinstance(v, str) and v.strip():  # 形状 C 扁平问答（{问: "答"}）
+                answered.add(q)
     inquiry = []
     for d in directions[:2]:
         for q, why in INQUIRY_FOR[d["name"]]:
