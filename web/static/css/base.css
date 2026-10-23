@@ -314,6 +314,11 @@ a:hover { color: var(--cinnabar-deep); }
 }
 .warn-slide.slide-out { animation: warn-slide-out .25s ease forwards; }
 
+/* ---------------- 加粗词呼吸感 ---------------- */
+/* 宋体无真粗体字重，浏览器 faux-bold 后笔画变粗、字宽不变，
+   与相邻字显得挤——左右各留 1px 空隙 */
+p strong, li strong, td strong { padding: 0 1px; }
+
 /* ---------------- 危险警示 ---------------- */
 
 .alert-danger {
