@@ -197,4 +197,4 @@ def test_settings_disabled_key_env_locked(tmp_path, data_root, monkeypatch):
     import re
     m = re.search(r'<input[^>]*name="VISION_ENABLED"[^>]*>', html)
     assert m and "disabled" in m.group(0)
-    assert "开关状态来自环境变量" in html
+    assert "环境变量锁定" in html  # 提示已移到卡片头开关旁（折叠时可见）
