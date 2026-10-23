@@ -433,3 +433,26 @@ def test_vision_disabled_no_banner(client, env_path):
     client.post("/settings", data={"FORM_VISION": "1"})
     html = client.get("/").get_data(as_text=True)
     assert "VISION_API_KEY" not in html
+
+
+def test_llm_banner_absent_when_ready(client, env_path):
+    """辨证模型三要素齐全 → 不弹警告（正例）。"""
+    import envfile
+    envfile.write_env(env_path, {"LLM_API_KEY": "sk-x", "LLM_MODEL": "m",
+                                 "LLM_BASE_URL": "https://x/v1/chat/completions"})
+    html = client.get("/").get_data(as_text=True)
+    assert "LLM_API_KEY" not in html
+
+
+def test_welcome_page_exempt_from_banners(client):
+    """welcome 页不弹缺配警告（它本身就是引导页）。"""
+    html = client.get("/welcome").get_data(as_text=True)
+    assert "VISION_API_KEY" not in html and "LLM_API_KEY" not in html
+
+
+def test_llm_banner_returns_when_reenabled(client):
+    """关闭→警告消失；重开→警告恢复（.env 回读链）。"""
+    client.post("/settings", data={"FORM_LLM": "1"})
+    assert "LLM_API_KEY" not in client.get("/").get_data(as_text=True)
+    client.post("/settings", data={"FORM_LLM": "1", "LLM_ENABLED": "1"})
+    assert "LLM_API_KEY" in client.get("/").get_data(as_text=True)

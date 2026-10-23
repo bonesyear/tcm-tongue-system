@@ -40,7 +40,7 @@
 {% endif %}
 {% if llm_missing and page != "welcome" %}
 <div class="alert-note warn-slide" id="banner-llm">
-  ⚠ 未配置辨证模型（<code>LLM_API_KEY</code> / <code>LLM_MODEL</code> / <code>LLM_BASE_URL</code>），辨证报告生成功能不可用——详情页报告区改用本地规则「四证倾向速览」。请到 <a href="/settings">设置页</a> 配置，或在设置页关闭辨证模型开关。
+  ⚠ 未配置辨证模型（<code>LLM_API_KEY</code> / <code>LLM_MODEL</code> / <code>LLM_BASE_URL</code>），辨证报告生成功能不可用——无历史报告的记录详情页改用本地规则「四证倾向速览」。请到 <a href="/settings">设置页</a> 配置，或在设置页关闭辨证模型开关。
 </div>
 {% endif %}
 {% block content %}{% endblock %}
