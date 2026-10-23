@@ -50,12 +50,14 @@ def _draft(data_root):
 
 
 def test_settings_toggle_vision_persists(client, tmp_path):
+    """含 VISION_BASE_URL 被环境变量锁定（输入框 disabled 不提交）的场景：
+    开关仅靠 FORM_VISION 隐藏标记识别表单（v1.8.31 曾靠 BASE_URL 在场而失效）。"""
     env_path = str(tmp_path / ".env")
-    client.post("/settings", data={"VISION_BASE_URL": "https://x.com/v1/chat/completions",
-                                   "VISION_MODEL": "m"})
+    # 模拟浏览器：BASE_URL 未提交（env_locked disabled），只有隐藏标记 + 模型名
+    client.post("/settings", data={"FORM_VISION": "1", "VISION_MODEL": "m"})
     assert envfile.read_env(env_path).get("VISION_DISABLED") == "1"
-    client.post("/settings", data={"VISION_BASE_URL": "https://x.com/v1/chat/completions",
-                                   "VISION_MODEL": "m", "VISION_ENABLED": "1"})
+    client.post("/settings", data={"FORM_VISION": "1", "VISION_MODEL": "m",
+                                   "VISION_ENABLED": "1"})
     assert envfile.read_env(env_path).get("VISION_DISABLED") == ""
 
 

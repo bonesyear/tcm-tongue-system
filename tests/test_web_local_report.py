@@ -97,10 +97,12 @@ def test_settings_toggle_persists(client, tmp_path):
     """启用开关：不勾 → LLM_DISABLED=1；勾选 → 置空（恢复启用）。"""
     env_path = str(tmp_path / ".env")
     resp = client.post("/settings", data={
+        "FORM_LLM": "1",
         "LLM_BASE_URL": "https://x.com/v1/chat/completions", "LLM_MODEL": "m"})
     assert resp.status_code == 302
     assert envfile.read_env(env_path).get("LLM_DISABLED") == "1"
     resp = client.post("/settings", data={
+        "FORM_LLM": "1",
         "LLM_BASE_URL": "https://x.com/v1/chat/completions", "LLM_MODEL": "m",
         "LLM_ENABLED": "1"})
     assert resp.status_code == 302
