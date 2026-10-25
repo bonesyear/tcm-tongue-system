@@ -4,7 +4,7 @@
 
 集中定义仓库内数据目录,消除 scripts/ 各自硬编码绝对路径
 (原 `/root/tcm-tongue-system/...` 仅在部署机存在,任何其他机器上
-import 即崩,见 docs/CODE_REVIEW_2026-07-12.md Bug 1/3)。
+import 即崩)。
 
 解析规则:
     REPO_ROOT   由本文件位置上溯一级得到(src/ 的父目录)

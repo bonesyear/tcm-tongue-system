@@ -4,6 +4,15 @@
 
 ## Unreleased（2026-10-23）
 
+### 清理
+
+- 删除 9 份过期的一次性审查/建议报告（7–9 月的 CODE_REVIEW×2、HERMES、
+  K3×6）；保留活文档：KNOWN_ISSUES、REPAIR_PLAN（轮次归档）、两份 10 月
+  设计/出处文档、DANGER_FLAGS 现行规范。同步清理 2 处指向已删文件的死链
+  （paths.py 注释、KNOWN_ISSUES 引用）。
+
+## Unreleased（2026-10-23）
+
 ### 修复（警告条批次复审）
 
 - **高｜开关失败回滚失效**：`prevChecked` 抓的是切换后的新值，revert 空操作
