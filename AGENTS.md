@@ -169,6 +169,8 @@
 - Web 模块统一使用顶层导入（`import records_store` / `from safe_fetch import …`），
   禁止混用 `web.records_store` / `from web import …`，避免双模块实例导致 mock、缓存和配置分叉。
   `lifecycle_store.py` 仅属于 Web 层，路径为 `web/lifecycle_store.py`。
+  知识库路由在 `web/kb_routes.py`；候选检索在 `web/kb_evidence.py`；报告生成在
+  `web/report_store.py`；`web/trends_store.py` 只保留周报实现和兼容转发。
 - Web 所有请求先校验 Host；写请求要求与当前请求同源，或凭有效会话兼容传统浏览器；
   `/welcome` POST 测试需加 `Origin: http://localhost`。局域网口令只走
   `/settings/login` POST，勿放入 URL/JS；非回环无口令配置必须拒绝。

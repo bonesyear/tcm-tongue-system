@@ -39,6 +39,7 @@
 - [事务与类别硬化](MIGRATION_2026-11-03_KB_HARDENING.md)
 - [分类重置](MIGRATION_2026-11-03_KB_RESET.md)
 - [公开历史清理与默认禁用](MIGRATION_2026-11-03_EXTERNAL_DEFAULT_OFF.md)
+- [B21–B22 路由与报告结构优化](MIGRATION_2026-11-03_B21-B22.md)
 
 ## 新增文档约定
 
