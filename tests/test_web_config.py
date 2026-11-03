@@ -1,5 +1,8 @@
 """B12：配置文件与 Web 配置边界，全部使用临时配置。"""
+import multiprocessing
 import os
+from pathlib import Path
+import time
 
 import pytest
 
@@ -7,6 +10,47 @@ pytest.importorskip("flask")
 
 import envfile
 from app import create_app
+
+
+def _concurrent_env_writer(code_root, sync_root, env_path, key, value):
+    import sys
+    sys.path[:0] = [code_root, os.path.join(code_root, "web")]
+    import envfile
+    original_decode = envfile._decode
+
+    def synchronize_decode(raw, path):
+        Path(sync_root, f"ready-{key}").write_text("ready", encoding="ascii")
+        deadline = time.monotonic() + 1
+        while len(list(Path(sync_root).glob("ready-*"))) < 2 \
+                and time.monotonic() < deadline:
+            time.sleep(0.005)
+        return original_decode(raw, path)
+
+    envfile._decode = synchronize_decode
+    envfile.write_env(env_path, {key: value})
+
+
+def test_concurrent_env_writers_preserve_both_updates(tmp_path):
+    code_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sync_root = tmp_path / "sync"
+    sync_root.mkdir()
+    path = tmp_path / ".env"
+    envfile.write_env(str(path), {"VISION_MODEL": "before", "LLM_MODEL": "before"})
+    context = multiprocessing.get_context("spawn")
+    processes = [context.Process(
+        target=_concurrent_env_writer,
+        args=(code_root, str(sync_root), str(path), key, value))
+        for key, value in (("VISION_MODEL", "vision-after"),
+                           ("LLM_MODEL", "llm-after"))]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(15)
+        assert not process.is_alive()
+        assert process.exitcode == 0
+    values = envfile.read_env(str(path))
+    assert values["VISION_MODEL"] == "vision-after"
+    assert values["LLM_MODEL"] == "llm-after"
 
 
 @pytest.fixture

@@ -128,7 +128,7 @@ def inspect_kb_categories(config=None):
         disabled = _config_value(config, definition["disabled_key"]) == "1"
         root = kb_category_root(category, config)
         if disabled or root is None:
-            info = {"root": resolve_kb_root(specific or root), "status": "unconfigured",
+            info = {"root": root or "", "status": "unconfigured",
                     "file_count": 0, "revision": "", "error": ""}
         else:
             info = inspect_kb(root)

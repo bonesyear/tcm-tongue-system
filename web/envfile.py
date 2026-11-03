@@ -93,7 +93,7 @@ def _format_value(value: str) -> str:
 
 
 def write_env(path: str, updates: dict) -> None:
-    """更新指定键；None 表示不修改，空字符串表示显式置空。"""
+    """更新指定键；完整读改写与回读共用线程/进程锁。"""
     for key, value in updates.items():
         if value is not None:
             _validate(key, value)
@@ -101,30 +101,31 @@ def write_env(path: str, updates: dict) -> None:
     if not updates:
         return
     try:
-        with open(path, "rb") as file:
-            text = _decode(file.read(), path)
-    except FileNotFoundError:
-        text = ""
-    lines = text.splitlines()
-    remaining = dict(updates)
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key = stripped.split("=", 1)[0].strip()
-        if key in remaining:
-            lines[index] = f"{key}={_format_value(remaining.pop(key))}"
-    for key, value in remaining.items():
-        lines.append(f"{key}={_format_value(value)}")
-    try:
-        from .io_utils import atomic_write_text
+        from .io_utils import atomic_write_text, write_lock
     except ImportError:
-        from io_utils import atomic_write_text
-    atomic_write_text(path, "\n".join(lines) + "\n")
-    actual = read_env(path)
-    for key, value in updates.items():
-        if actual.get(key) != value:
-            raise RuntimeError(f".env {key} 写入后回读不一致")
+        from io_utils import atomic_write_text, write_lock
+    with write_lock(os.path.dirname(os.path.abspath(path))):
+        try:
+            with open(path, "rb") as file:
+                text = _decode(file.read(), path)
+        except FileNotFoundError:
+            text = ""
+        lines = text.splitlines()
+        remaining = dict(updates)
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key = stripped.split("=", 1)[0].strip()
+            if key in remaining:
+                lines[index] = f"{key}={_format_value(remaining.pop(key))}"
+        for key, value in remaining.items():
+            lines.append(f"{key}={_format_value(value)}")
+        atomic_write_text(path, "\n".join(lines) + "\n")
+        actual = read_env(path)
+        for key, value in updates.items():
+            if actual.get(key) != value:
+                raise RuntimeError(f".env {key} 写入后回读不一致")
 
 
 def effective(key: str, env_file: str, default: str = "") -> str:

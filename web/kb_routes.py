@@ -1,7 +1,10 @@
 """知识库设置、分类导入与重置路由；依赖由 create_app 显式注入。"""
 from __future__ import annotations
 
+import os
+
 from flask import jsonify, redirect, request
+from io_utils import write_lock
 
 
 def register_kb_routes(app, *, admin_allowed, is_env_locked, env_lock,
@@ -14,7 +17,7 @@ def register_kb_routes(app, *, admin_allowed, is_env_locked, env_lock,
             return render_settings(env_error="TCM_KB_STRICT_CATEGORIES 已被环境变量锁定"), 409
         enabled = request.form.get("enabled") == "1"
         try:
-            with env_lock:
+            with env_lock, write_lock(os.path.dirname(os.path.abspath(env_path))):
                 envfile.write_env(env_path, {"TCM_KB_STRICT_CATEGORIES": "1" if enabled else ""})
         except (envfile.EnvDecodeError, ValueError) as error:
             return render_settings(env_error=str(error)), 400
@@ -35,7 +38,7 @@ def register_kb_routes(app, *, admin_allowed, is_env_locked, env_lock,
             return render_settings(env_error="该类知识库配置被环境变量锁定，不能重置"), 409
         from kb_reset import reset_kb
         try:
-            with env_lock:
+            with env_lock, write_lock(os.path.dirname(os.path.abspath(env_path))):
                 result = reset_kb(data_root, env_path, category,
                                   write_env=envfile.write_env)
         except ValueError as error:
@@ -66,7 +69,7 @@ def register_kb_routes(app, *, admin_allowed, is_env_locked, env_lock,
         locked = is_env_locked(env_key) or bool(
             disabled_key and is_env_locked(disabled_key))
         try:
-            with env_lock:
+            with env_lock, write_lock(os.path.dirname(os.path.abspath(env_path))):
                 result = import_kb(upload, data_root, env_path,
                                    env_locked=locked,
                                    write_env=envfile.write_env, category=category)

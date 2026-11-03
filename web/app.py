@@ -222,7 +222,7 @@ def create_app(env_file: str | None = None,
     # 每次进程启动生成新口令 → 重启后声明页必重新确认
     boot_token = secrets.token_hex(8)
     admin_sessions = set()
-    # write_env 读-改-写非原子，开关 fetch 并发会互踩——串行化
+    # 本进程配置写入串行化；跨线程/进程文件锁由 envfile/io_utils 提供。
     env_lock = threading.Lock()
 
     from io_utils import WriteConflictError

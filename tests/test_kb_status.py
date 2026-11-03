@@ -141,7 +141,7 @@ def test_strict_mode_toggle_disables_and_restores_legacy_fallback(tmp_path, monk
     assert inspect_kb_categories(envfile.read_env(str(env)))['diet']['status'] == 'ready'
 
 
-def test_external_roots_ignored_by_default_and_managed_copies_auto_enable(tmp_path):
+def test_external_roots_ignored_by_default_and_managed_copies_auto_enable(tmp_path, monkeypatch):
     from src.retrieval import inspect_kb_categories
     import io
     import zipfile
@@ -155,9 +155,11 @@ def test_external_roots_ignored_by_default_and_managed_copies_auto_enable(tmp_pa
     env = tmp_path / '.env'
     envfile.write_env(str(env), {
         'TCM_DATA_ROOT': str(data_root), 'TCM_KB_ROOT': str(external)})
+    monkeypatch.setenv('TCM_KB_ROOT', str(external))
     config = envfile.read_env(str(env))
     states = inspect_kb_categories(config)
     assert all(info['status'] == 'unconfigured' for info in states.values())
+    assert all(info['root'] == '' for info in states.values())
 
     for category in ('constitution', 'diet', 'formula'):
         output = io.BytesIO()
