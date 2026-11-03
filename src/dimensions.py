@@ -47,11 +47,16 @@ class VisionDimension(Enum):
 
         observation 可为 Record.get_observation() 返回的结构化 dict，
         也可为纯文本；任一字段有非空文本即算覆盖。
+        dict 与纯文本两种入口的空白语义一致：字符串值先 strip 再判空，
+        纯空白（"   "）在两种形态下都不算覆盖。
         """
         if observation is None:
             return False
         if isinstance(observation, dict):
-            return any(bool(v) for v in observation.values())
+            return any(
+                bool(v.strip()) if isinstance(v, str) else bool(v)
+                for v in observation.values()
+            )
         return bool(str(observation).strip())
 
 

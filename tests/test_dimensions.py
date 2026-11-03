@@ -62,6 +62,20 @@ def test_is_covered_count_rule():
     assert VisionDimension.TONGUE.is_covered("   ") is False
 
 
+def test_is_covered_dict_whitespace_semantics_match_text():
+    """dict 与纯文本两种入口的空白语义必须一致（B02）：纯空白值的 dict
+    与纯空白文本一样不算覆盖——文本分支 strip 后判空，dict 分支此前
+    用 bool(v) 不 strip，"   " 会被误计为已覆盖。"""
+    assert VisionDimension.TONGUE.is_covered({"body_color": "   "}) is False
+    assert VisionDimension.TONGUE.is_covered({"body_color": "\t\n "}) is False
+    # 混合：空白值不抵掉同维度真实值；真实值周围空白不影响判定
+    assert VisionDimension.TONGUE.is_covered(
+        {"body_color": "", "coating_color": "  淡红  "}) is True
+    # 全空 dict 仍未覆盖（语义不变）
+    assert VisionDimension.TONGUE.is_covered({}) is False
+    assert VisionDimension.TONGUE.is_covered({"body_color": None}) is False
+
+
 def test_name_lists():
     assert all_chinese_names() == ["舌诊", "头面诊", "目诊", "耳诊", "手诊", "皮肤诊"]
     assert all_english_names() == ["tongue", "head_face", "eye", "ear", "hand", "skin"]

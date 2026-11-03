@@ -8,48 +8,27 @@ _select_daily_file 同口径（规范名优先；否则排除备份/临时后取
 from __future__ import annotations
 
 import datetime
-import glob
 import json
 import os
-import re
-import shutil
 import sys
+import threading
 
+import time_utils
 from src import paths
+from src.daily_files import SUSPECT_ARCHIVE_RE as _SUSPECT_ARCHIVE_RE
+from src.daily_files import daily_files, select_daily_file as _select_daily_file
 from src.dimensions import DIMENSIONS
+from src.indicators import (
+    FIELD_OPTIONS, INDICATOR_LABELS, INDICATOR_REGISTRY,
+    REFERENCE_FIELDS, REVIEW_FIELDS,
+)
 from src.record import DailyRecord
+from src.observations import (
+    UNKNOWN_OBSERVATION_MARK, SCHEMA_VERSION, capture_observation,
+)
 from src.scoring import DIMENSION_RULES, score, score_indicators
 
-# 与 generate_weekly_report._SUSPECT_ARCHIVE_RE 同口径：备份/临时快照不参与选档
-_SUSPECT_ARCHIVE_RE = re.compile(r"\.bak|copy|tmp|_旧格式", re.IGNORECASE)
-_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
-
-# 退出评分层的字段：只展示不打分（KNOWN_ISSUES #5 点刺 / #18 掌温；
-# 其余 5 项 2026-10-20 补齐——显示「0 分」徽标会让用户误以为评分出错，
-# 统一给「参考项」徽标 + 原因说明）
-REF_FIELDS = {
-    "prickles": "退出评分层，仅供辨证（凸起需触诊，照片判不准）",
-    "palm_temp": "照片不可判，已降级为参考项（温度需触诊）",
-    "body_luster": "不参与评分，仅供辨证（光泽受光线/闪光灯干扰，静态照片不可判）",
-    "body_dynamics": "不参与评分，仅供辨证（动态体征需动态观察；红线词仍会触发危险信号）",
-    "coating_distribution": "不参与评分，仅供辨证",
-    "nose_color": "不参与评分，仅供辨证",
-    "nose_bleeding": "不参与评分，仅供辨证（发作事件照片拍不到，以自陈为准）",
-}
-
-# 修正选项（web 层 UI 数据，不进 src 核心库契约）：
-# 有评分词表的字段直接用 DIMENSION_RULES 的 key 作选项（选中即得分，消灭
-# 「词表外措辞静默读 0 分」）；无评分词表的字段（照片不可判、降级到辨证层）
-# 用下方人工词表——用户肉眼/触诊给出权威值，只入档案供辨证，不参与评分。
-FIELD_OPTIONS = {
-    "body_luster":          ["荣润", "少华", "枯"],
-    "prickles":             ["无", "少量", "点刺", "芒刺"],  # 留存词表复活
-    "body_dynamics":        ["正常", "颤动", "歪斜", "痿软", "强硬", "短缩", "吐弄"],
-    "coating_distribution": ["满布", "偏布一侧", "苔少"],
-    "nose_color":           ["正常", "红赤", "青黑", "枯槁"],
-    "nose_bleeding":        ["无", "少量", "较多"],
-    "palm_temp":            ["温", "凉", "不温", "厥冷"],     # 留存词表复活
-}
+REF_FIELDS = REFERENCE_FIELDS
 
 # 词表无 0 分基线词时给修正 UI 补的「正常」选项：措辞落在 validator 的
 # 正常/否定语义豁免区（input_validator 对「未见」类描述不做词表覆盖告警），
@@ -92,6 +71,7 @@ GLOSSARY = {
     "散在": "零星分布",
     "密集": "成片密集出现",
     "黄染": "眼白/皮肤发黄，黄疸信号",
+    "无黄染": "没有发现眼白黄染",
     "赤丝": "眼白出现明显红丝（3 分，与「红血丝」同档；赤丝为古医书用语）",
     "卧蚕": "下眼睑微肿如蚕卧状",
     "少华": "光泽欠佳",
@@ -161,6 +141,7 @@ GLOSSARY.update({
     "深裂": "裂纹较深",
     "剥脱": "舌苔部分脱落",
     "苔少": "舌苔量偏少",
+    "苔多": "舌苔量偏多",
     # 颜色词
     "淡红": "淡红色（多为正常基色）",
     "淡粉红": "淡淡的粉红色（正常唇色）",
@@ -271,19 +252,57 @@ _DISPLAY_HIDE = {
 
 def _field_options(dim, indicator: str):
     """修正 UI 的封闭选项；无词表且未人工指定时返回 None（回落自由文本）。"""
-    hide = _DISPLAY_HIDE.get(indicator, set())
+    spec = INDICATOR_REGISTRY.for_field(dim, indicator)
+    if spec.options is None:
+        return None
+    opts = list(spec.options)
     rules = DIMENSION_RULES.get(dim, {}).get(indicator)
-    if rules:
-        opts = list(rules.keys())
-        if not any(v == 0 for v in rules.values()):
-            opts.insert(0, NORMAL_OPTION)
-        return [o for o in opts if o not in hide]
-    return FIELD_OPTIONS.get(indicator)
+    if rules and not any(v == 0 for v in rules.values()):
+        opts.insert(0, NORMAL_OPTION)
+    hide = _DISPLAY_HIDE.get(indicator, set())
+    return [o for o in opts if o not in hide]
+
+
+def validate_field_value(dim, indicator, value, method="manual"):
+    """所有观察写入共享的类型、长度、占位符与封闭选项校验。"""
+    from src.observations import is_absolute_measurement
+    from src.record import is_declared_normal_value
+    from src.textnorm import canonical_option, has_line_breaks, normalize_text
+    if not isinstance(value, str):
+        raise ValueError("观察值必须为字符串")
+    if not value.strip():
+        raise ValueError("观察值不能为空；清空请使用显式清除动作")
+    if len(value) > 64:
+        raise ValueError("观察值不得超过 64 字")
+    if has_line_breaks(value):
+        raise ValueError("观察值不得包含换行")
+    if is_declared_normal_value(value) or value == UNKNOWN_OBSERVATION_MARK:
+        raise ValueError("声明或无法判读占位不能作为实测值写入")
+    if indicator == "sublingual_thickness" and method in ("photo", "measurement") \
+            and is_absolute_measurement(value):
+        return normalize_text(value.strip())
+    normalized = canonical_option(value)
+    spec = INDICATOR_REGISTRY.for_field(dim, indicator)
+    display_options = _field_options(dim, indicator)
+    options = spec.prompt_options if spec.prompt_options is not None else display_options
+    if options is not None:
+        options = list(dict.fromkeys([*options, *(display_options or [])]))
+    if options is not None:
+        for option in options:
+            if canonical_option(option) == normalized:
+                return option
+        raise ValueError(f"值不在封闭词表内: {value}")
+    return normalize_text(value.strip())
 
 
 # 形状 B 嵌套首段的展示前缀（修正/复核卡片分组用）
 _B_GROUP_LABELS = {"body": "舌质", "coating": "舌苔", "sublingual": "舌下络脉",
                    "face": "面域", "lips": "唇域", "nose": "鼻域"}
+
+
+def _glossary(dim, indicator: str, term: str):
+    spec = INDICATOR_REGISTRY.for_field(dim, indicator)
+    return INDICATOR_REGISTRY.glossary_for(spec.id, term, GLOSSARY.get(term))
 
 
 def correction_meta() -> dict:
@@ -295,57 +314,23 @@ def correction_meta() -> dict:
     for dim in DIMENSIONS:
         fields = {}
         for ind, shapes in _DIMENSION_INDICATORS.get(dim, {}).items():
+            spec = INDICATOR_REGISTRY.for_field(dim, ind)
             b_path = ".".join(shapes["B"])
             prefix = _B_GROUP_LABELS.get(shapes["B"][0], "") \
                 if len(shapes["B"]) > 1 else ""
-            label = (prefix + "·" if prefix else "") + \
-                INDICATOR_LABELS.get(ind, ind)
+            label = (prefix + "·" if prefix else "") + spec.label
             opts = _field_options(dim, ind)
             fields[b_path] = {
                 "ind": ind, "label": label, "opts": opts,
-                "scored": ind in DIMENSION_RULES.get(dim, {}),
-                "gloss": {o: GLOSSARY[o] for o in opts
-                          if o in GLOSSARY} if opts else None,
+                "scored": spec.scoring,
+                "gloss": {o: _glossary(dim, ind, o) for o in opts
+                          if _glossary(dim, ind, o) is not None} if opts else None,
             }
         meta[dim.english_name] = fields
     return meta
 
-# 待复核字段：照常评分，但需肉眼签认（2026-10-16 P1 原著审查；
-# 手册 user-guide.md「识图结果需肉眼确认的体征」清单 + 原著危重鉴别点）
-REVIEW_FIELDS = {
-    "jaundice": "急性黄疸红线相关，需肉眼复核",
-    "face_color": "红赤需与戴阳鉴别复核（太阳面赤 vs 戴阳面红如妆）",
-    "sublingual_varicosity": "血证核心体征，需肉眼复核",
-    "tooth_marks": "识图抖动高发字段，需肉眼复核",
-    "coating_greasy": "识图抖动高发字段，需肉眼复核",
-    "coating_thickness": "识图抖动高发字段，需肉眼复核",
-}
-
 # 「未拍摄（用户声明正常）」占位检测（单一事实来源在 src/record.py）
 from src.record import DECLARED_NORMAL_MARK  # noqa: F401
-
-# 指标 → 页面中文短标签（本表为线上单一事实来源；design 稿已分叉，勿再对照）
-INDICATOR_LABELS = {
-    "body_color": "颜色", "body_luster": "光泽", "body_size": "形态",
-    "petechiae": "瘀斑瘀点", "tooth_marks": "齿痕", "fissure": "裂纹",
-    "prickles": "点刺", "body_dynamics": "动态",
-    "coating_color": "苔色", "coating_thickness": "厚薄",
-    "coating_moisture": "润燥", "coating_greasy": "腻腐",
-    "coating_peeling": "剥落", "coating_distribution": "分布",
-    "sublingual_color": "颜色", "sublingual_thickness": "粗细",
-    "sublingual_varicosity": "迂曲", "sublingual_petechiae": "瘀点",
-    "face_color": "面色", "face_edema": "浮肿", "face_luster": "光泽",
-    "lip_color": "唇色", "lip_moisture": "润燥",
-    "nose_color": "鼻色", "nose_flare": "煽动", "nose_bleeding": "出血",
-    "redness": "目赤", "jaundice": "巩膜黄染", "edema": "浮肿",
-    "dark_orbit": "目眶黯黑", "sclera_color": "巩膜颜色",
-    "lower_lid": "下睑颜色",
-    "color": "颜色/肤色", "helix": "耳轮",
-    "palm_color": "手掌颜色", "palm_temp": "手掌温度",
-    "nail_color": "甲床颜色", "nail_shape": "甲床形态",
-    "ecchymosis": "瘀斑",
-    "cuo": "甲错", "yellow_sweat": "黄汗", "dryness": "干燥",
-}
 
 # 维度 → 展示分组（舌诊按 舌质/舌苔/舌下络脉，头面按 面/唇/鼻，其余单组）
 DIM_GROUPS = {
@@ -353,7 +338,8 @@ DIM_GROUPS = {
         ("舌质", ["body_color", "body_luster", "body_size", "petechiae",
                   "tooth_marks", "fissure", "prickles", "body_dynamics"]),
         ("舌苔", ["coating_color", "coating_thickness", "coating_moisture",
-                  "coating_greasy", "coating_peeling", "coating_distribution"]),
+                  "coating_greasy", "coating_peeling", "coating_amount",
+                  "coating_distribution"]),
         ("舌下络脉", ["sublingual_color", "sublingual_thickness",
                      "sublingual_varicosity", "sublingual_petechiae"]),
     ],
@@ -391,149 +377,219 @@ def sev_class(value):
 
 
 def weekday_cn(date_str: str) -> str:
-    d = datetime.date.fromisoformat(date_str)
-    return "周" + _WEEKDAYS[d.weekday()]
-
-
-def _select_daily_file(daily_dir: str, date_str: str):
-    """三级选档（与周报脚本同口径）。无候选返回 None。"""
-    exact = os.path.join(daily_dir, f"{date_str}_analysis.json")
-    if os.path.exists(exact):
-        return exact
-    matches = [m for m in glob.glob(os.path.join(daily_dir, f"{date_str}*analysis*.json"))
-               if not _SUSPECT_ARCHIVE_RE.search(os.path.basename(m))]
-    if not matches:
-        return None
-    filepath = max(matches, key=os.path.getmtime)
-    if len(matches) > 1:
-        print(f"⚠️ 警告: {date_str} 有多份非规范命名的 analysis 候选: "
-              f"{sorted(os.path.basename(m) for m in matches)}；"
-              f"选用 mtime 最新者 {os.path.basename(filepath)}", file=sys.stderr)
-    return filepath
+    from date_utils import parse_date
+    parsed = parse_date(date_str)
+    if parsed is None:
+        print(f"⚠️ 警告: 非法记录日期 {date_str!r}，星期显示留空", file=sys.stderr)
+        return ""
+    return "周" + _WEEKDAYS[parsed.weekday()]
 
 
 # 公开别名：跨模块调用不走私有名
 select_daily_file = _select_daily_file
 
 
-def validate_candidate(raw: dict, workdir: str):
-    """候选记录先写临时档过 input_validator；返回 (errors, warnings)。
-
-    ❌ 级由调用方决定是否拦截；⚠️/ℹ️ 仅展示。临时档即写即删。
-    """
+def validate_candidate(raw: dict, workdir: str, previous_raw: dict | None = None):
+    """校验候选；原记录已有的错误转 warning，只返回本次新增 errors。"""
+    from io_utils import write_temp_json
     from input_validator import validate_record
     os.makedirs(workdir, exist_ok=True)
-    tmp = os.path.join(workdir, ".validate-candidate.json")
+    tmp = write_temp_json(os.path.join(workdir, ".validate-candidate.json"), raw)
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
         _, errors, warnings = validate_record(tmp)
+        if previous_raw is not None:
+            previous_tmp = write_temp_json(
+                os.path.join(workdir, ".validate-previous.json"), previous_raw)
+            try:
+                _, previous_errors, _ = validate_record(previous_tmp)
+            finally:
+                if os.path.exists(previous_tmp):
+                    os.unlink(previous_tmp)
+            inherited = set(previous_errors)
+            warnings.extend(f"⚠️ 存量校验问题（本次未新增）: {error}"
+                            for error in errors if error in inherited)
+            errors = [error for error in errors if error not in inherited]
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
     return errors, warnings
 
 
-def backup_file(filepath: str, backup_dir: str) -> str:
-    """把 filepath 复制到 backup_dir（原名 + 时间戳 .bak），返回备份路径。
-    时间戳到微秒——同秒连续两次备份不得互相覆盖（首份备份 = 原始档，
-    恢复功能依赖其存活）。"""
-    os.makedirs(backup_dir, exist_ok=True)
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    backup = os.path.join(backup_dir, f"{os.path.basename(filepath)}.{stamp}.bak")
-    shutil.copyfile(filepath, backup)
-    return backup
+def backup_file(filepath: str, backup_dir: str, purpose="correction") -> str:
+    from lifecycle_store import backup_file as backup
+    return backup(filepath, backup_dir, purpose)
 
 
-def restore_original(daily_dir: str, backup_dir: str, date_str: str) -> dict:
-    """恢复为首次修正前的原始记录（LLM 原始输出）。
+def create_pristine_snapshot(raw: dict, backup_dir: str) -> dict:
+    from lifecycle_store import create_pristine_snapshot as create
+    return create(raw, backup_dir)
 
-    最早一份备份 = 第一次修正时备份的原始档。恢复前先把当前状态备份
-    （恢复本身也可再撤销）。无备份（从未修正过）返回错误。
-    """
-    filepath = _select_daily_file(daily_dir, date_str)
-    if not filepath:
-        return {"ok": False, "error": f"{date_str} 无记录"}
-    name = os.path.basename(filepath)
-    candidates = [b for b in glob.glob(os.path.join(backup_dir, f"{name}.*.bak"))
-                  if re.search(r"\.\d{8}-\d{6}(-\d+)?\.bak$", b)]
-    if not candidates:
-        return {"ok": False, "error": "无可用备份（该记录未被修正过）"}
-    oldest = min(candidates)  # 文件名含时间戳，字典序 = 时间序
-    safety = backup_file(filepath, backup_dir)
-    shutil.copyfile(oldest, filepath)
-    return {"ok": True,
-            "restored_from": os.path.basename(oldest),
-            "safety_backup": os.path.basename(safety)}
+
+def restore_original(daily_dir: str, backup_dir: str, date_str: str,
+                     timezone_name=None) -> dict:
+    from lifecycle_store import restore_original as restore
+    return restore(daily_dir, backup_dir, date_str, timezone_name)
 
 
 def list_dates(daily_dir: str):
-    """扫描 records/daily，返回有记录的日期列表（降序）。"""
+    """与详情、周报共用扫描规则，返回有候选记录的日期（降序）。"""
+    from date_utils import parse_date
     dates = set()
-    for f in glob.glob(os.path.join(daily_dir, "*analysis*.json")):
-        m = _DATE_RE.match(os.path.basename(f))
-        if m:
-            dates.add(m.group(1))
+    for date_str, candidates in daily_files(daily_dir).items():
+        if not candidates:
+            continue
+        if parse_date(date_str):
+            dates.add(date_str)
+        else:
+            print(f"⚠️ 警告: 跳过非法日期文件 {candidates[0][0]}", file=sys.stderr)
     return sorted(dates, reverse=True)
+
+
+def latest_record_date(daily_dir: str):
+    """最新可解析记录的日期；坏 JSON 不作为趋势回跳目标。"""
+    for date_str in list_dates(daily_dir):
+        if load_record(daily_dir, date_str) is not None:
+            return date_str
+    return None
+
+
+def load_record_with_version(daily_dir: str, date_str: str):
+    """返回 (DailyRecord|None, 文件版本|None)，读取与哈希使用同一内容。"""
+    from date_utils import parse_date
+    if parse_date(date_str) is None:
+        return None, None
+    filepath = _select_daily_file(daily_dir, date_str)
+    if not filepath:
+        return None, None
+    from io_utils import file_version, read_versioned_json
+    try:
+        raw, version = read_versioned_json(filepath)
+        if not isinstance(raw, dict):
+            raise TypeError(f"记录根节点不是对象（{type(raw).__name__}）")
+        if raw.get("date") != date_str:
+            print(f"⚠️ 警告: {filepath} 内部日期 {raw.get('date')!r} "
+                  f"与文件名不一致，按文件名 {date_str} 读取", file=sys.stderr)
+            raw = dict(raw, date=date_str)
+        return DailyRecord(raw), version
+    except (OSError, ValueError, TypeError) as e:
+        print(f"⚠️ 警告: 记录 {filepath} 解析失败: {e}", file=sys.stderr)
+        return None, file_version(filepath)
 
 
 def load_record(daily_dir: str, date_str: str):
     """选档并解析为 DailyRecord；无记录或解析失败返回 None。"""
+    return load_record_with_version(daily_dir, date_str)[0]
+
+
+def _is_declared_normal(obs: dict) -> bool:
+    """该维度是否只有声明占位；真实观察与占位并存时不算声明正常。"""
+    values = [v for v in obs.values() if v]
+    from src.record import is_declared_normal_value
+    return bool(values) and all(is_declared_normal_value(v) for v in values)
+
+
+def _scoring_observation(rec: DailyRecord, dim) -> dict:
+    return rec.get_scoring_observation(dim)
+
+
+def _dim_assessments(rec: DailyRecord):
+    from src.scoring import assess
+    return {dim: assess(dim, _scoring_observation(rec, dim)) for dim in DIMENSIONS}
+
+
+def _dim_scores(rec: DailyRecord):
+    assessments = _dim_assessments(rec)
+    return {
+        dim.chinese_name: (result.value
+                           if result.state in ("normal", "abnormal") else None)
+        for dim, result in assessments.items()
+    }
+
+
+def record_summary(rec: DailyRecord) -> dict:
+    """列表/日历用的单日摘要；未知项不计入总分或正常分母。"""
+    assessments = _dim_assessments(rec)
+    dims = {dim.chinese_name: (result.value
+                              if result.state in ("normal", "abnormal") else None)
+            for dim, result in assessments.items()}
+    known = [v for v in dims.values() if v is not None]
+    total = round(sum(known), 1)
+    return {
+        "date": rec.date,
+        "weekday": weekday_cn(rec.date) if rec.date else "",
+        "coverage": rec.get_covered_dimension_count(),
+        "coverage_total": len(DIMENSIONS),
+        "dims": dims,
+        "total": total,
+        "total_sev": sev_class(total / len(DIMENSIONS) if known else None),
+        "unknown_count": sum(r.unknown_count for r in assessments.values()),
+        "missing_count": sum(len(r.missing_indicators) for r in assessments.values()),
+    }
+
+
+_NEGATIVE_INQUIRY_ANSWERS = {
+    "无", "正常", "没有外感不适", "都不明显", "无不适", "无异常",
+    "口不渴", "温", "未见异常", "未见", "阴性",
+}
+
+
+def has_positive_inquiry(rec: DailyRecord) -> bool:
+    """任一已答问诊含非阴性答案即视为有阳性信息，未答不算阳性。"""
+    for answer in rec.get_inquiry_answers().values():
+        if answer and answer not in _NEGATIVE_INQUIRY_ANSWERS:
+            return True
+    return False
+
+
+def allows_no_abnormal_exit(rec: DailyRecord) -> bool:
+    """允许「本次已采集项未见异常」的必要条件，不是健康诊断。"""
+    summary = record_summary(rec)
+    known = [v for v in summary["dims"].values() if v is not None]
+    return (summary["coverage"] > 0 and summary["unknown_count"] == 0
+            and bool(known) and all(v == 0 for v in known)
+            and not has_positive_inquiry(rec)
+            and not rec.get_triggered_danger_flags())
+
+
+_SUMMARY_CACHE: dict[str, tuple[tuple[int, int], dict]] = {}
+_SUMMARY_CACHE_LOCK = threading.RLock()
+
+
+def _summary_for_date(daily_dir: str, date_str: str):
     filepath = _select_daily_file(daily_dir, date_str)
     if not filepath:
         return None
     try:
-        with open(filepath, encoding="utf-8") as f:
-            raw = json.load(f)
-        if not isinstance(raw, dict):
-            raise TypeError(f"记录根节点不是对象（{type(raw).__name__}）")
-        return DailyRecord(raw)
-    except (OSError, json.JSONDecodeError, TypeError) as e:
-        print(f"⚠️ 警告: 记录 {filepath} 解析失败: {e}", file=sys.stderr)
+        stat = os.stat(filepath)
+        signature = stat.st_mtime_ns, stat.st_size
+    except OSError:
         return None
+    cached = _SUMMARY_CACHE.get(filepath)
+    if cached and cached[0] == signature:
+        return cached[1]
+    with _SUMMARY_CACHE_LOCK:
+        cached = _SUMMARY_CACHE.get(filepath)
+        if cached and cached[0] == signature:
+            return cached[1]
+        rec = load_record(daily_dir, date_str)
+        if rec is None or not rec.date:
+            return None
+        summary = record_summary(rec)
+        _SUMMARY_CACHE[filepath] = (signature, summary)
+        return summary
 
 
-def _is_declared_normal(obs: dict) -> bool:
-    """该维度是否只有「未拍摄（用户声明正常）」占位（P1：不计覆盖）。"""
-    return any(v == DECLARED_NORMAL_MARK for v in obs.values())
-
-
-def _dim_scores(rec: DailyRecord):
-    """每维 (score 或 None, 是否覆盖)。未覆盖维度 score 为 None（与 0 分区分）；
-    声明正常占位维度同样按未覆盖处理（P1 原著审查：占位≠亲眼所见）。"""
-    out = {}
-    for dim in DIMENSIONS:
-        obs = rec.get_observation(dim)
-        if dim.is_covered(obs) and not _is_declared_normal(obs):
-            out[dim.chinese_name] = round(score(dim, obs), 1)
-        else:
-            out[dim.chinese_name] = None
-    return out
-
-
-def record_summary(rec: DailyRecord) -> dict:
-    """列表/日历用的单日摘要。"""
-    dims = _dim_scores(rec)
-    covered = sum(1 for v in dims.values() if v is not None)
-    total = round(sum(v for v in dims.values() if v is not None), 1)
-    return {
-        "date": rec.date,
-        "weekday": weekday_cn(rec.date) if rec.date else "",
-        "coverage": covered,
-        "coverage_total": len(DIMENSIONS),
-        "dims": dims,
-        "total": total,
-        "total_sev": sev_class(total / len(DIMENSIONS) if covered else None),
-    }
-
-
-def list_summaries(daily_dir: str):
-    """全部记录的摘要（按日期降序）；解析失败/无 date 的跳过。"""
+def list_summaries(daily_dir: str, limit=None):
+    """摘要按日期降序；可选择只加载前 limit 条，坏记录跳过。"""
+    if limit is not None and limit <= 0:
+        return []
     out = []
     for date_str in list_dates(daily_dir):
-        rec = load_record(daily_dir, date_str)
-        if rec and rec.date:
-            out.append(record_summary(rec))
+        summary = _summary_for_date(daily_dir, date_str)
+        if summary is not None:
+            out.append(summary)
+            if limit is not None and len(out) >= limit:
+                break
     return out
 
 
@@ -543,59 +599,85 @@ def calendar_month(daily_dir: str, month: str, today: str):
     返回 {"month": "2026-06", "label": "2026 年 6 月", "weeks": [[cell,...]]}，
     cell = {"day": int|None, "date", "has", "today", "dots": [sev...], "total", "sev"}。
     """
-    year, mon = int(month[:4]), int(month[5:7])
+    import calendar as calendar_lib
+    from date_utils import add_month, parse_month
+    first = parse_month(month)
+    if first is None:
+        return {"month": month, "label": month, "weeks": [],
+                "prev": None, "next": None}
+    year, mon = first.year, first.month
     by_date = {}
     for date_str in list_dates(daily_dir):
         if date_str.startswith(month):
-            rec = load_record(daily_dir, date_str)
-            if rec and rec.date:
-                by_date[date_str] = record_summary(rec)
+            summary = _summary_for_date(daily_dir, date_str)
+            if summary is not None:
+                by_date[date_str] = summary
 
-    first = datetime.date(year, mon, 1)
-    days = (datetime.date(year + (mon == 12), mon % 12 + 1, 1)
-            - datetime.timedelta(days=1)).day
-    cells = [{"day": None}] * first.weekday()
-    for d in range(1, days + 1):
-        date_str = f"{year:04d}-{mon:02d}-{d:02d}"
-        s = by_date.get(date_str)
-        cell = {"day": d, "date": date_str, "has": bool(s), "today": date_str == today}
-        if s:
-            cell["dots"] = [sev_class(v) for v in s["dims"].values()]
-            cell["total"] = f'{s["total"]:.1f}'
-            cell["sev"] = s["total_sev"]
-        cells.append(cell)
+    cells = []
+    for week in calendar_lib.monthcalendar(year, mon):
+        for day in week:
+            if not day:
+                cells.append({"day": None})
+                continue
+            date_str = f"{year:04d}-{mon:02d}-{day:02d}"
+            s = by_date.get(date_str)
+            cell = {"day": day, "date": date_str, "has": bool(s),
+                    "today": date_str == today}
+            if s:
+                cell["dots"] = [sev_class(v) for v in s["dims"].values()]
+                cell["total"] = f'{s["total"]:.1f}'
+                cell["sev"] = s["total_sev"]
+            cells.append(cell)
     weeks = [cells[i:i + 7] for i in range(0, len(cells), 7)]
-    prev_m = (first - datetime.timedelta(days=1)).strftime("%Y-%m")
-    next_first = datetime.date(year + (mon == 12), mon % 12 + 1, 1)
+    prev_m = add_month(first, -1)
+    next_m = add_month(first, 1)
     return {"month": month, "label": f"{year} 年 {mon} 月", "weeks": weeks,
-            "prev": prev_m, "next": next_first.strftime("%Y-%m")}
+            "prev": prev_m.strftime("%Y-%m") if prev_m else None,
+            "next": next_m.strftime("%Y-%m") if next_m else None}
 
 
-def week_stats(summaries, today: str):
-    """本周记录天数 / 连续记录天数 / 本周平均总偏离度。"""
-    today_d = datetime.date.fromisoformat(today)
-    week_start = today_d - datetime.timedelta(days=today_d.weekday())
-    by_date = {s["date"]: s for s in summaries}
-    this_week = [by_date.get((week_start + datetime.timedelta(days=i)).isoformat())
-                 for i in range(7)]
-    this_week = [s for s in this_week if s]
-    # 连续天数：从最近一条记录日往前逐日回数
+def week_stats(summaries, today: str, all_dates=None):
+    """本周截至今天的统计；连续天数从今天或昨天起算，忽略未来日期。"""
+    import time_utils
+    from date_utils import add_days, parse_date
+    today_d = parse_date(today) or time_utils.today()
+    week_start = add_days(today_d, -today_d.weekday())
+    summaries_by_date = {s["date"]: s for s in summaries}
+    dates = set(all_dates) if all_dates is not None else set(summaries_by_date)
+    this_week = []
+    for offset in range(7):
+        day = add_days(week_start, offset)
+        if day is not None and day <= today_d and day.isoformat() in summaries_by_date:
+            this_week.append(summaries_by_date[day.isoformat()])
+    today_str = today_d.isoformat()
+    cur = today_d if today_str in dates else add_days(today_d, -1)
     streak = 0
-    if summaries:
-        cur = datetime.date.fromisoformat(summaries[0]["date"])
-        while cur.isoformat() in by_date:
-            streak += 1
-            cur -= datetime.timedelta(days=1)
+    while cur and cur.isoformat() in dates:
+        streak += 1
+        cur = add_days(cur, -1)
     avg = round(sum(s["total"] for s in this_week) / len(this_week), 1) if this_week else None
     return {"week_days": len(this_week), "streak": streak, "week_avg": avg}
 
 
 def load_demo(daily_dir: str) -> str:
-    """把合成示例记录拷入 records/daily（空库引导用）。返回日期。"""
+    """仅向空库写入合成示例；已有记录或同名文件时拒绝覆盖。"""
+    if list_dates(daily_dir):
+        raise FileExistsError("记录库非空")
     src = os.path.join(paths.REPO_ROOT, "tests", "fixtures",
                        "2026-06-25_analysis.json")
     os.makedirs(daily_dir, exist_ok=True)
-    shutil.copyfile(src, os.path.join(daily_dir, "2026-06-25_analysis.json"))
+    target = os.path.join(daily_dir, "2026-06-25_analysis.json")
+    with open(src, encoding="utf-8") as f:
+        content = f.read()
+    try:
+        with open(target, "x", encoding="utf-8") as f:
+            f.write(content)
+    except FileExistsError:
+        raise
+    except Exception:
+        if os.path.exists(target):
+            os.unlink(target)
+        raise
     return "2026-06-25"
 
 
@@ -631,16 +713,15 @@ def _write_path(rec: DailyRecord, dim, indicator: str):
 
 
 def update_observation(daily_dir: str, backup_dir: str, date_str: str,
-                       dim_key: str, indicator: str, value: str) -> dict:
-    """修正一个观察值：校验 → 备份 → 形状感知写回 → 打标 → 重评分。
-
-    返回 {"ok", "errors", "warnings", ...}。validator 的 ❌ 级错误拦截保存
-    （不留半成品），⚠️ 级仅回传展示。文件替换用「临时文件 + os.replace」，
-    中途崩溃不损坏原档。
-    """
+                       dim_key: str, indicator: str, value: str,
+                       method="manual", evidence=None, action="set", client="",
+                       timezone_name=None) -> dict:
+    """修正或显式清除观察值：校验 → 审计 → 备份 → 形状感知写回。"""
     from src.dimensions import from_english
     from src.record import _DIMENSION_INDICATORS
 
+    if action not in ("set", "clear"):
+        return {"ok": False, "errors": ["未知修正动作"], "warnings": []}
     dim = from_english(dim_key)
     if dim is None or indicator not in _DIMENSION_INDICATORS.get(dim, {}):
         return {"ok": False, "errors": [f"未知的维度或指标: {dim_key}/{indicator}"],
@@ -649,11 +730,22 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
     if not filepath:
         return {"ok": False, "errors": [f"{date_str} 无记录"], "warnings": []}
     try:
-        with open(filepath, encoding="utf-8") as f:
-            raw = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
+        from io_utils import read_versioned_json
+        raw, current_version = read_versioned_json(filepath)
+    except (OSError, ValueError, TypeError) as e:
         return {"ok": False, "errors": [f"记录读取失败: {e}"], "warnings": []}
+    if not isinstance(raw, dict):
+        return {"ok": False, "errors": ["记录根节点不是对象"], "warnings": []}
+    normalized = None
+    if action == "set":
+        try:
+            normalized = validate_field_value(dim, indicator, value, method)
+        except ValueError as e:
+            return {"ok": False, "errors": [str(e)], "warnings": []}
 
+    previous_raw = json.loads(json.dumps(raw, ensure_ascii=False))
+    if not isinstance(raw.get("pristine_snapshot"), dict):
+        raw["pristine_snapshot"] = create_pristine_snapshot(previous_raw, backup_dir)
     rec = DailyRecord(raw)
     node, path = _write_path(rec, dim, indicator)
     if not isinstance(node, dict):
@@ -664,43 +756,56 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
         if not isinstance(node, dict):
             return {"ok": False, "errors": [f"记录结构异常：{key} 不是对象"],
                     "warnings": []}
-    node[path[-1]] = value.strip()
-    raw["manually_corrected"] = True
-    raw["corrected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
-
-    # 修正可能写入红线词（强硬/短缩/镜面等封闭选项）——重估 danger_flags。
-    # 仅形状 B 列表结构；形状 A 每旗对象结构由 LLM 维护，不动。
-    import wizard_store
-    detected = wizard_store.detect_danger(raw.get("observations", {}))
-    df = raw.get("danger_flags")
-    if isinstance(df, dict) and isinstance(df.get("triggered"), list):
-        triggered = sorted(set(df["triggered"]) | set(detected))
-    elif detected:
-        triggered = sorted(detected)
+    metadata = raw.get("observation_meta", {})
+    if not isinstance(metadata, dict):
+        return {"ok": False, "errors": ["记录 observation_meta 格式错误"], "warnings": []}
+    full_path = f"{dim.english_name}." + ".".join(path)
+    if action == "clear":
+        node.pop(path[-1], None)
+        metadata.pop(full_path, None)
     else:
-        triggered = None
-    if triggered is not None:
-        raw["danger_flags"] = {
-            "triggered": triggered,
-            "not_triggered": [k for k in wizard_store.DANGER_PATTERNS
-                              if k not in triggered],
-        }
+        try:
+            obs = capture_observation(dim, indicator, value.strip(), "manual", method,
+                                      evidence, value=normalized)
+        except ValueError as e:
+            return {"ok": False, "errors": [str(e)], "warnings": []}
+        metadata[obs.path] = obs.to_meta()
+        if obs.normalized:
+            node[path[-1]] = obs.normalized
+        else:
+            node.pop(path[-1], None)
+    audit = raw.get("correction_audit", [])
+    if not isinstance(audit, list):
+        return {"ok": False, "errors": ["记录 correction_audit 格式错误"], "warnings": []}
+    audit.append({"action": action, "indicator": indicator, "dimension": dim_key,
+                  "value": normalized, "method": method,
+                  "at": time_utils.iso_now(timezone_name)})
+    raw["correction_audit"] = audit
+    raw["observation_meta"] = metadata
+    if rec.shape == "B":
+        raw["schema_version"] = SCHEMA_VERSION
+    raw["manually_corrected"] = True
+    raw["corrected_at"] = time_utils.iso_now(timezone_name)
 
-    # 临时档先校验，❌ 拦截（原档不动）；通过则备份旧版 → 原子替换
-    tmp = filepath + ".validate-tmp"
+    # 重算自动触发项；仅证据消失才撤销，人工/外部无证据标记继续保留。
+    from src.danger_review import refresh_danger
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
-        from input_validator import validate_record
-        _, errors, warnings = validate_record(tmp)
-        blocking = [e for e in errors if e.startswith("❌")]
-        if blocking:
-            return {"ok": False, "errors": blocking, "warnings": warnings}
-        backup = backup_file(filepath, backup_dir)
-        os.replace(tmp, filepath)
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        events = refresh_danger(raw, previous_raw=previous_raw,
+                                source="correction", client=client)
+    except ValueError as error:
+        return {"ok": False, "errors": [str(error)], "warnings": []}
+
+    from src.derived import current_derived_meta
+    raw["derived_meta"] = current_derived_meta(DailyRecord(raw))
+
+    # 全部 errors 拦截；原记录已有的问题只告警，通过后备份并原子替换。
+    errors, warnings = validate_candidate(
+        raw, daily_dir, previous_raw=previous_raw)
+    if errors:
+        return {"ok": False, "errors": errors, "warnings": warnings}
+    from io_utils import atomic_write_json
+    backup = backup_file(filepath, backup_dir)
+    atomic_write_json(filepath, raw, current_version)
 
     new_rec = DailyRecord(raw)
     obs = new_rec.get_observation(dim)
@@ -713,79 +818,143 @@ def update_observation(daily_dir: str, backup_dir: str, date_str: str,
         "field_score": scored.get(indicator),
         "dim_score": round(score(dim, obs), 1) if dim.is_covered(obs) else None,
         "danger_triggered": (raw.get("danger_flags") or {}).get("triggered", []),
+        "cleared": events["cleared"], "revived": events["revived"],
         "summary": record_summary(new_rec),
     }
 
 
-def list_photos(photos_dir: str, date_str: str):
-    """records/photos/<date>/ 下的照片文件名列表（排序）。"""
+def list_photos(photos_dir: str, date_str: str, rec=None):
+    """优先按当前记录绑定列出照片；旧记录无绑定时保留目录兼容。"""
     d = os.path.join(photos_dir, date_str)
     if not os.path.isdir(d):
         return []
     ok = (".jpg", ".jpeg", ".png", ".webp")
+    if rec is not None and "photos" in rec.raw:
+        registered = rec.raw["photos"]
+        if not isinstance(registered, dict):
+            print("⚠️ 警告: 记录 photos 不是对象，原图对照留空", file=sys.stderr)
+            return []
+        return sorted({value for value in registered.values()
+                       if isinstance(value, str) and value == os.path.basename(value)
+                       and value.lower().endswith(ok)
+                       and os.path.isfile(os.path.join(d, value))})
     return sorted(f for f in os.listdir(d) if f.lower().endswith(ok))
 
 
-def record_detail(rec: DailyRecord) -> dict:
-    """单日详情页的完整视图模型。"""
+def record_detail(rec: DailyRecord, date_str=None) -> dict:
+    """单日详情页的完整视图模型；未知项与正常 0 分明确区分。"""
+    identity_date = date_str or rec.date
+    from src.scoring import assess_indicators
+    assessments = _dim_assessments(rec)
+    coverage = rec.get_dimension_coverage()
     dims = []
     for dim in DIMENSIONS:
         obs = rec.get_observation(dim)
-        covered = dim.is_covered(obs)
-        declared_normal = covered and _is_declared_normal(obs)
-        scored = score_indicators(dim, obs) if covered and not declared_normal else {}
+        result = assessments[dim]
+        declared_normal = (_is_declared_normal(obs)
+                           or (not coverage[dim] and any(
+                               d.get("kind") == "declared_normal"
+                               for d in rec.get_declarations(dim))))
+        covered = coverage[dim]
+        scored = (assess_indicators(dim, _scoring_observation(rec, dim))
+                  if covered else {})
         groups = []
         for gname, indicators in DIM_GROUPS[dim.english_name]:
             fields = []
             for ind in indicators:
                 v = obs.get(ind, "")
                 opts = _field_options(dim, ind)
-                label = INDICATOR_LABELS.get(ind, ind)
+                label = INDICATOR_REGISTRY.for_field(dim, ind).label
                 base = {"k": label, "v": v, "ind": ind,
                         "kgloss": GLOSSARY.get(label),
                         "opts": opts,
-                        "gloss": {o: GLOSSARY[o] for o in opts
-                                  if o in GLOSSARY} if opts else None}
-                if ind in REF_FIELDS:
+                        "gloss": {o: _glossary(dim, ind, o) for o in opts
+                                  if _glossary(dim, ind, o) is not None} if opts else None}
+                if v == UNKNOWN_OBSERVATION_MARK:
+                    fields.append({**base, "s": None, "unknown": True})
+                elif ind in REF_FIELDS:
                     fields.append({**base, "s": None, "ref": REF_FIELDS[ind]})
                 elif ind in scored:
-                    fields.append({**base, "s": scored[ind],
-                                   "review": REVIEW_FIELDS.get(ind)})
+                    assessment = scored[ind]
+                    fields.append({**base, "s": assessment.value,
+                                   "unknown": assessment.state == "unknown",
+                                   "review": INDICATOR_REGISTRY.for_field(dim, ind).review or None})
                 else:
-                    # 兜底：指标既不在评分规则也不在参考项（当前全集已被
-                    # 两者覆盖，此分支防御用——新增指标忘配规则时按 0 展示）
                     fields.append({**base, "s": 0})
-            # 空组不展示（该维度未覆盖时整组无值）
             if any(f["v"] for f in fields):
                 groups.append({"name": gname, "fields": fields})
-        positives = [v for v in scored.values() if v > 0]
+        positives = [a.value for a in scored.values() if a.state == "abnormal"]
         dims.append({
             "key": dim.english_name, "name": dim.chinese_name,
-            "covered": covered and not declared_normal,
+            "covered": covered,
             "declared_normal": declared_normal,
-            "score": round(score(dim, obs), 1) if scored else None,
+            "score": (result.value
+                      if covered and result.state in ("normal", "abnormal") else None),
             "max_indicator": max(positives) if positives else None,
+            "unknown_count": result.unknown_count,
+            "missing_count": len(result.missing_indicators),
             "groups": groups,
         })
 
-    total = round(sum(d["score"] for d in dims if d["score"] is not None), 1)
-    covered_n = sum(1 for d in dims if d["covered"])
+    known = [d["score"] for d in dims if d["score"] is not None]
+    total = round(sum(known), 1)
+    covered_n = rec.get_covered_dimension_count()
 
-    # 辨证结构化结论（形状 A/B/C 已由 DailyRecord 归一）
     pattern = rec.get_pattern_differentiation()
+    if pattern and not isinstance(pattern, dict):
+        print("⚠️ 警告: pattern_differentiation 不是对象，详情页忽略该字段",
+              file=sys.stderr)
+        pattern = {}
     diagnosis = None
     if pattern:
         tv = pattern.get("three_views") or pattern.get("三观") or {}
+        if not isinstance(tv, dict):
+            print("⚠️ 警告: three_views 不是对象，详情页忽略该字段", file=sys.stderr)
+            tv = {}
         diagnosis = {
             "three_views": [{"k": k, "v": v} for k, v in tv.items()],
-            "six_diseases": pattern.get("six_diseases", ""),
-            "pathomechanism": pattern.get("core_pathomechanism", ""),
+            "six_diseases": pattern.get("six_diseases") or pattern.get("六病定位", ""),
+            "pathomechanism": (pattern.get("core_pathomechanism")
+                               or pattern.get("核心病机", "")),
         }
 
-    triggered = rec.get_triggered_danger_flags()
+    diag = rec.raw.get("diagnosis")
+    report = diag.get("report") if isinstance(diag, dict) else None
+    if report is not None and not isinstance(report, dict):
+        print("⚠️ 警告: diagnosis.report 不是对象，详情页忽略该报告", file=sys.stderr)
+        report = {}
+    elif isinstance(report, dict):
+        report = dict(report)
+        if "markdown" in report and not isinstance(report["markdown"], str):
+            print("⚠️ 警告: 报告 markdown 不是字符串，详情页省略该内容", file=sys.stderr)
+        report["markdown"] = report.get("markdown") \
+            if isinstance(report.get("markdown"), str) else ""
+        for key in ("diet_advice", "lifestyle"):
+            if key in report and not isinstance(report[key], dict):
+                print(f"⚠️ 警告: 报告 {key} 不是对象，详情页忽略该字段", file=sys.stderr)
+                report.pop(key)
+
+    from src.danger import alert_evaluation_map
+    evaluations = alert_evaluation_map(rec)
+    flags = rec.raw.get("danger_flags", {})
+    dismissed = flags.get("dismissed", []) if isinstance(flags, dict) else []
+    dismissed = [key for key in dismissed if isinstance(key, str)] \
+        if isinstance(dismissed, list) else []
+    triggered = [key for key in rec.get_triggered_danger_flags()
+                 if isinstance(key, str) and key not in dismissed]
+    danger_unknown = [
+        {"key": k, **DANGER_FLAGS.get(k, {"name": k, "note": ""}), **evaluation}
+        for k, evaluation in evaluations.items()
+        if evaluation.get("state") == "unknown"
+        and k not in triggered and k not in dismissed]
+    danger_not_triggered = [
+        DANGER_FLAGS.get(k, {}).get("name", k)
+        for k, evaluation in evaluations.items()
+        if evaluation.get("state") == "not_triggered"
+        and k not in triggered and k not in dismissed]
     return {
-        "date": rec.date,
-        "weekday": weekday_cn(rec.date) if rec.date else "",
+        "date": identity_date,
+        "weekday": weekday_cn(identity_date) if identity_date else "",
         "coverage": covered_n,
         "coverage_total": len(DIMENSIONS),
         "confidence": rec.get_confidence(),
@@ -793,10 +962,20 @@ def record_detail(rec: DailyRecord) -> dict:
         "corrected": bool(rec.raw.get("manually_corrected")),
         "dims": dims,
         "total": total,
-        "total_sev": sev_class(total / len(DIMENSIONS) if covered_n else None),
+        "total_sev": sev_class(total / len(DIMENSIONS) if known else None),
+        "unknown_count": sum(r.unknown_count for r in assessments.values()),
+        "missing_count": sum(len(r.missing_indicators) for r in assessments.values()),
         "danger_triggered": [
-            {"key": k, **DANGER_FLAGS.get(k, {"name": k, "note": ""})}
+            {"key": k, **DANGER_FLAGS.get(k, {"name": k, "note": ""}),
+             **evaluations.get(k, {})}
             for k in triggered],
+        "danger_dismissed": [
+            {"key": key, **DANGER_FLAGS.get(key, {"name": key, "note": ""}),
+             **evaluations.get(key, {})}
+            for key in dismissed],
+        "danger_not_triggered": danger_not_triggered,
+        "danger_unknown": danger_unknown,
         "danger_all": [v["name"] for v in DANGER_FLAGS.values()],
         "diagnosis": diagnosis,
+        "report": report,
     }

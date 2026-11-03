@@ -31,10 +31,17 @@
   .rec-row .date small { font-family: var(--font-sans); font-weight: 400; color: var(--ink-3); margin-left: 6px; font-size: 12px; }
   .rec-row .dimmini { display: flex; gap: 8px; flex-wrap: wrap; }
   .rec-row .dimmini span { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
-  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+  .stat-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
   .stat { text-align: center; padding: 16px 10px; }
   .stat .n { font-family: var(--font-serif); font-size: 28px; font-weight: 700; }
   .stat .l { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.08em; margin-top: 2px; }
+  @media (max-width: 760px) {
+    .cal { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .rec-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .rec-row .tag { grid-column: 2; grid-row: 1; }
+    .rec-row .dimmini { grid-column: 1 / -1; grid-row: 2; }
+    .rec-row .scoreline { grid-column: 1 / -1; min-width: 0 !important; }
+  }
 </style>
 
 {% if empty %}
@@ -65,8 +72,8 @@
     <h2>日历</h2>
     <span class="muted" style="font-size:13px;">圆点 = 当日六维等级色；数字 = 总偏离度</span>
     <span class="spacer"></span>
-    <a class="btn btn-ghost btn-sm" href="/?m={{ cal.prev }}">‹ 上月</a>
-    <a class="btn btn-ghost btn-sm" href="/?m={{ cal.next }}">下月 ›</a>
+    {% if cal.prev %}<a class="btn btn-ghost btn-sm" href="/?m={{ cal.prev }}">‹ 上月</a>{% endif %}
+    {% if cal.next %}<a class="btn btn-ghost btn-sm" href="/?m={{ cal.next }}">下月 ›</a>{% endif %}
   </div>
   <div class="cal">
     {% for w in ["一","二","三","四","五","六","日"] %}<div class="wd">{{ w }}</div>{% endfor %}
@@ -88,14 +95,14 @@
 
 <div class="card" style="padding: 10px 12px;">
   <div class="card-head" style="margin: 8px 10px 6px;">
-    <h2>近七日</h2>
+    <h2>最近记录</h2>
     <span class="spacer"></span>
     <a class="btn btn-primary btn-sm" href="/wizard">＋ 今日记录</a>
   </div>
   <div>
     {% for s in summaries %}
     <a class="rec-row" href="/record/{{ s.date }}">
-      <div class="date num">{{ s.date[5:].replace("-", " / ") }}<small>{{ s.weekday }}</small></div>
+      <div class="date num">{{ s.date[5:].replace("-", " / ") }}<small>{{ s.date[:4] }} · {{ s.weekday }}</small></div>
       <span class="tag{% if s.coverage == s.coverage_total %} ok{% endif %}">覆盖 {{ s.coverage }} / {{ s.coverage_total }}</span>
       <div class="dimmini">
         {% for name, v in s.dims.items() %}

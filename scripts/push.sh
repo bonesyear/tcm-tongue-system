@@ -1,63 +1,119 @@
 #!/usr/bin/env bash
-# 安全 push 到 GitHub —— 绕过全局镜像重写 + push 后自动验证
-#
-# 用法：bash scripts/push.sh [remote] [branch]     默认 origin main
-#
-# ── 背景（2026-09-18 实测踩过，两个独立坑）──────────────────────────────
-# 坑① 凭据文件格式
-#   全局/本机 git 可能配了 URL 重写（url.<base>.insteadOf），把 github.com
-#   指向第三方镜像（如 gh-proxy.com）。镜像站点没有凭据 → push 失败。
-#   ⚠️ 绝不能给镜像站点配 GitHub token —— 那等于把 token 交给第三方。
-#   本脚本用「临时 GIT_CONFIG_GLOBAL」屏蔽全局配置，直连 github.com，
-#   不改动用户的 ~/.gitconfig。
-#
-# 坑② ~/.git-credentials 的格式
-#   必须是：  https://x-access-token:<TOKEN>@github.com
-#   写成     https://<TOKEN>@github.com  （缺 password 段）会因匹配失败而返回空，
-#   表现为 "fatal: could not read Username for 'https://github.com'"。
-#
-# ── 纪律（本轮教训）─────────────────────────────────────────────────────
-#   git commit 成功但 git push 失败时，两者输出都"看起来正常"，
-#   极易误以为已推送 → 因此本脚本在 push 后**自动核对本地与远端 SHA**。
-set -uo pipefail
+# 安全 push：保留凭据配置、校验目的地、独立核对远端 SHA。
+set -euo pipefail
 
 REMOTE="${1:-origin}"
 BRANCH="${2:-main}"
+GIT_BIN="${GIT_BIN:-git}"
+git() {
+  if [ "$GIT_BIN" = "git" ]; then
+    command git "$@"
+  else
+    "$GIT_BIN" "$@"
+  fi
+}
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "❌ 当前目录不是 git 仓库" >&2; exit 1
-fi
-
-# 检查凭据文件格式（只提示，不打印内容）
-CRED="$HOME/.git-credentials"
-if [ -f "$CRED" ]; then
-  if ! grep -q '^https://x-access-token:.*@github\.com' "$CRED" 2>/dev/null; then
-    echo "⚠️  $CRED 中未发现 'x-access-token:<token>@github.com' 格式的条目" >&2
-    echo "    若非此格式，helper 可能返回空 → 见脚本头部「坑②」" >&2
-  fi
-else
-  echo "⚠️  未找到 $CRED —— 若 push 要求输入用户名，请先配置凭据（见脚本头部）" >&2
-fi
-
-# 临时配置：只保留 credential.helper=store，屏蔽全局的 insteadOf
-BYPASS="$(mktemp)"; trap 'rm -f "$BYPASS"' EXIT
-printf '[credential]\n\thelper = store\n' > "$BYPASS"
-
-echo "▶ push $REMOTE $BRANCH（直连 github.com，绕过全局镜像重写）"
-if ! GIT_CONFIG_GLOBAL="$BYPASS" git -c http.version=HTTP/1.1 push "$REMOTE" "$BRANCH"; then
-  echo "❌ push 命令失败（见上方输出）" >&2; exit 1
-fi
-
-# ── push 后自动验证 ──
-LOCAL="$(git rev-parse HEAD)"
-git fetch --quiet "$REMOTE" "$BRANCH" 2>/dev/null || true
-REMOTE_SHA="$(git rev-parse "$REMOTE/$BRANCH" 2>/dev/null || echo '?')"
-
-echo
-if [ "$LOCAL" = "$REMOTE_SHA" ]; then
-  echo "✅ 验证通过：本地 = 远端 = ${LOCAL:0:7}"
-else
-  echo "❌ 验证失败：本地 ${LOCAL:0:7} ≠ 远端 ${REMOTE_SHA:0:7}" >&2
-  echo "   push 可能未真正生效 —— 请检查凭据/网络后重试" >&2
+  echo "❌ 当前目录不是 git 仓库" >&2
   exit 1
 fi
+
+VERSION="$(git version)"
+VERSION_NUMBER="${VERSION##* }"
+MAJOR="${VERSION_NUMBER%%.*}"
+REST="${VERSION_NUMBER#*.}"
+MINOR="${REST%%.*}"
+if [ "$MAJOR" -lt 2 ] || { [ "$MAJOR" -eq 2 ] && [ "$MINOR" -lt 32 ]; }; then
+  echo "❌ 需要 Git >= 2.32 才能隔离配置，当前为 $VERSION" >&2
+  exit 1
+fi
+
+BYPASS_GLOBAL="$(mktemp)"
+BYPASS_SYSTEM="$(mktemp)"
+INCLUDE_DIR="$(mktemp -d)"
+INCLUDE_INDEX=0
+trap 'rm -f "$BYPASS_GLOBAL" "$BYPASS_SYSTEM"; rm -rf "$INCLUDE_DIR"' EXIT
+
+# 复制非 URL 配置；include 指向临时净化副本，避免再次引入 URL 重写。
+sanitize_config() {
+  local level="$1" output="$2" source="${3:-}" key value include_source sanitized
+  if [ -z "$source" ]; then
+    case "$level" in
+      --global) source="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" ;;
+      --system) source="${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;
+      *) echo "❌ include 缺少来源配置" >&2; exit 1 ;;
+    esac
+  fi
+  : > "$output"
+  local cmd=(git config "$level")
+  if [ "$level" = "--file" ]; then
+    cmd+=("$source")
+  fi
+  while IFS=' ' read -r key value; do
+    case "$key" in
+      url.*) continue ;;
+      include.path|includeIf.*.path)
+        [ -z "$value" ] && continue
+        include_source="${value/#\~/$HOME}"
+        case "$include_source" in
+          /*|[A-Za-z]:[\\/]*|[A-Za-z]:/*) ;;
+          *) include_source="$(dirname "$source")/$include_source" ;;
+        esac
+        if [ ! -f "$include_source" ]; then
+          git config --file "$output" "$key" "$value"
+          continue
+        fi
+        if [ "$INCLUDE_INDEX" -ge 8 ]; then
+          echo "❌ include 文件数量或嵌套深度超过 8，拒绝继续" >&2
+          exit 1
+        fi
+        INCLUDE_INDEX=$((INCLUDE_INDEX+1))
+        sanitized="$INCLUDE_DIR/include.$INCLUDE_INDEX"
+        sanitize_config --file "$sanitized" "$include_source"
+        git config --file "$output" "$key" "$sanitized"
+        continue
+        ;;
+    esac
+    git config --file "$output" "$key" "$value"
+  done < <("${cmd[@]}" --get-regexp .)
+}
+
+sanitize_config --global "$BYPASS_GLOBAL"
+sanitize_config --system "$BYPASS_SYSTEM"
+export GIT_CONFIG_GLOBAL="$BYPASS_GLOBAL"
+export GIT_CONFIG_SYSTEM="$BYPASS_SYSTEM"
+
+if git config --local --get-regexp '^url\..*\.insteadof$' >/dev/null 2>&1; then
+  echo "❌ 仓库级 url.insteadOf 会改写推送目的地；请先在仓库配置中移除，不能用本脚本绕过" >&2
+  exit 1
+fi
+
+DESTINATION="$(git remote get-url --push "$REMOTE")"
+case "$DESTINATION" in
+  https://github.com/*|git@github.com:*|ssh://git@github.com/*) ;;
+  *)
+    echo "❌ 推送目的地不是 github.com：$DESTINATION；拒绝继续" >&2
+    exit 1
+    ;;
+esac
+
+echo "▶ push $REMOTE $BRANCH（保留凭据助手，仅过滤 URL 重写）"
+git -c http.version=HTTP/1.1 push "$REMOTE" "refs/heads/$BRANCH:refs/heads/$BRANCH"
+
+LOCAL_SHA="$(git rev-parse --verify "refs/heads/$BRANCH^{commit}")"
+if ! REMOTE_LINE="$(git ls-remote "$REMOTE" "refs/heads/$BRANCH")"; then
+  echo "❌ 远端验证失败：ls-remote 无法读取 $REMOTE/$BRANCH" >&2
+  exit 1
+fi
+REMOTE_SHA="${REMOTE_LINE%%[[:space:]]*}"
+if [ -z "$REMOTE_SHA" ]; then
+  echo "❌ 远端验证失败：$REMOTE/$BRANCH 不存在" >&2
+  exit 1
+fi
+
+if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+  echo "❌ 验证失败：本地 ${LOCAL_SHA:0:7} ≠ 远端 ${REMOTE_SHA:0:7}" >&2
+  exit 1
+fi
+
+echo "✅ 验证通过：本地 = 远端 = ${LOCAL_SHA:0:7}"

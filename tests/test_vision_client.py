@@ -6,14 +6,18 @@ import urllib.error
 
 import pytest
 
+import safe_fetch
 import vision_client
 
 
 def _fake_response(payload):
-    """构造 urlopen 返回值：支持 with 上下文管理，read() 返回 JSON 字节。"""
+    """构造 urlopen 返回值：支持 with 上下文管理与分块读取。"""
     class Resp:
-        def read(self):
-            return json.dumps(payload).encode()
+        def __init__(self):
+            self.stream = io.BytesIO(json.dumps(payload).encode())
+
+        def read(self, size=-1):
+            return self.stream.read(size)
 
         def __enter__(self):
             return self
@@ -25,9 +29,12 @@ def _fake_response(payload):
 
 @pytest.fixture(autouse=True)
 def _clean_vision_param_env(monkeypatch):
-    """清除运行环境残留的 VISION_* 参数变量，避免影响 payload/超时断言。"""
+    """固定假端点并清除可选参数；重试退避不在单元测试中真实等待。"""
     for name in ("VISION_TEMPERATURE", "VISION_MAX_TOKENS", "VISION_TIMEOUT"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("VISION_BASE_URL", "http://vision.test/v1/chat/completions")
+    monkeypatch.setenv("VISION_MODEL", "test-model")
+    monkeypatch.setattr(safe_fetch.time, "sleep", lambda _: None)
 
 
 @pytest.fixture(autouse=True)
@@ -42,8 +49,9 @@ def _reset_legacy_warn_state():
 
 @pytest.fixture
 def img(tmp_path):
+    from PIL import Image
     p = tmp_path / "t.jpg"
-    p.write_bytes(b"\xff\xd8fake-jpeg-bytes")
+    Image.new("RGB", (2, 2), (128, 128, 128)).save(p, format="JPEG")
     return str(p)
 
 
@@ -62,7 +70,7 @@ def _block_env_files(monkeypatch, tmp_path):
 
 # ① 正常调用
 def test_call_success(monkeypatch, img, key):
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: _fake_response(
                             {"choices": [{"message": {"content": "舌面"}}]}))
     dt, out = vision_client.call(img, "prompt")
@@ -70,19 +78,20 @@ def test_call_success(monkeypatch, img, key):
     assert isinstance(dt, int)
 
 
-def test_call_uses_mime_of_extension(monkeypatch, tmp_path, key):
+def test_call_uses_cleaned_jpeg_mime(monkeypatch, tmp_path, key):
+    from PIL import Image
     png = tmp_path / "t.png"
-    png.write_bytes(b"\x89PNG-fake")
+    Image.new("RGB", (2, 2), (128, 128, 128)).save(png, format="PNG")
     seen = {}
 
     def capture(req, timeout=None):
         seen["body"] = json.loads(req.data.decode())
         return _fake_response({"choices": [{"message": {"content": "ok"}}]})
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(safe_fetch, "urlopen", capture)
     vision_client.call(str(png), "prompt")
     url = seen["body"]["messages"][0]["content"][0]["image_url"]["url"]
-    assert url.startswith("data:image/png;base64,")
+    assert url.startswith("data:image/jpeg;base64,")
 
 
 def test_call_payload_defaults(monkeypatch, img, key):
@@ -94,7 +103,7 @@ def test_call_payload_defaults(monkeypatch, img, key):
         seen["body"] = json.loads(req.data.decode())
         return _fake_response({"choices": [{"message": {"content": "ok"}}]})
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(safe_fetch, "urlopen", capture)
     vision_client.call(img, "prompt")
     assert "temperature" not in seen["body"]
     assert seen["body"]["max_tokens"] == 600
@@ -111,7 +120,7 @@ def test_call_payload_temperature_from_env(monkeypatch, img, key):
         seen["body"] = json.loads(req.data.decode())
         return _fake_response({"choices": [{"message": {"content": "ok"}}]})
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(safe_fetch, "urlopen", capture)
     vision_client.call(img, "prompt")
     assert seen["body"]["temperature"] == 0.6
 
@@ -125,7 +134,7 @@ def test_call_payload_max_tokens_from_env(monkeypatch, img, key):
         seen["body"] = json.loads(req.data.decode())
         return _fake_response({"choices": [{"message": {"content": "ok"}}]})
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(safe_fetch, "urlopen", capture)
     vision_client.call(img, "prompt")
     assert seen["body"]["max_tokens"] == 8000
 
@@ -135,7 +144,7 @@ def test_call_http_500(monkeypatch, img, key):
     def boom(req, timeout=None):
         raise urllib.error.HTTPError("http://x", 500, "Server Error", {},
                                      io.BytesIO(b"internal boom"))
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom)
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "500" in str(e.value)
@@ -145,14 +154,14 @@ def test_call_http_401(monkeypatch, img, key):
     def boom(req, timeout=None):
         raise urllib.error.HTTPError("http://x", 401, "Unauthorized", {},
                                      io.BytesIO(b"bad key"))
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom)
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "401" in str(e.value)
 
 
 def test_call_missing_choices(monkeypatch, img, key):
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: _fake_response({"error": "nope"}))
     with pytest.raises(RuntimeError):
         vision_client.call(img, "p")
@@ -161,7 +170,7 @@ def test_call_missing_choices(monkeypatch, img, key):
 def test_call_url_error(monkeypatch, img, key):
     def boom(req, timeout=None):
         raise urllib.error.URLError("connection refused")
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom)
     with pytest.raises(RuntimeError):
         vision_client.call(img, "p")
 
@@ -200,6 +209,7 @@ def test_call_without_key(monkeypatch, img, tmp_path):
 
 # ⑤ .env 注释行与行内注释处理
 def test_load_key_env_file_comments(monkeypatch, tmp_path):
+    monkeypatch.setenv("VISION_ENABLE_LEGACY_ENV_PATHS", "1")
     monkeypatch.delenv("VISION_API_KEY", raising=False)
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
     env_dir = tmp_path / ".hermes" / "profiles" / "tcm-tongue"
@@ -255,7 +265,7 @@ def test_classify_known_output(monkeypatch, img, capsys):
 def test_observe_unknown_part_warns_and_falls_back(monkeypatch, img, capsys):
     seen = {}
 
-    def fake_call(img_path, prompt, timeout=150):
+    def fake_call(img_path, prompt, **kwargs):
         seen["prompt"] = prompt
         return (1, "{}")
 
@@ -270,8 +280,11 @@ def test_observe_unknown_part_warns_and_falls_back(monkeypatch, img, capsys):
 # ⑨ respond 非 JSON 文本 → RuntimeError（不得裸 JSONDecodeError 崩溃）
 def test_call_invalid_json_response(monkeypatch, img, key):
     class Resp:
-        def read(self):
-            return b"<html>gateway error</html>"
+        def __init__(self):
+            self.stream = io.BytesIO(b"<html>gateway error</html>")
+
+        def read(self, size=-1):
+            return self.stream.read(size)
 
         def __enter__(self):
             return self
@@ -279,7 +292,7 @@ def test_call_invalid_json_response(monkeypatch, img, key):
         def __exit__(self, *args):
             return False
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: Resp())
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
@@ -290,7 +303,7 @@ def test_call_invalid_json_response(monkeypatch, img, key):
 def test_call_socket_timeout(monkeypatch, img, key):
     def boom(req, timeout=None):
         raise socket.timeout("timed out")
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom)
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "timed out" in str(e.value)
@@ -305,7 +318,7 @@ def test_tongue_prompt_declares_rzao_key_name():
 # ⑫ 可观测性告警：四类失败从静默变为 stderr 可见（统一前缀 [vision_client][warn]）
 def test_call_warns_on_empty_content(monkeypatch, img, key, capsys):
     """① 空 content：告警指向 reasoning_content 与 VISION_MAX_TOKENS。"""
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: _fake_response(
                             {"choices": [{"message": {"content": "  \n"},
                                           "finish_reason": "stop"}]}))
@@ -320,14 +333,14 @@ def test_call_warns_on_empty_content(monkeypatch, img, key, capsys):
 def test_call_warns_on_length_finish_reason(monkeypatch, img, key, capsys):
     """② finish_reason=length → 截断告警；正常 finish_reason=stop 无任何告警。"""
     # 正常路径基线：stderr 必须为空
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: _fake_response(
                             {"choices": [{"message": {"content": "ok"},
                                           "finish_reason": "stop"}]}))
     vision_client.call(img, "prompt")
     assert capsys.readouterr().err == ""
 
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: _fake_response(
                             {"choices": [{"message": {"content": '{"舌质颜色":"淡红'},
                                           "finish_reason": "length"}]}))
@@ -354,7 +367,7 @@ def test_call_http_4xx_includes_troubleshooting_hint(monkeypatch, img, key):
     def boom400(req, timeout=None):
         raise urllib.error.HTTPError("http://x", 400, "Bad Request", {},
                                      io.BytesIO(b"invalid parameter"))
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom400)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom400)
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "400" in str(e.value)
@@ -364,7 +377,7 @@ def test_call_http_4xx_includes_troubleshooting_hint(monkeypatch, img, key):
     def boom500(req, timeout=None):
         raise urllib.error.HTTPError("http://x", 500, "Server Error", {},
                                      io.BytesIO(b"boom"))
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", boom500)
+    monkeypatch.setattr(safe_fetch, "urlopen", boom500)
     with pytest.raises(RuntimeError) as e:
         vision_client.call(img, "p")
     assert "排查提示" not in str(e.value)

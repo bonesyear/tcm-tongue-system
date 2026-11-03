@@ -25,7 +25,6 @@ import json
 import os
 import re
 import sys
-import glob
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any, Union
 
@@ -34,9 +33,13 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+import time_utils  # noqa: E402
 from src.record import DailyRecord, has_formula_content  # noqa: E402
 from src.dimensions import DIMENSIONS, VisionDimension  # noqa: E402
-from src.scoring import score as score_dimension, score_indicators, TONGUE_RADAR_METRIC_KEYS  # noqa: E402
+from src.scoring import (  # noqa: E402
+    assess, assess_indicators, score as score_dimension, score_indicators,
+    SCORING_RULESET_VERSION, TONGUE_RADAR_METRIC_KEYS,
+)
 from src import confidence as confidence_mod  # noqa: E402
 from src.paths import (  # noqa: E402
     RECORDS_DAILY_DIR as RECORDS_DIR,
@@ -107,41 +110,13 @@ _RADAR_AXIS_LABELS = {
     "舌苔剥落": "舌苔剥落\n(剥落/地图)",
 }
 
-# 同日期档案竞争排除模式：备份/副本/临时/旧格式快照不参与档案选择——
-# 它们是历史快照，选上会读到旧口径数据（实测：08-28 的 .bak 曾让周报
-# 偏离度静默变 0.0）
-_SUSPECT_ARCHIVE_RE = re.compile(r"\.bak|copy|tmp|_旧格式", re.IGNORECASE)
+from src.daily_files import SUSPECT_ARCHIVE_RE as _SUSPECT_ARCHIVE_RE  # noqa: E402
+from src.daily_files import select_daily_file  # noqa: E402
 
 
 def _select_daily_file(date_str: str) -> Optional[str]:
-    """为某一天选出唯一的 analysis JSON 档案（三级规则）。
-
-    ① 规范名 {date}_analysis.json 精确存在即选用——系统唯一认可的命名，
-       存在即无歧义，同日副本再多也不参与竞争；
-    ② 无规范名时，排除文件名含 .bak/copy/tmp/_旧格式 的备份/临时快照后，
-       取剩余候选中 mtime 最新者（"字典序最新"启发式不可靠：07-15 曾
-       静默选中 _b 副本而丢弃正档）；
-    ③ 排除后仍有多份候选时向 stderr 打印 warning（列出全部候选与实际
-       选用者），再取 mtime 最新——多份候选必须可见，不得静默选一。
-    无候选（或排除后为空）时返回 None，该日静默跳过。
-    """
-    exact = os.path.join(RECORDS_DIR, f"{date_str}_analysis.json")
-    if os.path.exists(exact):
-        return exact
-    pattern = os.path.join(RECORDS_DIR, f"{date_str}*analysis*.json")
-    matches = [m for m in glob.glob(pattern)
-               if not _SUSPECT_ARCHIVE_RE.search(os.path.basename(m))]
-    if not matches:
-        return None
-    filepath = max(matches, key=os.path.getmtime)
-    if len(matches) > 1:
-        print(
-            f"⚠️ 警告: {date_str} 有多份非规范命名的 analysis 候选: "
-            f"{sorted(os.path.basename(m) for m in matches)}；"
-            f"选用 mtime 最新者 {os.path.basename(filepath)}",
-            file=sys.stderr,
-        )
-    return filepath
+    """与 Web 共用选档：规范名优先，排除副本，非规范多候选告警。"""
+    return select_daily_file(RECORDS_DIR, date_str)
 
 
 def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
@@ -156,16 +131,29 @@ def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, 
 
     错误处理:
         - JSON 解析失败：跳过该文件并打印警告
+        - 合法 JSON 但非对象（数组/字符串/数值等）：跳过并打印警告——
+          混入列表会让下游 r.get("date") 崩溃（历史：sort 阶段 TypeError）
         - 目录为空：返回空列表，不报错
         - 文件不存在：静默跳过
+
+    date 输入契约:
+        - 规范 date 为 "YYYY-MM-DD" 字符串；
+        - 排序一律 str() 归一后按字典序升序——数值 date（如 20260624）与
+          字符串混排不崩，顺序确定（'-' < 数字，连字符格式排前）；
+        - 非 "YYYY-MM-DD" 的 date 不参与周界推导，week_id 降级行为见
+          generate_weekly_report_data（告警 + 占位符，非静默）。
     """
     if target_date is None:
-        target_date = datetime.now()
+        target_date = time_utils.now()
 
     records = []
+    from date_utils import add_days
 
     for i in range(6, -1, -1):
-        day = target_date - timedelta(days=i)
+        day = add_days(target_date, -i)
+        if day is None:
+            print("⚠️ 警告: 周界日期溢出，跳过范围外日期", file=sys.stderr)
+            continue
         date_str = day.strftime("%Y-%m-%d")
 
         # 三级规则选出该日唯一档案（见 _select_daily_file）
@@ -178,7 +166,17 @@ def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, 
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 record = json.load(f)
-                records.append(record)
+            if not isinstance(record, dict):
+                # 合法 JSON 但不是对象（数组/字符串/数值）：按坏记录跳过。
+                # 直接放进列表会让下游 r.get("date") 抛 AttributeError，
+                # 与本函数"坏记录跳过、容错加载"的契约相悖
+                print(
+                    f"⚠️ 警告: 文件 {filepath} 是合法 JSON 但不是对象"
+                    f"（实际 {type(record).__name__}），已跳过",
+                    file=sys.stderr,
+                )
+                continue
+            records.append(record)
         except json.JSONDecodeError as e:
             print(f"⚠️ 警告: 文件 {filepath} JSON 解析失败: {e}", file=sys.stderr)
             continue
@@ -194,27 +192,19 @@ def load_week_records(target_date: Optional[datetime] = None) -> List[Dict[str, 
     return records
 
 
-def extract_tongue_metrics(record: Dict[str, Any]) -> Dict[str, float]:
-    """
-    从单条 daily record 中提取舌象定量指标分数。
+def _scoring_observation(rec: DailyRecord, dim) -> dict:
+    return rec.get_scoring_observation(dim)
 
-    通过 Record module 按维度取观测，再交由 Scoring module 按规范指标打分，
-    不再硬编码形状 A 容器键（历史名 doubao_vision_analysis，现名 vision_analysis）/ 舌诊 字段路径。
 
-    参数:
-        record: 单日诊断 JSON 记录（dict 或 DailyRecord）
-
-    返回:
-        dict: 指标名 → 分数（0-10）
-    """
+def extract_tongue_metrics(record: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    """提取舌象定量指标；未知指标返回 None，不伪装成正常 0 分。"""
     rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
-    obs = rec.get_observation(VisionDimension.TONGUE)
-    indicators = score_indicators(VisionDimension.TONGUE, obs)
+    indicators = assess_indicators(
+        VisionDimension.TONGUE, _scoring_observation(rec, VisionDimension.TONGUE))
 
-    # 雷达图指标名 → Scoring 规范指标 key（轴集合由 TONGUE_RADAR_METRIC_KEYS
-    # 单一来源决定；轮次 3 起为 9 轴，含「舌苔剥落」）
     return {
-        metric_name: float(indicators.get(ind_key, 0))
+        metric_name: (indicators[ind_key].value
+                      if indicators[ind_key].state in ("normal", "abnormal") else None)
         for metric_name, ind_key in TONGUE_RADAR_METRIC_KEYS.items()
     }
 
@@ -240,56 +230,42 @@ def extract_tongue_observation_flags(record: Dict[str, Any]) -> Dict[str, bool]:
     }
 
 
-def compute_dimension_deviation(record: Dict[str, Any]) -> Dict[str, float]:
-    """
-    计算单条记录各望诊维度的综合偏离度分数（0-10）。
-
-    遍历 Dimension module 的规范六维，Record 取观测 → Scoring 打分，
-    不再硬编码中文名 ×48。
-
-    参数:
-        record: 单日诊断 JSON 记录（dict 或 DailyRecord）
-
-    返回:
-        dict: 维度中文名 → 偏离度分数
-    """
+def compute_dimension_deviation(record: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    """计算六维偏离度；未知维度返回 None，不与正常 0 分混用。"""
     rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
-    return {
-        dim.chinese_name: score_dimension(dim, rec.get_observation(dim))
-        for dim in DIMENSIONS
-    }
+    out = {}
+    for dim in DIMENSIONS:
+        result = assess(dim, _scoring_observation(rec, dim))
+        out[dim.chinese_name] = (result.value
+                                 if result.state in ("normal", "abnormal") else None)
+    return out
+
+
+def compute_dimension_state(record: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """返回评分状态及 unknown/missing 计数，不改变旧 detail 的键集合。"""
+    rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
+    out: Dict[str, Dict[str, Any]] = {}
+    for dim in DIMENSIONS:
+        obs = _scoring_observation(rec, dim)
+        result = assess(dim, obs)
+        indicators = assess_indicators(dim, obs)
+        positives = [a.value for a in indicators.values() if a.state == "abnormal"]
+        out[dim.chinese_name] = {
+            "score": result.value,
+            "max": max(positives) if positives else 0.0,
+            "n": len(positives),
+            "observed": rec.get_dimension_coverage()[dim],
+            "unknown_count": result.unknown_count,
+            "missing_count": len(result.missing_indicators),
+        }
+    return out
 
 
 def compute_dimension_deviation_detail(record: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """
-    计算单条记录各望诊维度的偏离度多维信息：score / max / n。
-
-    - score：与 compute_dimension_deviation 完全同口径（score() 公开语义：
-      舌诊为最重单项（v1.7.21 起），其余维度为累加封顶 10——非舌维度该值是
-      累加和而非均值，故键名为 score 而非 mean）；
-    - max：该维度内最高单项分（无异常指标时为 0.0）——均值会被新增轻度异常
-      稀释，max 不会，趋势判定需要它做第二道门槛；
-    - n：有分（>0）指标数，即异常负荷；n=0 表示"无有效观测"
-      （没拍到/解析不到与真正常在旧口径下同写 0.0，靠 n 区分）。
-
-    参数:
-        record: 单日诊断 JSON 记录（dict 或 DailyRecord）
-
-    返回:
-        dict: 维度中文名 → {"score": float, "max": float, "n": int}
-    """
-    rec = record if isinstance(record, DailyRecord) else DailyRecord(record)
-    detail: Dict[str, Dict[str, Any]] = {}
-    for dim in DIMENSIONS:
-        obs = rec.get_observation(dim)
-        indicators = score_indicators(dim, obs)
-        positives = [float(v) for v in indicators.values() if v > 0]
-        detail[dim.chinese_name] = {
-            "score": score_dimension(dim, obs),
-            "max": max(positives) if positives else 0.0,
-            "n": len(positives),
-        }
-    return detail
+    """返回 score/max/n/observed；score 为 None 表示未知。"""
+    state = compute_dimension_state(record)
+    return {dim: {key: values[key] for key in ("score", "max", "n", "observed")}
+            for dim, values in state.items()}
 
 
 def describe_trend(name: str, first_val: float, last_val: float,
@@ -298,7 +274,9 @@ def describe_trend(name: str, first_val: float, last_val: float,
                    last_max: Optional[float] = None,
                    first_n: Optional[int] = None,
                    last_n: Optional[int] = None,
-                   metric_name: str = "均值") -> str:
+                   metric_name: str = "均值",
+                   first_observed: Optional[bool] = None,
+                   last_observed: Optional[bool] = None) -> str:
     """
     根据首末两次数值生成中文趋势描述。
 
@@ -320,7 +298,12 @@ def describe_trend(name: str, first_val: float, last_val: float,
                   and first_n is not None and last_n is not None)
 
     # n=0 = 无有效观测（没拍到/解析不到），与"正常 0 分"必须区分开
-    if has_detail and (first_n == 0 or last_n == 0):
+    if first_observed is not None or last_observed is not None:
+        if not first_observed and not last_observed:
+            return f"{name}本周无有效观测（未拍到或未解析到有分指标），不作趋势判定"
+        if not first_observed or not last_observed:
+            return f"{name}仅一端有有效观测，不作趋势判定"
+    elif has_detail and (first_n == 0 or last_n == 0):
         if first_n == 0 and last_n == 0:
             return f"{name}本周无有效观测（未拍到或未解析到有分指标），不作趋势判定"
         return (f"{name}仅一端有有效观测（周初 {first_n} 项 / 周末 {last_n} 项"
@@ -336,7 +319,11 @@ def describe_trend(name: str, first_val: float, last_val: float,
         return (f"{name}较周初{direction}{abs(delta):.1f}分，异常程度加重，"
                 f"需持续关注（{first_val:.1f} → {last_val:.1f}）")
 
-    # 改善方向：启用双门槛（理由见 docstring）
+    if has_detail and metric_name == "累计分" and last_n <= first_n:
+        return (f"{name}较周初{direction}{abs(delta):.1f}分，异常程度减轻"
+                f"（{first_val:.1f} → {last_val:.1f}）")
+
+    # 均值/最重单项口径保留双门槛；累加分无分母稀释问题。
     if has_detail:
         max_drop = round(first_max - last_max, 1)
         if max_drop >= 0.5 and last_n <= first_n:
@@ -439,7 +426,7 @@ def generate_radar_chart(metrics_list: List[Dict[str, float]],
                   fontsize=9, framealpha=0.9)
 
     # 保存
-    date_tag = dates[-1] if dates else datetime.now().strftime("%Y-%m-%d")
+    date_tag = dates[-1] if dates else time_utils.now().strftime("%Y-%m-%d")
     chart_path = os.path.join(CHARTS_DIR, f"radar_weekly_{date_tag}.png")
     plt.savefig(chart_path, dpi=150, bbox_inches="tight",
                 facecolor="#FFFDF7", edgecolor="none")
@@ -472,8 +459,9 @@ def generate_trend_chart(records: List[Dict[str, Any]]) -> Optional[str]:
         print("⚠️ 无记录，跳过趋势图生成")
         return None
 
-    # 提取日期标签
-    dates = [r.get("date", f"Day {i+1}") for i, r in enumerate(records)]
+    # 提取日期标签（date 契约：一律 str() 归一——数值 date 如 20260624
+    # 取 len() 会抛 TypeError 让整图生成崩溃）
+    dates = [str(r.get("date", f"Day {i + 1}")) for i, r in enumerate(records)]
     # 简化日期标签（只取月-日）
     date_labels = [d[-5:] if len(d) >= 10 else d for d in dates]
     x = np.arange(len(records))
@@ -521,7 +509,7 @@ def generate_trend_chart(records: List[Dict[str, Any]]) -> Optional[str]:
     ax.text(len(x) - 0.3, 8.1, "高危线", fontsize=7, color="#C41E3A", va="bottom")
 
     # 保存
-    date_tag = dates[-1] if dates else datetime.now().strftime("%Y-%m-%d")
+    date_tag = dates[-1] if dates else time_utils.now().strftime("%Y-%m-%d")
     chart_path = os.path.join(CHARTS_DIR, f"trend_weekly_{date_tag}.png")
     plt.savefig(chart_path, dpi=150, bbox_inches="tight",
                 facecolor=fig.get_facecolor(), edgecolor="none")
@@ -567,6 +555,10 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
             "summary": "本周无记录",
             "next_week_suggestion": "请至少完成 1 天记录后再生成周报。",
             "confidence_checks": [],
+            "unknown_counts": {"first": 0, "last": 0, "total": 0},
+            "rule_versions": [],
+            "mixed_rule_versions": False,
+            "scoring_ruleset_version": SCORING_RULESET_VERSION,
             "dimension_deviation_detail": {},
         }
 
@@ -578,11 +570,17 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
     first_date = recs[0].date or "unknown"
     last_date = recs[-1].date or "unknown"
 
-    # 计算 week_id（ISO 周：%G-W%V，避免 %U 周日起算导致的跨年错位）
+    # 滚动窗口起止日期同时作为 week_id 与输出文件名，避免同 ISO 周互相覆盖。
     try:
-        last_dt = datetime.strptime(last_date, "%Y-%m-%d")
-        week_id = last_dt.strftime("%G-W%V")
-    except ValueError:
+        datetime.strptime(first_date, "%Y-%m-%d")
+        datetime.strptime(last_date, "%Y-%m-%d")
+        week_id = f"{first_date}_{last_date}"
+    except (ValueError, TypeError):
+        print(
+            f"⚠️ 警告: 末条记录 date={last_date!r} 不是合法的 YYYY-MM-DD，"
+            f"无法推导 ISO 周，week_id 记为占位符 YYYY-W00",
+            file=sys.stderr,
+        )
         week_id = "YYYY-W00"
 
     # 提取舌象与维度偏离度序列（deviations 保留旧结构供 max_dim 分支等使用；
@@ -590,13 +588,27 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
     tongue_metrics = [extract_tongue_metrics(r) for r in recs]
     deviations = [compute_dimension_deviation(r) for r in recs]
     details = [compute_dimension_deviation_detail(r) for r in recs]
-
+    states = [compute_dimension_state(r) for r in recs]
+    first_state, last_state = states[0], states[-1]
     first_tm = tongue_metrics[0]
     last_tm = tongue_metrics[-1]
     first_dev = deviations[0]
     last_dev = deviations[-1]
     first_detail = details[0]
     last_detail = details[-1]
+
+    rule_versions = []
+    for rec in recs:
+        version = rec.raw.get("derived_meta", {}).get(
+            "scoring_ruleset_version", "legacy")
+        if version not in rule_versions:
+            rule_versions.append(version)
+    mixed_rule_versions = len(rule_versions) > 1
+    unknown_counts = {
+        "first": sum(d["unknown_count"] for d in first_state.values()),
+        "last": sum(d["unknown_count"] for d in last_state.values()),
+        "total": sum(d["unknown_count"] for state in states for d in state.values()),
+    }
 
     # 逐指标"有无观测"判据：观测文本非空（score 无法区分"正常 0"与"无数据"）
     first_flags = extract_tongue_observation_flags(recs[0])
@@ -606,6 +618,14 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         """维度级趋势描述：携带 max/n 启用双门槛与无有效观测判定。
         仅服务五个非舌维度（score 为各指标之和封顶 10），metric_name 传
         "累计分"——name 已含"偏离度"，不得再叠"偏离度"字样，也不能称"均值"。"""
+        if first_dev[dim_cn] is None or last_dev[dim_cn] is None:
+            if (first_state[dim_cn]["unknown_count"]
+                    or last_state[dim_cn]["unknown_count"]):
+                return f"{name}评分信息不足，不作趋势判定"
+            if first_dev[dim_cn] is None and last_dev[dim_cn] is None:
+                return f"{name}本周无有效观测，不作趋势判定"
+            return (f"{name}仅一端有有效观测（周初 {first_detail[dim_cn]['n']} 项 / "
+                    f"周末 {last_detail[dim_cn]['n']} 项有分指标），不作趋势判定")
         return describe_trend(
             name, first_dev[dim_cn], last_dev[dim_cn],
             first_max=first_detail[dim_cn]["max"],
@@ -613,12 +633,19 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
             first_n=first_detail[dim_cn]["n"],
             last_n=last_detail[dim_cn]["n"],
             metric_name="累计分",
+            first_observed=first_detail[dim_cn]["observed"],
+            last_observed=last_detail[dim_cn]["observed"],
         )
 
     def _metric_trend(name: str, axis: str) -> str:
         """逐指标趋势：观测 flag 作为 n（0/1）传入 describe_trend，
         无观测走其既有 n=0 分支，不再把"未解析到"写成"整体稳定（0.0 → 0.0）"；
         两端都有观测时退化为与旧标量调用逐字一致的输出。"""
+        if first_tm[axis] is None or last_tm[axis] is None:
+            if first_flags[axis] and last_flags[axis]:
+                return f"{name}评分信息不足，不作趋势判定"
+            return (f"{name}仅一端有有效观测（周初 {int(first_flags[axis])} 项 / "
+                    f"周末 {int(last_flags[axis])} 项有分指标），不作趋势判定")
         return describe_trend(
             name, first_tm[axis], last_tm[axis],
             first_max=first_tm[axis], last_max=last_tm[axis],
@@ -668,27 +695,25 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         "稳定指标": [],
     }
 
-    # 找出本周偏离度最高的维度
-    max_dim, max_score = max(last_dev.items(), key=lambda item: item[1])
+    known_last = {k: v for k, v in last_dev.items() if v is not None}
+    if known_last:
+        max_dim, max_score = max(known_last.items(), key=lambda item: item[1])
+    else:
+        max_dim, max_score = None, None
+    all_dims_unobserved = not known_last
 
-    # 全维度周末 n=0 = 本周未解析到任何有效观测：不作偏离度排名，
-    # 也不得落入"偏离度总体较低"建议分支（会把"无数据"误述为"状况良好"）
-    all_dims_unobserved = all(d["n"] == 0 for d in last_detail.values())
-
-    # 舌诊偏离度多维呈现：均值 + 最重单项 + 异常项数；n=0 时显式标注
-    # "无有效观测"，不再把"没拍到/解析不到"写成 0.0 假"正常"
     first_td = first_detail["舌诊"]
     last_td = last_detail["舌诊"]
-    if first_td["n"] == 0 and last_td["n"] == 0:
+    if first_td["score"] is None and last_td["score"] is None:
         tongue_phrase = "舌诊本周无有效观测（未拍到或未解析到有分指标），偏离度不予计值"
-    elif last_td["n"] == 0:
+    elif last_td["score"] is None:
         tongue_phrase = (
             f"舌诊综合偏离度周初为 {first_td['score']:.1f}"
-            f"（共 {first_td['n']} 项异常），周末无有效观测"
+            f"（共 {first_td['n']} 项异常），周末评分未知"
         )
-    elif first_td["n"] == 0:
+    elif first_td["score"] is None:
         tongue_phrase = (
-            f"舌诊综合偏离度周初无有效观测，周末为 {last_td['score']:.1f}"
+            f"舌诊综合偏离度周初评分未知，周末为 {last_td['score']:.1f}"
             f"（最重单项 {last_td['max']:g} 分，共 {last_td['n']} 项异常）"
         )
     else:
@@ -782,6 +807,10 @@ def generate_weekly_report_data(records: List[Dict[str, Any]]) -> Dict[str, Any]
         "summary": summary,
         "next_week_suggestion": next_week_suggestion,
         "confidence_checks": confidence_checks,
+        "unknown_counts": unknown_counts,
+        "rule_versions": rule_versions,
+        "mixed_rule_versions": mixed_rule_versions,
+        "scoring_ruleset_version": SCORING_RULESET_VERSION,
         # 纯增量键（向后兼容）：各维度周初/周末的 score/max/n 多维信息，
         # 供趋势双门槛复核与"无有效观测"（n=0）识别；旧键一律不动
         "dimension_deviation_detail": {
@@ -845,7 +874,7 @@ def main():
             print(f"❌ 日期格式错误: {sys.argv[1]}，请使用 YYYY-MM-DD 格式")
             sys.exit(1)
     else:
-        target_date = datetime.now()
+        target_date = time_utils.now()
 
     # 目录创建集中在运行入口（import 时零副作用）
     ensure_data_dirs()
@@ -865,7 +894,7 @@ def main():
         return
 
     # 打印加载的日期列表
-    loaded_dates = [r.get("date", "?") for r in records]
+    loaded_dates = [str(r.get("date", "?")) for r in records]
     print(f"📆 覆盖日期: {', '.join(loaded_dates)}")
 
     # Step 2: 提取舌象指标并生成雷达图
@@ -876,7 +905,7 @@ def main():
     for record in records:
         m = extract_tongue_metrics(record)
         metrics_list.append(m)
-        dates_labels.append(record.get("date", "?"))
+        dates_labels.append(str(record.get("date", "?")))
         obs_flags_list.append(extract_tongue_observation_flags(record))
 
     radar_path = generate_radar_chart(metrics_list, dates_labels,
@@ -907,7 +936,21 @@ def main():
 
     # Step 5: 保存周报 JSON（可选）
     week_id = weekly_report_data.get("week_id", "YYYY-W00")
-    report_path = os.path.join(WEEKLY_DIR, f"{week_id}_report.json")
+    if week_id == "YYYY-W00":
+        # 占位 week_id 是"坏 date"信号（见 generate_weekly_report_data 的告警）：
+        # 不同坏 date 的周报若都叫 YYYY-W00_report.json 会静默互相覆盖——
+        # 用 end_date 构造唯一文件名，覆盖行为显式可见
+        safe_end = re.sub(r"[^\w.-]+", "_",
+                          str(weekly_report_data.get("end_date", "unknown")))
+        report_name = f"{week_id}_{safe_end}_report.json"
+        print(
+            f"⚠️ 警告: week_id 为占位符（末条 date 非 YYYY-MM-DD），"
+            f"周报文件名改用 {report_name}，避免静默覆盖",
+            file=sys.stderr,
+        )
+    else:
+        report_name = f"{week_id}_report.json"
+    report_path = os.path.join(WEEKLY_DIR, report_name)
 
     # 构建完整周报数据结构
     chart_info = []
@@ -929,6 +972,7 @@ def main():
         "charts": chart_info,
     }
 
+    os.makedirs(WEEKLY_DIR, exist_ok=True)
     try:
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report_data, f, ensure_ascii=False, indent=2)

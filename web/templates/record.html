@@ -29,6 +29,7 @@
     cursor: pointer; font-size: 13px; padding: 2px 6px;
   }
   .field-row:hover .edit { opacity: 1; }
+  .field-row .edit:focus-visible { opacity: 1; outline: 2px solid var(--cinnabar); outline-offset: 2px; }
   .field-row .edit:hover { color: var(--cinnabar); }
   .field-row .ref {
     font-size: 12px; color: var(--ink-3); border: 1px dashed var(--line-strong);
@@ -214,6 +215,7 @@
         <span class="tag{% if r.coverage == r.coverage_total %} ok{% endif %}">覆盖 {{ r.coverage }} / {{ r.coverage_total }} 维</span>
         {% if r.confidence %}<span class="tag">置信度 {{ r.confidence }}</span>{% endif %}
         {% if r.version %}<span class="tag">v{{ r.version }}</span>{% endif %}
+        {% if r.unknown_count %}<span class="tag" title="无法判读或不在当前词表内；未按正常 0 分计">未知 {{ r.unknown_count }} 项</span>{% endif %}
         {% if r.corrected %}<span class="tag cinnabar">含人工修正</span>{% endif %}
       </div>
     </div>
@@ -222,28 +224,63 @@
       <span class="muted" style="font-size:13px;">总偏离度</span>
       <span class="badge lg {{ r.total_sev }} num">{{ "%.1f"|format(r.total) }} / 60</span>
       <div class="scorebar"><i class="{{ r.total_sev }}" style="width:{{ (r.total / 60 * 100) | round(1) }}%"></i></div>
+      <div class="faint" style="font-size:12px; margin-top:6px; line-height:1.7;">
+        观察汇总与偏离值均为未经验证的界面指标，不作为疾病严重度或处方依据；总分及历史重算结果未获独立医学验证。
+      </div>
     </div>
     <button class="btn btn-ghost" id="edit-toggle" title="显示/隐藏全部修正入口（触屏用）">✎ 修正观察值</button>
     {% if r.corrected %}
     <button class="btn btn-ghost" id="restore-btn"
-            title="放弃全部人工修正，恢复为识图模型最初输出的记录（当前状态会先自动备份）">↺ 恢复数据</button>
+            title="在当前代修正前状态与当前状态之间恢复/撤销；保留报告，当前状态会先自动备份">↺ 恢复/撤销</button>
     {% endif %}
+    <details id="delete-day" style="width:100%; margin-top:10px;">
+      <summary class="btn btn-ghost">删除当日数据</summary>
+      <div style="padding:10px 4px;">
+        <p class="faint" style="font-size:13px;">将永久删除当日记录、照片、暂存、草稿和全部备份，不能恢复或撤销。</p>
+        <form id="delete-form" method="post" action="/record/{{ r.date }}/delete">
+          <input type="hidden" name="confirm" value="DELETE">
+          <button class="btn btn-ghost" type="submit">确认永久删除</button>
+        </form>
+      </div>
+    </details>
   </div>
 </div>
 
 {% if r.danger_triggered %}
-<div class="alert-danger">
+<div class="alert-danger" role="alert">
   <div>
-    <strong>⚠ 今日触发安全红线 {{ r.danger_triggered | length }} 项：</strong>
-    {% for d in r.danger_triggered %}{{ d.name }}{% if d.sign %}（{{ d.sign }}）{% endif %}{% if not loop.last %}；{% endif %}{% endfor %}
-    <div class="muted" style="font-size:12.5px; margin-top:4px;">{% for d in r.danger_triggered %}{{ d.note }}{% if not loop.last %}；{% endif %}{% endfor %}。请以线下就医为准，本系统不构成诊疗建议。</div>
+    <strong>⚠ 今日有 {{ r.danger_triggered | length }} 项安全预警需要复核：</strong>
+    {% for d in r.danger_triggered %}
+    <div style="margin-top:6px;">
+      <strong>{{ d.name }}</strong>：
+      {% if d.state and d.state != "triggered" %}历史/外部标记，需复核
+      {% elif d.kind == "critical_rule" %}组合危重规则触发，请立即线下评估
+      {% else %}单项/部分证据筛查，不等于确诊{% endif %}
+      {% if d.sign %}<div class="muted">规则体征：{{ d.sign }}</div>{% endif %}
+      {% if d.matched_clauses %}<div>已见：{{ d.matched_clauses | join("、") }}</div>{% endif %}
+      {% if d.missing_clauses %}<div>还缺：{{ d.missing_clauses | join("、") }}</div>{% endif %}
+      <div class="muted">{{ d.note }}</div>
+    </div>
+    {% endfor %}
+    <div class="muted" style="font-size:12.5px; margin-top:4px;">请以线下就医为准，本系统不构成诊疗建议。{% if r.danger_unknown %}另有 {{ r.danger_unknown | length }} 项未评估/证据不足，不等于已排除。{% endif %}</div>
   </div>
+</div>
+{% elif r.danger_dismissed %}
+<div class="alert-note">
+  <strong>用户判为误报 {{ r.danger_dismissed | length }} 项：</strong>
+  {{ r.danger_dismissed | map(attribute="name") | join("、") }}。
+  原始观察与裁决审计保留，这不等于探测未触发，也不等于医学排除。
 </div>
 {% else %}
 <div class="card" style="display:flex; align-items:center; gap:12px; padding:14px 22px;">
+  {% if r.danger_unknown %}
+  <i class="dot sev-4"></i>
+  <span>{% if r.danger_not_triggered %}已评估项均未触发（{{ r.danger_not_triggered | length }} 项）；{% endif %}另有 {{ r.danger_unknown | length }} 项未评估/证据不足，不能视为已排除。</span>
+  {% else %}
   <i class="dot sev-0"></i>
   <span>今日 {{ r.danger_all | length }} 项安全红线<strong style="color:var(--sev-0);">均未触发</strong></span>
   <span class="faint" style="font-size:12.5px;">{{ r.danger_all | join(" · ") }}</span>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -258,7 +295,7 @@
       <span class="spacer"></span>
       {% if dim.declared_normal %}
       <span class="tag cinnabar">未拍摄（用户声明正常）</span>
-      {% elif dim.covered %}
+      {% elif dim.covered and dim.score is not none %}
       <div class="scoreline" style="width: 180px;">
         <span class="badge {{ sev(dim.score) }} num">{{ dim.score }}</span>
         <div class="scorebar"><i class="{{ sev(dim.score) }}" style="width:{{ dim.score * 10 }}%"></i></div>
@@ -266,12 +303,16 @@
       {% if dim.max_indicator and dim.max_indicator != dim.score %}
       <span class="faint num" style="font-size:12px;" title="该维度最重单项分（累积口径下不被均摊的异常负荷）">最重 {{ dim.max_indicator }}</span>
       {% endif %}
+      {% elif dim.covered %}
+      <span class="badge sev-none">评分未知</span>
       {% else %}
       <span class="badge sev-none">未覆盖</span>
       {% endif %}
     </div>
     {% if dim.declared_normal %}
     <p class="faint" style="font-size:13px;">该维度未拍摄，按未覆盖处理（不计入覆盖度与置信度）。</p>
+    {% elif dim.unknown_count %}
+    <p class="faint" style="font-size:13px;">{{ dim.unknown_count }} 项无法判读或不在当前词表内，未按正常 0 分计。</p>
     {% elif not dim.covered %}
     <p class="faint" style="font-size:13px;">该维度未拍摄或无有效观测。</p>
     {% endif %}
@@ -287,10 +328,12 @@
         <span class="row" style="gap:2px;">
           {% if f.ref %}
           <span class="ref" title="{{ f.ref }}">参考项</span>
+          {% elif f.unknown %}
+          <span class="badge sev-none" title="无法判读或不在当前词表内；未按正常 0 分计">未知</span>
           {% else %}
           <span class="badge {{ sev(f.s) }} num">{{ f.s }}</span>
           {% endif %}
-          <button class="edit" title="修正此项">✎</button>
+          <button class="edit" title="修正此项" aria-label="修正{{ dim.name }}·{{ g.name }}·{{ f.k }}"><span aria-hidden="true">✎</span></button>
         </span>
       </div>
       {% endfor %}
@@ -335,8 +378,18 @@
   {% endif %}
 </div>
 
+{% if r.report_stale %}
+<div class="alert-note">
+  <strong>报告已过期：</strong>{{ r.stale_reasons | join("；") }}。历史报告不再作为当前结论，请重新生成；未配置辨证模型时显示当前本地速览。
+</div>
+{% endif %}
+
+{% set constitution_ready = kb_categories.constitution.status == "ready" %}
+{% set diet_ready = kb_categories.diet.status == "ready" %}
+{% set formula_ready = kb_categories.formula.status == "ready" %}
+
 {% if local_mode %}
-{# 本地规则模式：未启用/未配置辨证模型 —— 四段速览（确定性聚类+库内查表，非辨证结论） #}
+{# 本地规则计算仍可使用，但对应信息只有该类知识库可用时才展示 #}
 <div class="card">
   <div class="card-head">
     <h2>四证倾向速览</h2>
@@ -345,10 +398,35 @@
     <span class="faint" style="font-size:12px;">辨证模型未启用</span>
   </div>
   <p class="muted" style="font-size:13px; margin:2px 0 12px; line-height:1.7;">
-    以下为阳性体征的确定性聚类与库内查表（本地规则，映射出处逐条标注），<strong>不是辨证结论</strong>。
-    在设置页启用辨证模型后，此处显示完整辨证报告（三观/四证/六经 + 饮食起居 + 方药）。
+    以下为阳性体征的确定性聚类与<strong>项目内置规则映射</strong>，不读取当前知识库，也不构成库内引用，<strong>不是辨证结论</strong>。
+    对应类别知识库不可用时，该类别信息不显示。
   </p>
 
+  {% if local_overview.unknowns %}
+  <h3 class="sect-h">未知/待复核</h3>
+  <div class="fields" style="margin-bottom:14px;">
+    {% for e in local_overview.unknowns %}
+    <div class="field-row">
+      <span class="k">{{ e.dim }}·{{ e.label }}</span>
+      <span class="v">{{ e.v }}</span>
+      <span class="badge sev-none" title="无法判读或不在当前词表内；未按正常 0 分计">未知</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="faint" style="font-size:12.5px;">以上项目未按正常 0 分计，请补充可判读信息或人工修正。</p>
+  {% endif %}
+
+  {% if not local_overview.directions %}
+  {% if not local_overview.covered_dimensions %}
+  <p class="faint">暂无已采集观察；未覆盖不等于未见异常。</p>
+  {% elif local_overview.unknowns %}
+  <p class="faint">暂无可聚类的已确认阳性体征；未知/待复核不等于未见异常。</p>
+  {% else %}
+  <p class="faint">本次已采集项目未见已知阳性倾向（本地规则）；未覆盖项目不代表正常。</p>
+  {% endif %}
+  {% endif %}
+
+  {% if constitution_ready %}
   {% if local_overview.constitution %}
   <h3 class="sect-h">体质格局倾向</h3>
   <div class="fields" style="margin-bottom:14px;">
@@ -380,18 +458,6 @@
     </div>
   </div>
   {% endfor %}
-  {% else %}
-  <p class="faint">六维未见阳性倾向（本地规则）。</p>
-  {% endif %}
-
-  {% if local_overview.diet %}
-  <h3 class="sect-h">饮食宜忌方向</h3>
-  <div class="fields" style="margin-bottom:14px;">
-    {% for d in local_overview.diet %}
-    <div class="field-row"><span class="k">{{ d.name }} · 宜</span><span class="v">{{ d.宜 }}<span class="faint" style="font-size:12px;">（{{ d.src }}）</span></span></div>
-    <div class="field-row"><span class="k">{{ d.name }} · 忌</span><span class="v">{{ d.忌 }}</span></div>
-    {% endfor %}
-  </div>
   {% endif %}
 
   {% if local_overview.inquiry %}
@@ -401,6 +467,23 @@
     <div class="field-row"><span class="k">{{ it.q }}</span><span class="v">{{ it.why }}</span></div>
     {% endfor %}
   </div>
+  {% endif %}
+  {% else %}
+  <div class="alert-note">缺少中医体质辨证知识库，体质格局、四证聚类和相关问诊提示不可显示。</div>
+  {% endif %}
+
+  {% if diet_ready %}
+  {% if local_overview.diet %}
+  <h3 class="sect-h">饮食宜忌方向（内置规则，非当前知识库引用）</h3>
+  <div class="fields" style="margin-bottom:14px;">
+    {% for d in local_overview.diet %}
+    <div class="field-row"><span class="k">{{ d.name }} · 宜</span><span class="v">{{ d.宜 }}</span></div>
+    <div class="field-row"><span class="k">{{ d.name }} · 忌</span><span class="v">{{ d.忌 }}</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="alert-note">缺少食疗知识库，饮食宜忌信息不可显示。</div>
   {% endif %}
 </div>
 {% else %}
@@ -415,7 +498,7 @@
     {% endif %}
   </div>
 
-  {% if r.diagnosis %}
+  {% if r.diagnosis and constitution_ready %}
   {% if r.diagnosis.three_views %}
   <div class="diag-views">
     {% for v in r.diagnosis.three_views %}
@@ -429,7 +512,7 @@
     {% if r.diagnosis.pathomechanism %}<div class="field-row"><span class="k">核心病机</span><span class="v">{{ r.diagnosis.pathomechanism }}</span></div>{% endif %}
   </div>
 
-  {% if report and report.diet_advice %}
+  {% if report and report.diet_advice and diet_ready %}
   <hr class="divider">
   <h3 class="sect-h">饮食建议</h3>
   {% if report.diet_advice.daily_foods %}
@@ -467,12 +550,23 @@
     {% endfor %}
   </div>
   {% endif %}
+  {% elif r.report_stale %}
+  <p class="faint">历史报告已过期，请重新生成。</p>
   {% elif not report %}
   <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
+  {% if not constitution_ready %}
+  <div class="alert-note">缺少中医体质辨证知识库，辨证提要、全案和该类候选参考不可显示。</div>
+  {% endif %}
+  {% if not formula_ready %}
+  <div class="alert-note">缺少方剂知识库，方药内容、完整方药报告和该类候选参考不可显示。</div>
+  {% endif %}
+  {% if not diet_ready %}
+  <div class="alert-note">缺少食疗知识库，饮食宜忌信息和该类候选参考不可显示。</div>
+  {% endif %}
 </div>
 
-{% if report %}
+{% if report and constitution_ready and formula_ready %}
 <div class="card">
   <div class="card-head">
     <h2>辨证报告·全案</h2>
@@ -481,7 +575,24 @@
   </div>
   <div class="mdreport">{{ report.markdown | markdown | safe }}</div>
 
-  {% if report.diet_advice %}
+  {% set kb_status = report.kb_status or ("retrieved" if report.kb_refs else "unknown") %}
+  {% if kb_status != "retrieved" %}
+  <div class="alert-note">
+    {% if kb_status == "unconfigured" %}
+    <strong>本次未使用知识库：</strong>生成报告时未配置知识库，食疗、方义及其他建议未经库内校核。
+    {% elif kb_status == "empty" %}
+    <strong>本次未使用知识库：</strong>生成报告时知识库为空，食疗、方义及其他建议未经库内校核。
+    {% elif kb_status == "no_hits" %}
+    <strong>本次未命中知识库条文：</strong>已配置知识库，但未检索到相关候选参考，报告未经库内校核。
+    {% elif kb_status == "error" %}
+    <strong>知识库不可用：</strong>生成报告时目录或检索失败，报告未经库内校核。{% if report.kb_error %}<br>{{ report.kb_error }}{% endif %}
+    {% else %}
+    <strong>知识库状态未记录：</strong>这是历史报告，无法确认生成时是否使用知识库，请按需重新生成。
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if report.diet_advice and diet_ready %}
   <div class="action-zone" id="action-zone">
     <h3 class="zone-h">方药与调护</h3>
     <div id="formula-slot"></div>
@@ -535,7 +646,7 @@
 
   {% if report.kb_refs %}
   <details class="kb-refs">
-    <summary>知识库引用出处<span class="n">{{ report.kb_refs | length }} 条 · 食疗/方义建议的库内来源</span></summary>
+    <summary>知识库候选参考<span class="n">{{ report.kb_refs | length }} 条 · 生成时送入模型的资料，不等同实际引用</span></summary>
     <ol class="kb-list">
       {% for ref in report.kb_refs %}
       <li class="kb-item">
@@ -553,9 +664,11 @@
 {% endif %}
 {% endif %}
 
+<script src="{{ url_for('static', filename='js/feedback.js') }}"></script>
 <script>
 (function () {
   var RECORD_DATE = {{ r.date | tojson }};
+  tcmShowWarnings(RECORD_DATE, document.getElementById("correction-alert"));
 
   /* 触屏无 hover：顶栏按钮切换全部 ✎ 的常驻可见 */
   var toggle = document.getElementById("edit-toggle");
@@ -566,7 +679,7 @@
   var restoreBtn = document.getElementById("restore-btn");
   if (restoreBtn) {
     restoreBtn.addEventListener("click", async function () {
-      if (!confirm("放弃全部人工修正，恢复为识图模型最初输出的记录？\n（当前状态会先自动备份，可再撤销）")) return;
+      if (!confirm("在当前代修正前状态与当前状态之间恢复/撤销？\n报告会保留，当前状态会先自动备份。")) return;
       restoreBtn.disabled = true;
       try {
         var resp = await fetch("/record/" + RECORD_DATE + "/restore", {method: "POST"});
@@ -580,13 +693,20 @@
     });
   }
 
+  document.getElementById("delete-form").addEventListener("submit", function (event) {
+    if (!confirm("永久删除当日记录、照片、暂存、草稿和全部备份？此操作不能撤销。")) {
+      event.preventDefault();
+    }
+  });
+
   function alertBox(text, danger) {
     var box = document.getElementById("correction-alert");
     box.className = danger ? "alert-danger" : "alert-note";
+    box.setAttribute("role", danger ? "alert" : "status");
+    box.setAttribute("aria-live", danger ? "assertive" : "polite");
     var strong = document.createElement("strong");
     strong.textContent = text;
-    box.innerHTML = "";
-    box.appendChild(strong);
+    box.replaceChildren(strong);
     box.style.display = "";
     box.scrollIntoView({behavior: "smooth", block: "nearest"});
   }
@@ -599,8 +719,8 @@
       var old = vSpan.textContent;
       row.classList.add("editing");
       var actionCell = btn.parentElement;
-      vSpan.innerHTML = "";
-      actionCell.innerHTML = "";
+      vSpan.replaceChildren();
+      actionCell.replaceChildren();
       var opts = null, gloss = {};
       try {
         opts = row.dataset.opts ? JSON.parse(row.dataset.opts) : null;
@@ -614,6 +734,8 @@
         var chipBox = document.createElement("div");
         chipBox.className = "row wrap";
         chipBox.style.gap = "6px";
+        chipBox.setAttribute("role", "group");
+        chipBox.setAttribute("aria-label", "修正观察值：" + row.querySelector(".k").textContent);
         opts.forEach(function (opt) {
           var c = document.createElement("button");
           c.type = "button";
@@ -634,47 +756,69 @@
         vSpan.appendChild(chipBox);
       } else {
         input = document.createElement("input");
+        input.id = "correction-" + row.dataset.dim + "-" + row.dataset.ind;
         input.value = old;
-        input.setAttribute("aria-label", "修正观察值");
+        input.maxLength = 64;
+        input.autocomplete = "off";
+        input.setAttribute("aria-describedby", "correction-alert");
+        var oldLabel = row.querySelector(".k");
+        var label = document.createElement("label");
+        label.className = oldLabel.className;
+        label.htmlFor = input.id;
+        while (oldLabel.firstChild) label.appendChild(oldLabel.firstChild);
+        oldLabel.replaceWith(label);
         vSpan.appendChild(input);
       }
       var saveBtn = document.createElement("button");
+      saveBtn.type = "button";
       saveBtn.className = "btn btn-primary btn-sm";
       saveBtn.textContent = "保存";
       saveBtn.disabled = !!opts && selected === null;
       if (saveBtn.disabled) saveBtn.title = "当前值不在词表内，请重新选择";
+      var clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "btn btn-subtle btn-sm";
+      clearBtn.textContent = "清除此项";
       var cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
       cancelBtn.className = "btn btn-subtle btn-sm";
       cancelBtn.textContent = "取消";
       actionCell.appendChild(saveBtn);
+      actionCell.appendChild(clearBtn);
       actionCell.appendChild(cancelBtn);
       if (input) input.focus();
 
       cancelBtn.addEventListener("click", function () { location.reload(); });
-      saveBtn.addEventListener("click", async function () {
+      async function update(action) {
+        if (action === "clear" && !confirm("清除此项观察值？原记录会先自动备份。")) return;
         saveBtn.disabled = true;
+        clearBtn.disabled = true;
+        var payload = {dim: row.dataset.dim, indicator: row.dataset.ind, action: action};
+        if (action === "set") payload.value = opts ? selected : input.value;
         try {
           var resp = await fetch("/record/" + RECORD_DATE + "/field", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-              dim: row.dataset.dim,
-              indicator: row.dataset.ind,
-              value: opts ? selected : input.value
-            })
+            body: JSON.stringify(payload)
           });
           var data = await resp.json();
           if (data.ok) {
+            tcmFlashWarnings(data.warnings, RECORD_DATE);
             location.reload();  // 重评分结果以服务端重渲为准
           } else {
-            alertBox("保存被拦截：" + data.errors.join("；"), true);
+            alertBox((action === "clear" ? "清除" : "保存") + "被拦截：" +
+                     (data.errors || [data.error || "未知错误"]).join("；"), true);
             saveBtn.disabled = false;
+            clearBtn.disabled = false;
           }
         } catch (e) {
-          alertBox("保存失败：" + e, true);
+          alertBox((action === "clear" ? "清除" : "保存") + "失败：" + e, true);
           saveBtn.disabled = false;
+          clearBtn.disabled = false;
         }
-      });
+      }
+      saveBtn.addEventListener("click", function () { update("set"); });
+      clearBtn.addEventListener("click", function () { update("clear"); });
     });
   });
 

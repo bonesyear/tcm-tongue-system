@@ -49,3 +49,18 @@ _books/
 
 # Web 服务运行日志（本地）
 records/_*.log
+
+# 私有知识库：公开仓仅保留配置说明，内容不得再提交
+knowledge_base/*
+!knowledge_base/README.md
+
+# 仓库内独立私有资料目录（与程序管理的 private_kb/ 隔离）
+private/
+
+# 导入的私有知识库与暂存区（仅本机，永不入库）
+private_kb/
+.kb-staging/
+.kb-backup-*/
+.kb-failed-*/
+.kb-preserve-*/
+.kb-reset-backup-*/

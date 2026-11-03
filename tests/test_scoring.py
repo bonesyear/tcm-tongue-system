@@ -336,11 +336,11 @@ def test_body_color_five_level_after_purge():
 
 
 def test_sclera_color_scoring():
-    # 巩膜颜色：黄染/苍白/蓝巩膜
     inds = score_indicators(VisionDimension.EYE, {"sclera_color": "蓝巩膜"})
     assert inds["sclera_color"] == 8
     inds2 = score_indicators(VisionDimension.EYE, {"sclera_color": "黄染"})
-    assert inds2["sclera_color"] == 7
+    assert inds2["jaundice"] == 4
+    assert inds2["sclera_color"] == 0
     inds3 = score_indicators(VisionDimension.EYE, {"sclera_color": "苍白"})
     assert inds3["sclera_color"] == 5
 
@@ -608,3 +608,60 @@ def test_match_score_delegates_to_match_keyword():
     # 公开语义不变：命中得分值，无命中 0
     assert _match_score(TONGUE_BODY_SIZE_MAP, "偏胖") == 4
     assert _match_score(TONGUE_BODY_SIZE_MAP, "较丰满") == 0
+
+
+def test_assess_indicators_distinguishes_states_and_keeps_legacy_behavior():
+    from src.scoring import assess_indicators, SCORING_RULESET_VERSION
+    obs = {
+        "body_color": "淡红",
+        "coating_thickness": "黄厚",
+        "coating_moisture": "无法判读的描述",
+        "petechiae": "",
+        "body_luster": "润泽",
+    }
+
+    results = assess_indicators(VisionDimension.TONGUE, obs)
+
+    assert results["body_color"].state == "normal"
+    assert results["body_color"].value == 0
+    assert results["coating_thickness"].state == "abnormal"
+    assert results["coating_thickness"].value == 7
+    assert results["coating_moisture"].state == "unknown"
+    assert results["coating_moisture"].value is None
+    assert results["petechiae"].state == "not_applicable"
+    assert results["body_luster"].state == "not_applicable"
+    assert results["coating_thickness"].ruleset_version == SCORING_RULESET_VERSION
+    # 旧接口的数值语义不在本批破坏
+    assert score_indicators(VisionDimension.TONGUE, obs)["coating_moisture"] == 0
+
+
+def test_assess_dimension_tracks_unknown_and_missing_separately():
+    from src.scoring import assess
+    abnormal = assess(VisionDimension.TONGUE, {
+        "coating_thickness": "黄厚", "coating_moisture": "无法判读的描述",
+        "petechiae": "",
+    })
+    assert abnormal.state == "abnormal"
+    assert abnormal.value == 7
+    assert abnormal.unknown_indicators == ("coating_moisture",)
+    assert "petechiae" in abnormal.missing_indicators
+
+    unknown = assess(VisionDimension.TONGUE, {
+        "body_color": "淡红", "coating_moisture": "无法判读的描述",
+    })
+    assert unknown.state == "unknown"
+    assert unknown.value is None
+
+
+def test_assess_empty_and_reference_only_are_not_applicable():
+    from src.scoring import assess
+    assert assess(VisionDimension.TONGUE, {}).state == "not_applicable"
+    result = assess(VisionDimension.TONGUE, {"body_luster": "润泽"})
+    assert result.state == "not_applicable"
+    assert result.value is None
+
+
+def test_assess_non_string_observation_is_unknown_not_crash():
+    from src.scoring import assess
+    assert assess(VisionDimension.TONGUE, {"body_color": 5}).state == "unknown"
+    assert assess(VisionDimension.TONGUE, {"body_color": ["红"]}).state == "unknown"

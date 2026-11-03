@@ -51,8 +51,8 @@ def test_weekly_report_data_valid_output(real_raw):
     # 摘要应包含非零的舌诊偏离度数值（fixture：齿痕 4 + 胖大 7 + 剥落 6 → 最重单项 7.0（v1.7.21 max 口径）；
     # 点刺已退出评分层，2026-09-18）
     assert "7.0" in data["summary"]
-    # week_id 为 ISO 周格式（%G-W%V）
-    assert re.fullmatch(r"\d{4}-W\d{2}", data["week_id"])
+    # 滚动窗口使用真实起止日期，不按 ISO 周混写。
+    assert data["week_id"] == "2026-06-25_2026-06-25"
     # confidence 校验断言已写入
     checks = data["confidence_checks"]
     assert len(checks) == 1
@@ -267,17 +267,17 @@ def test_empty_records_report_structure():
 
 
 def test_compute_dimension_deviation_detail(real_raw):
-    """多维输出：每维度携带 score/max/n，score 与旧口径 compute_dimension_deviation 一致。"""
+    """每维度独立携带 score/max/n/observed，正常 0 不等于未观测。"""
     detail = g.compute_dimension_deviation_detail(real_raw)
     dev = g.compute_dimension_deviation(real_raw)
     assert set(detail.keys()) == set(dev.keys())
     for dim_cn, d in detail.items():
-        assert set(d.keys()) == {"score", "max", "n"}
+        assert set(d.keys()) == {"score", "max", "n", "observed"}
         assert "mean" not in d
         assert d["score"] == dev[dim_cn]
     # fixture 舌诊：齿痕 4 + 胖大 7 + 剥落 6 → 最重单项 7.0、共 3 项异常
     # （点刺 5 已于 2026-09-18 退出评分层，不再计入）
-    assert detail["舌诊"] == {"score": 7.0, "max": 7.0, "n": 3}
+    assert detail["舌诊"] == {"score": 7.0, "max": 7.0, "n": 3, "observed": True}
 
 
 def test_describe_trend_dual_gate_allows_real_improvement():
@@ -343,13 +343,11 @@ def test_describe_trend_metric_name_default_verbatim_unchanged():
 
 
 def test_describe_trend_metric_name_non_tongue_wording():
-    """非舌维度传 metric_name="累计分"：不再把 sum 说成"均值"，
-    且不与 name 里的"偏离度"重复。"""
+    """非舌维度按累计分及异常项数判断，不要求最重单项同步下降。"""
     text = g.describe_trend("头面诊偏离度", 7.0, 2.0,
-                            first_max=5.0, last_max=5.0, first_n=2, last_n=5,
+                            first_max=5.0, last_max=5.0, first_n=3, last_n=1,
                             metric_name="累计分")
-    assert text == ("头面诊偏离度累计分较周初降低5.0分，但最重单项未同步减轻"
-                    "（5 → 5 分），暂不判为好转（7.0 → 2.0）")
+    assert text == "头面诊偏离度较周初降低5.0分，异常程度减轻（7.0 → 2.0）"
     assert "均值" not in text
 
 
@@ -362,11 +360,11 @@ def test_tongue_summary_phrase_verbatim_unchanged(real_raw):
 
 
 def test_weekly_report_detail_keys_additive(real_raw):
-    """周报 JSON 纯增量加键：dimension_deviation_detail 含首末 score/max/n，旧键不动。"""
+    """周报 JSON 纯增量加 observed，其余键保持。"""
     data = g.generate_weekly_report_data([real_raw])
     detail = data["dimension_deviation_detail"]
-    assert detail["舌诊"]["first"] == {"score": 7.0, "max": 7.0, "n": 3}
-    assert detail["舌诊"]["last"] == {"score": 7.0, "max": 7.0, "n": 3}
+    assert detail["舌诊"]["first"] == {"score": 7.0, "max": 7.0, "n": 3, "observed": True}
+    assert detail["舌诊"]["last"] == {"score": 7.0, "max": 7.0, "n": 3, "observed": True}
     # 旧键一个不少
     for key in ("week_id", "start_date", "end_date", "daily_records_count",
                 "trend_analysis", "weekly_comparison", "summary",
@@ -487,3 +485,35 @@ def test_radar_chart_skips_unobserved_day(monkeypatch, tmp_path, capsys):
     assert "2026-01-02 全部轴无有效观测" in capsys.readouterr().err
     # 不传 flags：全部绘制，不抛异常
     assert g.generate_radar_chart(metrics, dates) is not None
+
+
+def test_dimension_deviation_marks_unknown_not_zero():
+    raw = {"date": "2026-01-01", "observations": {
+        "tongue": {"coating": {"moisture": "无法判读的描述"}},
+    }}
+
+    detail = g.compute_dimension_state(raw)
+    metrics = g.extract_tongue_metrics(raw)
+
+    assert detail["舌诊"]["score"] is None
+    assert detail["舌诊"]["unknown_count"] == 1
+    assert metrics["舌苔润燥"] is None
+
+
+def test_weekly_data_includes_unknown_and_rule_versions():
+    from src.derived import current_derived_meta
+    from src.record import DailyRecord
+    from src.scoring import SCORING_RULESET_VERSION
+    first = {"date": "2026-01-01", "observations": {"tongue": {"body": {"color": "淡红"}}}}
+    second = {"date": "2026-01-02", "observations": {
+        "tongue": {"coating": {"moisture": "无法判读的描述"}},
+    }}
+    second["derived_meta"] = current_derived_meta(DailyRecord(second))
+
+    data = g.generate_weekly_report_data([first, second])
+
+    assert data["unknown_counts"] == {"first": 0, "last": 1, "total": 1}
+    assert data["rule_versions"] == ["legacy", SCORING_RULESET_VERSION]
+    assert data["mixed_rule_versions"] is True
+    assert data["scoring_ruleset_version"] == SCORING_RULESET_VERSION
+    assert "不作趋势判定" in data["trend_analysis"]["舌苔变化"]

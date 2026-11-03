@@ -29,7 +29,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     c.post("/demo")  # 载入合成示例记录 2026-06-25
     return c
 
@@ -59,10 +59,11 @@ def test_correction_full_flow(client, data_root):
     assert raw.get("corrected_at")
 
     backup_dir = os.path.join(data_root, "records", "_backup")
-    backups = os.listdir(backup_dir)
-    assert len(backups) == 1 and backups[0].startswith("2026-06-25_analysis.json")
-    # 备份里是修正前的旧值
-    with open(os.path.join(backup_dir, backups[0]), encoding="utf-8") as f:
+    backups = [name for name in os.listdir(backup_dir) if name.endswith(".bak")]
+    assert len(backups) == 2  # 当前代 pristine + 本次 correction
+    # 修正用备份里是修正前的旧值
+    correction = next(name for name in backups if ".correction." in name)
+    with open(os.path.join(backup_dir, correction), encoding="utf-8") as f:
         assert json.load(f)["observations"]["tongue"]["body"]["tooth_marks"] == "轻度"
 
     # 详情页出现「含人工修正」与新分数
@@ -94,13 +95,13 @@ def test_correction_lan_readonly(client):
 
 
 def test_correction_warning_does_not_block(client, data_root):
-    """⚠️ 级问题（如值夹带注记）不拦截保存，仅回传展示。"""
+    """封闭词表内的修正不被其他 ⚠️ 级问题拦截。"""
     resp = client.post("/record/2026-06-25/field", json={
         "dim": "tongue", "indicator": "tooth_marks",
-        "value": "轻度（与昨日一致）"})
+        "value": "轻度"})
     assert resp.status_code == 200
     raw = _read_raw(data_root)
-    assert raw["observations"]["tongue"]["body"]["tooth_marks"] == "轻度（与昨日一致）"
+    assert raw["observations"]["tongue"]["body"]["tooth_marks"] == "轻度"
 
 
 # ---------------- 修正选项化（封闭词表按钮直选） ----------------
@@ -139,6 +140,16 @@ def test_option_value_scores_directly(client):
         "dim": "tongue", "indicator": "body_color", "value": "紫暗"})
     assert resp.status_code == 200
     assert resp.get_json()["field_score"] == 9
+
+
+def test_eye_jaundice_correction_uses_one_canonical_score(client):
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "eye", "indicator": "jaundice", "value": "黄染明显"})
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["field_score"] == 8
+    assert resp.get_json()["dim_score"] == 10  # 原红血丝 3 分仍保留，非舌维度封顶 10
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "黄染明显" in html and "巩膜黄染" in html
 
 
 def test_normal_option_scores_zero_and_passes(client, data_root):
@@ -243,7 +254,7 @@ def test_correction_meta_marks_unscored():
 # ---------------- 恢复原始数据（/record/<date>/restore） ----------------
 
 def test_restore_reverts_to_original(client, data_root):
-    """修正两个字段 → 恢复 → 全部回到 LLM 原始输出，manually_corrected 消失。"""
+    """修正两个字段 → 恢复当前代 pristine，并保留可撤销审计。"""
     client.post("/record/2026-06-25/field", json={
         "dim": "tongue", "indicator": "tooth_marks", "value": "重度"})
     client.post("/record/2026-06-25/field", json={
@@ -257,7 +268,7 @@ def test_restore_reverts_to_original(client, data_root):
     raw = _read_raw(data_root)
     assert raw["observations"]["tongue"]["body"]["tooth_marks"] == "轻度"  # 回原值
     assert raw["observations"]["tongue"]["body"]["color"] != "紫暗"
-    assert not raw.get("manually_corrected")
+    assert raw["manually_corrected"] is True
     # 恢复前当前状态已自动备份（可再撤销）
     assert data["safety_backup"]
 
@@ -291,3 +302,31 @@ def test_skin_color_dedup_keeps_full_phrase():
     assert "橘皮" not in opts and "黄如橘皮" in opts
     assert DIMENSION_RULES[V.SKIN]["color"]["橘皮"] == 8
     assert score_indicators(V.SKIN, {"color": "橘皮"})["color"] == 8
+
+
+@pytest.mark.parametrize("raw", [
+    {"date": "2026-06-25", "vision_analysis": {"舌诊": {"舌体动态": "正常"}},
+     "danger_flags": {}},
+    {"date": "2026-06-25", "tongue": {"body_dynamics": "正常"},
+     "danger_flags": {"triggered": [], "not_triggered": []}},
+], ids=["shape-a", "shape-c"])
+def test_correction_redetects_danger_for_legacy_shapes(client, data_root, raw):
+    target = os.path.join(data_root, "records", "daily", "2026-06-25_analysis.json")
+    with open(target, "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "body_dynamics", "value": "强硬"})
+
+    assert resp.status_code == 200, resp.get_json()
+    assert "tongue_rigid" in resp.get_json()["danger_triggered"]
+    assert "tongue_rigid" in _read_raw(data_root)["danger_flags"]["triggered"]
+
+
+def test_correction_rejects_null_value(client, data_root):
+    before = _read_raw(data_root)["observations"]["tongue"]["body"]["color"]
+    resp = client.post("/record/2026-06-25/field", json={
+        "dim": "tongue", "indicator": "body_color", "value": None})
+
+    assert resp.status_code == 400
+    assert _read_raw(data_root)["observations"]["tongue"]["body"]["color"] == before

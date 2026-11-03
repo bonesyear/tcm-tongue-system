@@ -231,10 +231,10 @@ class TestRelpath:
 
 
 # ============================================================
-# 真实 KB 冒烟测试
+# 合成 KB 冒烟测试
 # ============================================================
 class TestRealKbSmoke:
-    """对真实 knowledge_base/ 的集成冒烟测试（不耦合精确行号）。"""
+    """对独立合成 knowledge_base/ 的集成冒烟测试（不耦合精确行号）。"""
 
     def test_linggui_formula_hits_real_kb(self):
         # 苓桂术甘汤 实测出现在 constitution-types / diet-therapy / diagnostic-framework

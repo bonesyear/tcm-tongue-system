@@ -18,9 +18,17 @@ import llm_client  # noqa: E402
 import wizard_store  # noqa: E402
 from app import create_app  # noqa: E402
 
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d494844520000000100000001080600000"
-    "01f15c4890000000d4944415478da63fc3f40401f0005fb018a845d3d")
+def _synthetic_png():
+    from PIL import Image
+    output = io.BytesIO()
+    Image.new("RGB", (2, 2), (128, 128, 128)).save(output, format="PNG")
+    return output.getvalue()
+
+
+PNG = _synthetic_png()
+
+
+
 ALL_PARTS = [p["part"] for p in wizard_store.PARTS]
 
 
@@ -38,25 +46,50 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     return c
 
 
 def _mock_observe(monkeypatch):
-    """把识图换成固定输出（舌面给嵌套中文键，其余给简单键）。"""
-    def fake(part, img_path):
-        if part == "舌面":
-            return {"舌质颜色": "淡红", "舌质润燥": "润泽",
-                    "舌体": {"胖瘦": "正常", "齿痕": "无"},
-                    "舌苔": {"颜色": "白", "厚薄": "薄白"}}, []
-        return {"耳色": "淡红"} if part == "耳" else {"肤色": "正常"}, []
-    monkeypatch.setattr(wizard_store, "observe_photo", fake)
+    """只替换网络调用，保留 observe_photo 的真实 JSON 解析。"""
+    import vision_client
+
+
+    def fake_call(img_path, prompt, **kwargs):
+        if "舌质颜色" in prompt:
+            payload = {"舌质颜色": "淡红", "舌质润燥": "润泽",
+                       "舌体": {"胖瘦": "正常", "齿痕": "无"},
+                       "舌苔": {"颜色": "白", "厚薄": "薄白"}}
+        elif "耳色" in prompt:
+            payload = {"耳色": "淡红"}
+        else:
+            payload = {"肤色": "正常"}
+        return 0, json.dumps(payload, ensure_ascii=False)
+
+    monkeypatch.setattr(vision_client, "call", fake_call)
 
 
 def _upload(client, part):
     return client.post("/wizard/photo", data={
         "part": part, "file": (io.BytesIO(PNG), "photo.jpg"),
     }, content_type="multipart/form-data")
+
+
+def test_observe_photo_json_forms_and_error(client, monkeypatch):
+    import vision_client
+
+    payload = {"舌质颜色": "淡红"}
+    monkeypatch.setattr(
+        vision_client, "call",
+        lambda *a, **k: (0, "```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```"))
+    resp = _upload(client, "舌面")
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["observation"]["body"]["color"] == "淡红"
+
+    monkeypatch.setattr(vision_client, "call", lambda *a, **k: (0, "not-json"))
+    resp = _upload(client, "舌面")
+    assert resp.status_code == 502
+    assert resp.get_json()["photo_saved"] is True
 
 
 def test_wizard_page_renders(client):
@@ -76,7 +109,11 @@ def test_photo_upload_observes_and_saves(client, data_root, monkeypatch):
     assert data["observation"]["coating"]["thickness"] == "薄白"
     today = wizard_store.datetime.date.today().isoformat()
     assert os.path.exists(os.path.join(
-        data_root, "records", "photos", today, "舌面.jpg"))
+        data_root, "records", "photos", today, ".staging"))
+    assert len([name for name in os.listdir(os.path.join(
+        data_root, "records", "photos", today, ".staging"))
+        if name.endswith(".jpg")]) == 1
+    assert data["photo"].startswith("/photos-staging/")
 
 
 def test_unmapped_keys_preserved_not_dropped(monkeypatch):
@@ -107,9 +144,10 @@ def test_full_wizard_produces_shape_b_record(client, data_root, monkeypatch):
         os.path.join(data_root, "records", "daily"), today).raw
     assert raw["record_id"] == f"{today}-web"
     assert raw["observations"]["tongue"]["body"]["color"] == "淡红"
-    # 声明正常的部位：占位写入首指标路径，计入覆盖
-    assert "未拍摄（用户声明正常）" in json.dumps(
-        raw["observations"]["head_face"], ensure_ascii=False)
+    assert raw["schema_version"] == 2
+    assert any(item["kind"] == "declared_normal" and item["dimension"] == "head_face"
+               for item in raw["declarations"])
+    assert raw["observations"]["head_face"] == {}
     # P1（原著审查）：声明正常占位不计覆盖度——仅舌诊实观测 → LOW
     assert raw["confidence"] == "LOW"
     assert raw["danger_flags"]["triggered"] == []
@@ -143,7 +181,7 @@ def test_danger_interception_two_exits(client, data_root, monkeypatch):
     assert data["danger"][0]["name"] == "戴阳证"
     assert not os.path.exists(os.path.join(daily, f"{today}_analysis.json"))
 
-    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "keep"})
+    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "keep", "danger_token": resp.get_json()["danger_token"]})
     assert resp.get_json()["ok"] is True
     import records_store
     raw = records_store.load_record(daily, today).raw
@@ -179,7 +217,7 @@ def test_vision_unconfigured_saves_photo_but_no_observe(tmp_path, data_root, mon
     monkeypatch.delenv("VISION_API_KEY", raising=False)
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     resp = c.post("/wizard/photo", data={
         "part": "舌面", "file": (io.BytesIO(PNG), "p.jpg"),
     }, content_type="multipart/form-data")
@@ -212,23 +250,6 @@ def test_declared_normal_dim_scores_none(client, data_root, monkeypatch):
     assert "按未覆盖处理" in html
 
 
-def test_mirror_tongue_pattern_no_false_positive():
-    """「局部剥落」不得命中镜面舌探测（pattern 为「无苔」）。"""
-    assert "无苔" not in "局部剥落"
-    assert wizard_store.detect_danger(
-        {"tongue": {"coating": {"peeling": "局部剥落"}}}) == []
-    assert wizard_store.detect_danger(
-        {"tongue": {"coating": {"peeling": "光剥无苔"}}}) == ["mirror_tongue"]
-
-
-def test_new_danger_patterns_detected():
-    """新增两条红线：直视→阳明危重、冷汗→脱阳前兆。"""
-    got = wizard_store.detect_danger({"skin": {"note": "微喘直视"}})
-    assert got == ["yangming_critical"]
-    got = wizard_store.detect_danger({"skin": {"sweat": "冷汗如油"}})
-    assert got == ["collapse_yang"]
-
-
 def test_inquiry_multiple_questions_written(client, data_root, monkeypatch):
     """15 项问诊放开：多问多答按模板契约写入（含手足温凉）。"""
     _finish_all_parts(client, monkeypatch)
@@ -256,22 +277,15 @@ def test_tongue_score_max_dominant():
     assert score(VisionDimension.TONGUE, obs) == 9.0  # 旧均值口径为 4.7；青紫已并入紫暗
 
 
-def test_detect_danger_negation_guard():
-    """否定守卫：「无苔」前 4 字内有「无/不/未/没」即不触发。"""
-    assert wizard_store.detect_danger(
-        {"tongue": {"coating": {"peeling": "局部无苔"}}}) == []
-    assert wizard_store.detect_danger(
-        {"skin": {"sweat": "无冷汗"}}) == []
-    assert wizard_store.detect_danger(
-        {"tongue": {"coating": {"peeling": "光剥无苔"}}}) == ["mirror_tongue"]
-
-
 def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
-    """辨证输入：问诊答案全量进入，分母固定 16，未答项不出现。"""
-    monkeypatch.setattr(llm_client, "chat",
-                        lambda *a, **k: json.dumps(
-                            {"structured": {}, "markdown": "# ok"},
-                            ensure_ascii=False))
+    """实际 LLM 入参包含全部问诊，分母取 INQUIRY_TOTAL。"""
+    seen = {}
+
+    def fake_chat(user, system, *args, **kwargs):
+        seen["user"] = user
+        seen["system"] = system
+        return json.dumps({"structured": {}, "markdown": "# ok"}, ensure_ascii=False)
+    monkeypatch.setattr(llm_client, "chat", fake_chat)
     monkeypatch.setenv("LLM_API_KEY", "sk-x")
     monkeypatch.setenv("LLM_MODEL", "m")
     monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
@@ -283,17 +297,17 @@ def test_report_input_contains_inquiry_answers(client, data_root, monkeypatch):
     resp = client.post(f"/record/{today}/report")
     assert resp.status_code == 200, resp.get_json()
     # 检查传给 LLM 的用户输入
-    import trends_store
-    import records_store
-    rec = records_store.load_record(
-        os.path.join(data_root, "records", "daily"), today)
-    text = trends_store.build_report_input(rec)
+
+    text = seen["user"]
     assert "问诊覆盖：2/" + str(wizard_store.INQUIRY_TOTAL) in text
-    assert "手足温凉 厥冷（冰冷）" in text
-    assert "大便？ 便溏" in text
+    assert '"手足温凉": "厥冷（冰冷）"' in text
+    assert '"大便？": "便溏"' in text
     assert "目眩？" not in text
     # 禁忌核对能扫到问诊里的「厥冷」
     assert "已观测：厥冷" in text
+    with open(os.path.join(_ROOT, "templates", "adaptive_analysis_prompt.md"),
+              encoding="utf-8") as handle:
+        assert seen["system"] == handle.read()
 
 
 # ---------------- 2026-10-16 教材复查修复（P0/P1/P2） ----------------
@@ -304,22 +318,6 @@ def test_dynamics_options_include_suosuo_tunong():
     opts = records_store.FIELD_OPTIONS["body_dynamics"]
     assert "短缩" in opts and "吐弄" in opts
     assert "危重" in records_store.GLOSSARY["短缩"]
-
-
-def test_critical_tongue_flags_detected():
-    """P1：危重舌象 8 项文本探测（含否定守卫）。"""
-    assert wizard_store.detect_danger({"tongue": {"body": {"texture": "砂皮"}}}) \
-        == ["sandy_tongue"]
-    assert wizard_store.detect_danger({"tongue": {"note": "未见砂皮样改变"}}) == []
-    got = wizard_store.detect_danger({"tongue": {"body": {"color": "赭黑"}}})
-    assert got == ["ochre_tongue"]
-
-
-def test_collapse_yang_detects_juehan_tuple_pattern():
-    """P2：collapse_yang 支持多模式（冷汗/绝汗）。"""
-    assert wizard_store.detect_danger({"skin": {"sweat": "冷汗如油"}}) == ["collapse_yang"]
-    assert wizard_store.detect_danger({"inquiry": {"汗出时间特征？": "绝汗(大汗淋漓如油)"}}) \
-        == ["collapse_yang"]
 
 
 def test_inquiry_sweat_item_in_list():
@@ -338,7 +336,7 @@ def test_inquiry_juehan_triggers_danger_on_submit(client, data_root, monkeypatch
     d = resp.get_json()
     assert d["need_danger_ack"] is True
     assert any(f["key"] == "collapse_yang" for f in d["danger"])
-    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "keep"})
+    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "keep", "danger_token": resp.get_json()["danger_token"]})
     assert resp.get_json()["ok"] is True
     import records_store
     raw = records_store.load_record(
@@ -346,18 +344,6 @@ def test_inquiry_juehan_triggers_danger_on_submit(client, data_root, monkeypatch
         resp.get_json()["date"]).raw
     assert raw["inquiry"]["汗出时间特征？"]["answer"] == "绝汗(大汗淋漓如油)"
     assert "collapse_yang" in raw["danger_flags"]["triggered"]
-
-
-def test_detect_danger_no_cross_field_negation_bleed():
-    """审查高危修复：否定窗口不再跨字段出血（无汗+绝汗 → 绝汗仍触发）。"""
-    assert wizard_store.detect_danger({
-        "inquiry": {"有汗or无汗？": "无汗", "汗出时间特征？": "绝汗(大汗淋漓如油)"}
-    }) == ["collapse_yang"]
-    # 观察值侧同样：前字段以「无」结尾不抑制后字段红线词
-    assert "tongue_rigid" in wizard_store.detect_danger(
-        {"tongue": {"prickles": "无", "dynamics": "强硬"}})
-    # 字段内否定语义保持抑制
-    assert wizard_store.detect_danger({"skin": {"sweat": "无冷汗"}}) == []
 
 
 def test_sweat_question_has_healthy_exit():
@@ -374,7 +360,7 @@ def test_prompt_has_healthy_exit_branch():
         _ROOT, "templates", "adaptive_analysis_prompt.md"),
         encoding="utf-8").read()
     assert "平人出口" in prompt
-    assert "未见明显病证" in prompt
+    assert "本次已采集项目未见已知异常" in prompt and "健康状态良好，无需服药" not in prompt
     assert prompt.count("平人出口") >= 2  # HIGH 与 MEDIUM 两处
 
 
@@ -495,19 +481,25 @@ def test_wizard_field_adds_missing_field(client, data_root, monkeypatch):
     assert draft["parts"]["舌面"]["observation"]["body"]["cracks"] == "深裂"
 
 
-def test_mirror_tongue_detectable_via_closed_vocab():
-    """A1：封闭枚举词「镜面」可触发镜面舌探测（核验文档发现的最深错位）。"""
-    from src.danger import detect_danger
-    assert detect_danger(
-        {"tongue": {"coating": {"peeling": "镜面"}}}) == ["mirror_tongue"]
-    assert detect_danger(
-        {"tongue": {"coating": {"peeling": "局部剥落"}}}) == []
-    assert detect_danger(
-        {"tongue": {"coating": {"peeling": "局部无苔"}}}) == []
-
-
-def test_sign_texts_match_textbook():
-    """A2/A3：舌强/镜面 sign 与《中医诊断学》p118 原文口径一致。"""
-    from src.danger import DANGER_FLAGS
-    assert DANGER_FLAGS["tongue_rigid"]["sign"] == "舌体强直，转动不灵，且语言謇涩"
-    assert "深绛无苔而光亮如镜" in DANGER_FLAGS["mirror_tongue"]["sign"]
+def test_danger_response_distinguishes_screening_and_unknown(client, data_root, monkeypatch):
+    _finish_all_parts(client, monkeypatch)
+    resp = client.post("/wizard/manual", json={
+        "part": "头面", "indicator": "face_color", "value": "红如妆"})
+    assert resp.status_code == 200
+    resp = client.post("/wizard/submit", json={"mode": "new"})
+    data = resp.get_json()
+    assert data["need_danger_ack"] is True
+    flag = data["danger"][0]
+    assert flag["kind"] == "screening"
+    assert "面红如妆" in flag["matched_clauses"]
+    assert "手足厥逆" in flag["missing_clauses"]
+    assert client.post("/wizard/submit", json={
+        "mode": "new", "acknowledge": "keep", "danger_token": resp.get_json()["danger_token"]}).get_json()["ok"] is True
+    import records_store
+    today = wizard_store.datetime.date.today().isoformat()
+    raw = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), today).raw
+    assert raw["danger_flags"]["unknown"]
+    assert "daiyang" not in raw["danger_flags"]["not_triggered"]
+    html = client.get(f"/record/{today}").get_data(as_text=True)
+    assert "筛查" in html and "手足厥逆" in html and "未评估" in html

@@ -28,20 +28,16 @@ from __future__ import annotations
 import math
 import os
 import re
+import sys
+import threading
 from dataclasses import dataclass
 
+from .kb_paths import resolve_kb_root
 
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
-DEFAULT_KB_ROOT = os.path.join(_REPO_ROOT, "knowledge_base")
+
+DEFAULT_KB_ROOT = resolve_kb_root()
 DEFAULT_EXCLUDE = {"README.md"}
-
-# 环境变量覆盖——与 grep_search 同一约定：TCM_KB_ROOT 必须对 grep 与 RAG
-# 同时生效，否则设置该变量后 retrieve() 会把两个不同知识库的结果混在一起返回
-_ENV_KB = os.environ.get("TCM_KB_ROOT")
-if _ENV_KB:
-    DEFAULT_KB_ROOT = _ENV_KB
-
+MIN_RAG_SCORE = 0.2
 _CHUNK_MAX_CHARS = 500
 # 中日韩统一表意文字范围（简判，够用）
 _CJK = r"一-鿿"
@@ -69,8 +65,15 @@ def _doc_text(c: Chunk) -> str:
     return (c.title + "\n" + c.text) if c.title else c.text
 
 
+def _is_divider(text: str) -> bool:
+    if re.fullmatch(r"[-*_]{3,}", text):
+        return True
+    return (text.startswith("|") and text.endswith("|")
+            and text.count("-") >= 3 and set(text) <= set("-: |"))
+
+
 def _chunk_file(lines: list[str], rel: str) -> list[Chunk]:
-    """按空行分段，附最近 # 标题，超长按行再切。"""
+    """按段落分块；分隔线不计正文，超长行按字符窗口切分。"""
     chunks: list[Chunk] = []
     title = ""
     buf: list[str] = []
@@ -82,17 +85,19 @@ def _chunk_file(lines: list[str], rel: str) -> list[Chunk]:
             return
         text = "\n".join(buf).strip()
         if text:
-            # 超长则按行切分
             if len(text) <= _CHUNK_MAX_CHARS:
                 chunks.append(Chunk(rel, buf_start + 1, end_idx + 1, title, text))
             else:
                 acc, acc_start = "", buf_start
                 for i, ln in enumerate(buf):
-                    if len(acc) + len(ln) + 1 > _CHUNK_MAX_CHARS and acc:
-                        chunks.append(Chunk(rel, acc_start + 1, buf_start + i, title, acc.strip()))
-                        acc, acc_start = ln, buf_start + i
-                    else:
-                        acc = acc + "\n" + ln if acc else ln
+                    for start in range(0, len(ln), _CHUNK_MAX_CHARS):
+                        part = ln[start:start + _CHUNK_MAX_CHARS]
+                        if acc and len(acc) + len(part) + 1 > _CHUNK_MAX_CHARS:
+                            chunks.append(Chunk(rel, acc_start + 1, buf_start + i,
+                                                title, acc.strip()))
+                            acc, acc_start = part, buf_start + i
+                        else:
+                            acc = acc + "\n" + part if acc else part
                 if acc.strip():
                     chunks.append(Chunk(rel, acc_start + 1, end_idx + 1, title, acc.strip()))
         buf, buf_start = [], end_idx + 1
@@ -100,11 +105,10 @@ def _chunk_file(lines: list[str], rel: str) -> list[Chunk]:
     for idx, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("#"):
-            # 标题行：结束当前段、更新标题、标题本身不入段
             flush(idx - 1)
             title = stripped.lstrip("#").strip()
             continue
-        if not stripped:
+        if not stripped or _is_divider(stripped):
             flush(idx - 1)
             continue
         if not buf:
@@ -116,22 +120,25 @@ def _chunk_file(lines: list[str], rel: str) -> list[Chunk]:
 
 def build_chunks(kb_root: str | None = None, exclude: set[str] | None = None) -> list[Chunk]:
     """扫描 kb_root 下所有 .md，切成 Chunk 列表。"""
-    from glob import glob
-    root = os.path.abspath(kb_root or DEFAULT_KB_ROOT)
-    excl = exclude if exclude is not None else DEFAULT_EXCLUDE
-    files = sorted(glob(os.path.join(root, "**", "*.md"), recursive=True))
+    from .grep_search import _read_lines, list_kb_files
+    root = resolve_kb_root(kb_root)
     chunks: list[Chunk] = []
-    for f in files:
-        if os.path.basename(f) in excl:
+    for path in list_kb_files(root, sorted(exclude) if exclude is not None else None):
+        lines = _read_lines(path)
+        if not lines:
             continue
-        try:
-            with open(f, encoding="utf-8") as fh:
-                lines = fh.read().splitlines()
-        except OSError:
-            continue
-        rel = os.path.relpath(f, root)
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
         chunks.extend(_chunk_file(lines, rel))
     return chunks
+
+
+def _excerpt(chunk: Chunk, query: str) -> tuple[str, int]:
+    """返回与查询 token 重合度最高的真实行及其在记录中的行号。"""
+    query_tokens = set(tokenize(query))
+    lines = chunk.text.splitlines() or [""]
+    index, line = max(enumerate(lines),
+                      key=lambda item: len(query_tokens & set(tokenize(item[1]))))
+    return line, chunk.start_line + index
 
 
 # ============================================================
@@ -204,7 +211,8 @@ class TfidfBackend:
         tf: dict[str, int] = {}
         for t in q_toks:
             tf[t] = tf.get(t, 0) + 1
-        q_weights = {t: c * self._idf[t] for t, c in tf.items() if t in self._idf}
+        q_weights = {t: c * self._idf[t] for t, c in tf.items()
+                     if t in self._idf and (len(t) > 1 or len(q_toks) == 1)}
         q_norm = math.sqrt(sum(w * w for w in q_weights.values()))
         if q_norm == 0:
             return []
@@ -217,13 +225,15 @@ class TfidfBackend:
         top = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
         out: list[dict] = []
         for i, sim in top[:min(k, len(self.chunks))]:
-            if sim <= 0:
+            if sim < MIN_RAG_SCORE:
                 continue
             c = self.chunks[i]
+            content, hit_line = _excerpt(c, query)
             out.append({
                 "file": c.file,
-                "line": c.start_line,
-                "content": c.text.splitlines()[0] if c.text else "",
+                "line": hit_line,
+                "end_line": c.end_line,   # 供 dispatcher 按行范围去重
+                "content": content,
                 "context": c.text.splitlines(),
                 "score": round(sim, 4),
                 "title": c.title,
@@ -257,26 +267,38 @@ class EmbeddingBackend:
     def build(self) -> None:
         if not self._available:
             return
-        self._model = self._SentenceTransformer(self.model_name)
-        self._vectors = self._model.encode([_doc_text(c) for c in self.chunks],
-                                           normalize_embeddings=True)
+        try:
+            self._model = self._SentenceTransformer(self.model_name)
+            self._vectors = self._model.encode([_doc_text(c) for c in self.chunks],
+                                               normalize_embeddings=True)
+        except Exception as e:
+            # 模型加载/编码失败（如首次需下载而无网络、模型缓存损坏）：
+            # 降级为不可用——RagSearch._ensure_index 会据此回退 TF-IDF。
+            # 可诊断：stderr 告警，不静默吞错
+            print(f"⚠️ 警告: embedding 模型加载失败，回退 TF-IDF 后端: {e}",
+                  file=sys.stderr)
+            self._available = False
+            self._model = None
+            self._vectors = None
 
     def search(self, query: str, k: int = 5) -> list[dict]:
-        import numpy as np  # 惰性
         if not self._available or self._model is None:
             return []
+        import numpy as np  # 惰性（守卫在前：后端不可用时不需要 numpy）
         qv = self._model.encode([query], normalize_embeddings=True)[0]
         sims = self._vectors @ qv
         order = np.argsort(-sims)[:min(k, len(self.chunks))]
         out = []
         for i in order:
             score = float(sims[i])
-            if score <= 0:
+            if score < MIN_RAG_SCORE:
                 continue
             c = self.chunks[i]
+            content, hit_line = _excerpt(c, query)
             out.append({
-                "file": c.file, "line": c.start_line,
-                "content": c.text.splitlines()[0] if c.text else "",
+                "file": c.file, "line": hit_line,
+                "end_line": c.end_line,   # 供 dispatcher 按行范围去重
+                "content": content,
                 "context": c.text.splitlines(),
                 "score": round(score, 4), "title": c.title, "source": "rag",
             })
@@ -290,26 +312,37 @@ class RagSearch:
     """RAG 检索统一入口。优先 embedding 后端，回退 TF-IDF。"""
 
     def __init__(self, kb_root: str | None = None, model_name: str | None = None):
-        self.kb_root = os.path.abspath(kb_root or DEFAULT_KB_ROOT)
+        self.kb_root = resolve_kb_root(kb_root)
         self.model_name = model_name
         self._chunks: list[Chunk] | None = None
         self._backend: TfidfBackend | EmbeddingBackend | None = None
+        self._index_lock = threading.RLock()
 
     def _ensure_index(self) -> None:
         if self._backend is not None:
             return
-        if self._chunks is None:
-            self._chunks = build_chunks(self.kb_root)
-        # 优先 embedding
-        emb = EmbeddingBackend(self._chunks, self.model_name or "paraphrase-multilingual-MiniLM-L12-v2")
-        if emb.is_available():
-            emb.build()
-            self._backend = emb
-        else:
-            # 回退 TF-IDF（numpy）
-            tfidf = TfidfBackend(self._chunks)
-            tfidf.build()
-            self._backend = tfidf
+        with self._index_lock:
+            if self._backend is not None:
+                return
+            if self._chunks is None:
+                self._chunks = build_chunks(self.kb_root)
+            # 优先 embedding；build 失败（模型加载异常）会自我标记不可用，
+            # 此处再兜一层：不自守的后端异常也不得让检索崩溃——回退 TF-IDF
+            emb = EmbeddingBackend(self._chunks, self.model_name or "paraphrase-multilingual-MiniLM-L12-v2")
+            built_ok = False
+            if emb.is_available():
+                try:
+                    emb.build()
+                    built_ok = True
+                except Exception as e:
+                    print(f"⚠️ 警告: embedding 后端构建异常，回退 TF-IDF 后端: {e}",
+                          file=sys.stderr)
+            if built_ok and emb.is_available():
+                self._backend = emb
+            else:
+                tfidf = TfidfBackend(self._chunks)
+                tfidf.build()
+                self._backend = tfidf
 
     def is_available(self) -> bool:
         """是否可用于检索。
@@ -337,14 +370,9 @@ class RagSearch:
 # ============================================================
 # 模块级便捷函数
 # ============================================================
-_default: RagSearch | None = None
-
-
 def _get_default() -> RagSearch:
-    global _default
-    if _default is None:
-        _default = RagSearch()
-    return _default
+    from .dispatcher import _default_rag
+    return _default_rag(None)
 
 
 def is_available() -> bool:

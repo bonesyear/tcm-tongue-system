@@ -31,6 +31,8 @@ Grep 主路径 + 别名词典静态映射 + 可选 RAG 语义补充。
 安全提示：
   - search()/search_and() 接受**原始正则**，不受信输入
     （用户/LLM 生成的字符串）请一律走 retrieve()（内部 re.escape）。
+  - retrieve() 层统一**大小写不敏感**（ASCII 词）；search()/search_and()
+    作为原始正则接口保持默认大小写敏感。
   - kb_root 参数与 TCM_KB_ROOT 环境变量是**部署配置**，不应来自用户
     输入——指向任意目录即可读出其中全部 .md 文件内容。
 
@@ -60,6 +62,37 @@ from .dispatcher import (
     retrieve_and,
     GREP_MIN_HITS,
 )
+from .kb_status import (
+    KB_CATEGORY_DEFS,
+    inspect_kb,
+    inspect_kb_categories,
+    kb_category_root,
+    kb_env_key,
+    kb_disabled_key,
+    kb_legacy_root,
+)
+
+
+def invalidate_kb_caches(kb_root=None):
+    """知识库被外部替换后，清除该根的词典、文件和 RAG 缓存。"""
+    import os
+    from . import dispatcher, grep_search, synonym_loader
+    from .kb_paths import kb_map_path, resolve_kb_root
+
+    root = resolve_kb_root(kb_root)
+    with synonym_loader._CACHE_LOCK:
+        synonym_loader._CACHE.pop(kb_map_path(root), None)
+    with dispatcher._RAG_CACHE_LOCK:
+        dispatcher._RAG_CACHE.pop(root, None)
+    with grep_search._FILE_CACHE_LOCK:
+        for path in list(grep_search._FILE_CACHE):
+            try:
+                inside = os.path.commonpath((root, path)) == root
+            except ValueError:
+                inside = False
+            if inside:
+                grep_search._FILE_CACHE.pop(path, None)
+
 
 __all__ = [
     "retrieve",
@@ -75,5 +108,13 @@ __all__ = [
     "RagSearch",
     "is_rag_available",
     "rag_search",
+    "invalidate_kb_caches",
+    "inspect_kb",
+    "inspect_kb_categories",
+    "kb_category_root",
+    "kb_env_key",
+    "kb_disabled_key",
+    "kb_legacy_root",
+    "KB_CATEGORY_DEFS",
     "GREP_MIN_HITS",
 ]

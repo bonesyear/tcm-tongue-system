@@ -34,8 +34,27 @@ def from_coverage(dimensions_covered: int) -> ConfidenceLevel:
 
     1 维 → LOW；2-3 维 → MEDIUM；4-6 维 → HIGH。
     不足 1 维按 LOW；超过 6 维封顶 HIGH。
+
+    输入契约（B02 收紧，行为一致且可诊断）：只接受 int 或 None。
+      - None = 「无覆盖信息」，fail-closed 按 0 维 → LOW（行为不变）；
+      - 其余类型（str / float / bool / 容器等）一律抛 TypeError，
+        消息含肇事函数名、收到的类型与值及纠正指引——此前
+        ``int(dimensions_covered or 0)`` 会静默截断 3.7→3、
+        对 "3" 放行而对 "abc" 抛文案含糊的 ValueError、把 True 当 1 维，
+        同一类错误三种行为，且都无声地影响安全边界判定。
     """
-    n = int(dimensions_covered or 0)
+    if dimensions_covered is None:
+        n = 0
+    elif (isinstance(dimensions_covered, bool)
+          or not isinstance(dimensions_covered, int)):
+        raise TypeError(
+            "from_coverage 只接受 int（已覆盖维度数）或 None；收到 "
+            f"{type(dimensions_covered).__name__}: {dimensions_covered!r}。"
+            "请勿传浮点/字符串/布尔——浮点会被静默截断，"
+            "安全边界不接受含糊输入，请显式转成 int。"
+        )
+    else:
+        n = dimensions_covered
     if n <= 1:
         return ConfidenceLevel.LOW
     if n <= 3:

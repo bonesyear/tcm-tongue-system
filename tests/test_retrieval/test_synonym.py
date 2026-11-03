@@ -9,18 +9,18 @@ from src.retrieval.synonym_loader import (
     expand_many,
     load_map,
     _parse_simple_yaml,
-    DEFAULT_MAP_PATH,
 )
+from src.retrieval.kb_paths import kb_map_path
 
 
 # ============================================================
 # load_map
 # ============================================================
 class TestLoadMap:
-    def test_loads_real_map(self):
+    def test_loads_fixture_map(self):
         m = load_map()
         assert isinstance(m, dict)
-        assert len(m) > 10  # 实际 72 个键
+        assert len(m) > 10  # 独立合成映射，不依赖私有知识库
 
     def test_known_key_has_verified_targets(self):
         m = load_map()
@@ -36,7 +36,7 @@ class TestLoadMap:
         except ImportError:
             # 没装 PyYAML 时，load_map 本就走手写路径，无需对比
             return
-        with open(DEFAULT_MAP_PATH, encoding="utf-8") as f:
+        with open(kb_map_path(), encoding="utf-8") as f:
             text = f.read()
         assert load_map() == _parse_simple_yaml(text)
 

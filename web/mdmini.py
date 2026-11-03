@@ -35,7 +35,8 @@ def render(md: str) -> str:
                 block.append(lines[i].strip())
                 i += 1
             rows = [[c.strip() for c in r.strip("|").split("|")] for r in block]
-            rows = [r for r in rows if not all(set(c) <= set("-: ") for c in r)]
+            if len(rows) > 1 and all(re.fullmatch(r":?-{3,}:?", c) for c in rows[1]):
+                rows.pop(1)
             if rows:
                 head, body = rows[0], rows[1:]
                 out.append("<table><thead><tr>"
@@ -76,12 +77,24 @@ def render(md: str) -> str:
             out.append("<ul>" + "".join(
                 f"<li>{_inline(html.escape(t))}</li>" for t in items) + "</ul>")
             continue
-        if re.match(r"^\d+\.\s+", line):
+        match = re.match(r"^(\d+)\.\s+", line)
+        if match:
+            start = int(match.group(1))
             items = []
-            while i < len(lines) and re.match(r"^\d+\.\s+", lines[i].rstrip()):
-                items.append(re.sub(r"^\d+\.\s+", "", lines[i].rstrip()))
-                i += 1
-            out.append("<ol>" + "".join(
+            while i < len(lines):
+                if re.match(r"^\d+\.\s+", lines[i].rstrip()):
+                    items.append(re.sub(r"^\d+\.\s+", "", lines[i].rstrip()))
+                    i += 1
+                    continue
+                next_item = i
+                while next_item < len(lines) and not lines[next_item].strip():
+                    next_item += 1
+                if next_item < len(lines) and re.match(r"^\d+\.\s+", lines[next_item]):
+                    i = next_item
+                    continue
+                break
+            start_attr = f' start="{start}"' if start != 1 else ""
+            out.append(f"<ol{start_attr}>" + "".join(
                 f"<li>{_inline(html.escape(t))}</li>" for t in items) + "</ol>")
             continue
         out.append(f"<p>{_inline(html.escape(line))}</p>")

@@ -40,7 +40,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     c.post("/demo")  # 确保记录存在（fixture 同名覆盖也无妨）
     return c
 
@@ -51,7 +51,7 @@ def _fixture_overview():
 
 
 def test_pattern_overview_aggregates_fixture():
-    """fixture 阳性体征聚为 水/血/火/气 四倾向，分值降序，出处注记随行。"""
+    """fixture 聚类保持医学映射不变，页面注记只称内置规则。"""
     ov = _fixture_overview()
     assert ov["positive_n"] == 8
     names = [d["name"] for d in ov["directions"]]
@@ -60,8 +60,9 @@ def test_pattern_overview_aggregates_fixture():
     water_signs = {(e["dim"], e["label"], e["s"]) for e in ov["directions"][0]["signs"]}
     assert ("舌诊", "形态", 7) in water_signs
     blood = ov["directions"][1]
-    assert any(e["label"] == "面色" and e["v"] == "晦暗" and "KB L97" in e["note"]
+    assert any(e["label"] == "面色" and e["v"] == "晦暗" and "内置规则" in e["note"]
                for e in blood["signs"])
+    assert all("KB L" not in e["note"] for d in ov["directions"] for e in d["signs"])
     # 皮肤干燥（2 分）四证刻意未映射——positive_n 不含它（宁缺毋滥）
     all_labels = [e["label"] for d in ov["directions"] for e in d["signs"]]
     assert "干燥" not in all_labels
@@ -91,6 +92,23 @@ def test_pattern_overview_all_zero_is_empty():
     ov = local_report.build_pattern_overview(rec)
     assert ov["directions"] == [] and ov["positive_n"] == 0
     assert ov["constitution"] is None and ov["diet"] == []
+
+
+def test_pattern_overview_and_page_list_unknown(client, data_root):
+    rec = _rec({"body": {"color": "无法判读的描述"}})
+    ov = local_report.build_pattern_overview(rec)
+
+    assert ov["directions"] == []
+    assert ov["unknowns"] == [{"dim": "舌诊", "label": "颜色", "v": "无法判读的描述"}]
+
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), "w", encoding="utf-8") as f:
+        json.dump(rec.raw, f, ensure_ascii=False)
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "未知/待复核" in html
+    assert "无法判读的描述" in html
+    assert "未知/待复核不等于未见异常" in html
+    assert "已采集项目未见阳性倾向" not in html
 
 
 def _rec(obs_tongue=None, **extra_dims):
@@ -186,11 +204,23 @@ def test_detail_local_mode_replaces_report_cards(client, tmp_path):
     assert "本地规则引擎" in html and "不是辨证结论" in html
     assert "体质格局倾向" in html and "正邪观" in html and "津液观" in html
     assert "水证倾向" in html and "血证倾向" in html
-    assert "偏胖大" in html and "KB L50" in html  # 证据行带出处注记
-    assert "饮食宜忌方向" in html and "甘淡利湿" in html
+    assert "偏胖大" in html and "内置规则" in html
+    assert "KB L50" not in html and "diet-therapy.md" not in html
+    assert "饮食宜忌方向（内置规则，非当前知识库引用）" in html
+    assert "甘淡利湿" in html
     assert "明日问诊优先项" in html and "口渴？" in html
     assert "辨证报告·提要" not in html and "辨证报告·全案" not in html
     assert 'id="btn-report"' not in html
+
+
+def test_empty_record_does_not_claim_no_positive(client, data_root):
+    rec = _rec(None)
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), "w", encoding="utf-8") as f:
+        json.dump(rec.raw, f, ensure_ascii=False)
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "暂无已采集观察；未覆盖不等于未见异常" in html
+    assert "已采集项目未见阳性倾向" not in html
 
 
 def test_detail_llm_mode_keeps_cards(tmp_path, data_root, monkeypatch):
@@ -203,7 +233,7 @@ def test_detail_llm_mode_keeps_cards(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     c.post("/demo")
     html = c.get("/record/2026-06-25").get_data(as_text=True)
     assert "辨证报告·提要" in html

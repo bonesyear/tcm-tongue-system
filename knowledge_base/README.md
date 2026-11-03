@@ -1,34 +1,27 @@
-# 中医望诊知识库
+# 知识库配置说明
 
-本目录存放中医著作提炼后的结构化知识，供辨证模型（OpenAI 兼容，可插拔）加载使用，
-并作为 `src/retrieval/` 混合检索（Grep + 同义词 + RAG）的语料库。
+公开仓库不再附带原结构化知识库、整理/衍生笔记或别名词典。这里仅保留配置说明，不是替代知识库，也不会生成检索证据。
 
-## 目录结构
+## 私有知识库
 
-```
-knowledge_base/
-├── README.md                                    ← 本文件
-├── synonym_map.yaml                             ← 临床口语 → 标准术语 别名词典（检索展开用）
-├── diagnostics/
-│   ├── diagnostic-framework.md                  ← 经典经方三观/四证/六病完整辨证框架
-│   ├── smartphone-visual-diagnostics.md          ← 六大拍照维度+十五项问诊→经典经方框架映射
-│   ├── constitution-types.md                    ← 九种体质分类与判定标准
-│   └── tongue-diagnostics-textbook.md           ← 舌诊知识拆解（《中医诊断学》整理笔记）
-├── formulas/
-│   ├── formula-system.md                         ← 方机体系/治法法则/药证/选方逻辑
-│   └── decoction-methods.md                      ← 煎服法纲要（常规煎法/特殊煎法四类/将息法/剂型换算）
-├── diet-lifestyle/
-│   └── diet-therapy.md                          ← 食疗方案（四气五味+忌口）
+完整内容已保存在仓库外的私有目录，原版权说明保持不变。公私分离不等于取得公开再分发授权，也不改变既有公开历史。
+
+使用现有 `TCM_KB_ROOT` 指向你**有权使用的私有知识库目录**：
+
+```bash
+# Linux / macOS 示例
+export TCM_KB_ROOT=/absolute/path/to/private-kb
+
+# Windows 示例：请在系统环境变量或项目 .env 中配置绝对路径
+# TCM_KB_ROOT=C:\private\knowledge_base
 ```
 
-> ⚠️ 本仓库不含已出版著作的全文内容。如有本地研究用参考文件（已加入 `.gitignore`，不入版本库），请遵守相关版权法规。
+`TCM_KB_ROOT` 是部署配置，不接受网页用户输入。Grep、RAG 和默认别名词典共用此根目录；相对路径按仓库根归一化。不要把私有目录路径、原始引文或笔记重新提交到公开仓库。
 
-## 使用方式
+未配置或目录不存在时，检索按既有降级行为返回空结果或告警，不伪造知识库引用。公开测试使用 `tests/fixtures/knowledge_base/` 中的独立合成资料，不依赖私有内容。
 
-- 辨证：加载 diagnostics/ 和 formulas/ 相关内容作为系统知识上下文。
-- 检索：`from src.retrieval import retrieve` 统一入口（Grep 优先，低命中补 RAG）。
+## 本地 ZIP 导入与自建
 
-## ⚠️ 版权说明
+没有现成知识库时，可按 [`docs/KB_AUTHORING.md`](../docs/KB_AUTHORING.md) 将自己的合法文献整理为 Markdown/YAML，或使用 [`templates/kb/`](../templates/kb/) 的非医学合成模板验证格式。打包 ZIP 后在「设置 → 知识库」导入，不需要在线下载或调用模型。
 
-本仓库知识库文件为基于中医经典学术体系的整理/衍生笔记，仅作个人学习研究用途，
-请勿以任何形式再分发（公开仓库、共享存储、转交他人）。
+每次成功导入只覆盖 `<TCM_DATA_ROOT>/private_kb/` 这份程序管理的副本，再按需写回 `TCM_KB_ROOT`；**不会移动、覆盖或删除上述外部私有目录**。不要把唯一原稿放进导入副本。环境变量锁定时不改 `.env`，现有根继续生效。自定义内容只参与检索与引用，不自动修改医学规则，也不是模型训练。

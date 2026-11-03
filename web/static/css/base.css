@@ -483,7 +483,7 @@ p strong, li strong, td strong { padding: 0 1px; }
 .divider { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
 
 @media (max-width: 760px) {
-  .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; }
+  .grid.cols-2, .grid.cols-3 { grid-template-columns: minmax(0, 1fr); }
   .appbar-inner { flex-wrap: wrap; }
   /* 字段行窄屏仍保持单行三列（徽章/✎ 体积小，84+值+徽章在 360px 也排得下），
      不要拆两行——旧规则假设徽章是网格直接子元素，现 DOM 下会让行动列整列掉行 */

@@ -17,6 +17,35 @@ def test_from_coverage_mapping():
     assert from_coverage(7) is ConfidenceLevel.HIGH
 
 
+def test_from_coverage_none_means_low_fail_closed():
+    """None = 无覆盖信息 → fail-closed 按 0 维 LOW（行为不变，文档化）。"""
+    assert from_coverage(None) is ConfidenceLevel.LOW
+
+
+def test_from_coverage_rejects_non_integer_types():
+    """B02：非法类型一律 TypeError 且信息可诊断（类型 + 值 + 纠正指引）。
+    此前 int(x or 0) 口径不一：float 静默截断、str 有的通有的炸、bool 当 1。"""
+    for bad in ("3", "abc", 3.7, 2.0, True, False, [3], {"n": 3}, (3,)):
+        with pytest.raises(TypeError) as exc_info:
+            from_coverage(bad)
+        msg = str(exc_info.value)
+        assert "from_coverage" in msg           # 指明肇事函数
+        assert type(bad).__name__ in msg        # 指明收到的类型，可诊断
+
+
+def test_from_coverage_does_not_silently_truncate_float():
+    """钉死 B02 核心缺陷：3.7 不得被 int() 静默截断成 3（MEDIUM）。
+    安全边界不接受含糊输入——浮点必须报错让调用方显式决定。"""
+    with pytest.raises(TypeError):
+        from_coverage(3.7)
+
+
+def test_is_consistent_still_uses_from_coverage():
+    """is_consistent 内部走 from_coverage，正常 int 输入行为不变。"""
+    assert C.is_consistent("HIGH", 6) is True
+    assert C.is_consistent("MEDIUM", 2) is True
+
+
 def test_allows_formula_low_false():
     """安全铁律：LOW 置信度不允许给方剂。"""
     assert allows_formula(ConfidenceLevel.LOW) is False

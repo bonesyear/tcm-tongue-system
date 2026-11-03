@@ -76,9 +76,42 @@ def test_dimension_coverage_six(real_record):
     assert real_record.get_covered_dimension_count() == 6
 
 
+def test_declared_normal_placeholder_does_not_cancel_real_observation():
+    """B02：「未拍摄（用户声明正常）」占位不能抵消同维度的真实观察。
+    旧实现 `DECLARED_NORMAL_MARK not in obs.values()` 是"一票否决"——
+    只要维度里任何一个指标带占位标记，整维就算未覆盖，即使同维度
+    其他指标有真实观察值（占位与真实值混合的档案被误降覆盖）。"""
+    from src.record import DECLARED_NORMAL_MARK
+    rec = DailyRecord({
+        "date": "2026-10-23",
+        "observations": {
+            "eye": {"redness": "无", "scleral_jaundice": DECLARED_NORMAL_MARK},
+        },
+    })
+    coverage = rec.get_dimension_coverage()
+    assert coverage[VisionDimension.EYE] is True   # 真实观察在，占位不抵消
+    assert rec.get_covered_dimension_count() == 1
+
+
+def test_declared_normal_placeholder_alone_still_not_covered():
+    """B02 另一半语义：占位本身仍不计覆盖（v1.7.19 约定不变）——
+    维度只有占位标记时仍按未覆盖处理。"""
+    from src.record import DECLARED_NORMAL_MARK
+    rec = DailyRecord({
+        "date": "2026-10-23",
+        "observations": {
+            "eye": {"redness": DECLARED_NORMAL_MARK,
+                    "scleral_jaundice": DECLARED_NORMAL_MARK},
+        },
+    })
+    coverage = rec.get_dimension_coverage()
+    assert coverage[VisionDimension.EYE] is False
+    assert rec.get_covered_dimension_count() == 0
+
+
 def test_inquiry_coverage(real_record):
     asked, total = real_record.get_inquiry_coverage()
-    assert asked == 15 and total == 15
+    assert asked == 15 and total == 17
 
 
 def test_confidence_claimed(real_record):
@@ -116,6 +149,71 @@ def test_shape_a_legacy_key_compat():
     assert head["nose_bleeding"] == "无"
 
 
+def test_shape_a_null_new_key_falls_back_to_legacy_key():
+    """B02：新键值为 null 时旧名回退（vision/diagnosis 同族）。
+    旧实现 `_first_present` 只要新键"存在"就返回其值（None），
+    旧名里的完整数据被静默丢弃。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "vision_analysis": None,
+        "doubao_vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+        "diagnosis": None,
+        "deepseek_diagnosis": {
+            "经方六经辨证": {"核心病机": "旧名辨证"},
+            "方剂建议": {"主方": "旧名方"},
+        },
+    })
+    assert rec.shape == "A"
+    tongue = rec.get_observation(VisionDimension.TONGUE)
+    assert tongue["body_color"] == "淡红"
+    assert rec.get_pattern_differentiation() == {"核心病机": "旧名辨证"}
+    assert rec.get_formula() == {"主方": "旧名方"}
+
+
+def test_formula_null_new_key_falls_back_to_alias():
+    """B02：formula 为 null 时回退别名 formula_adjust /
+    formula_with_dosage（formula 同族）。旧实现首个键存在即返回
+    `raw.get(key) or {}`，null 被吞成 {}，别名里的方剂静默丢失。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "observations": {},
+        "formula": None,
+        "formula_adjust": {"name": "苓桂术甘汤"},
+    })
+    assert rec.get_formula() == {"name": "苓桂术甘汤"}
+    rec2 = DailyRecord({
+        "date": "2026-01-01",
+        "observations": {},
+        "formula_with_dosage": {"name": "桂枝汤"},
+    })
+    assert rec2.get_formula() == {"name": "桂枝汤"}
+
+
+def test_pattern_differentiation_null_falls_back_to_alias():
+    """B02：pattern_differentiation 为 null 时回退别名 pattern_update。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "observations": {},
+        "pattern_differentiation": None,
+        "pattern_update": {"核心病机": "别名辨证"},
+    })
+    assert rec.get_pattern_differentiation() == {"核心病机": "别名辨证"}
+
+
+def test_null_container_without_fallback_stays_empty():
+    """B02 兼容性：null 且无旧名可退时照旧返回空，不抛异常。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "vision_analysis": None,
+        "diagnosis": None,
+        "formula": None,
+    })
+    assert rec.shape == "A"
+    assert not any(rec.get_observation(VisionDimension.TONGUE).values())
+    assert rec.get_pattern_differentiation() == {}
+    assert rec.get_formula() == {}
+
+
 def test_shape_a_new_key_wins_when_both_present():
     """同一记录同时含新旧两键时取新名（钉死"新名优先"规则——
     若被误实现为旧名优先，本测试立即失败）。"""
@@ -137,6 +235,59 @@ def test_shape_a_new_key_wins_when_both_present():
     assert tongue["body_color"] == "淡红"
     assert rec.get_pattern_differentiation() == {"核心病机": "新名辨证"}
     assert rec.get_formula() == {"主方": "新名方"}
+
+
+def test_empty_shell_observations_does_not_shadow_vision_analysis(capsys):
+    """B02：observations 是空壳（None / 全部叶子无内容）且记录含完整
+    vision_analysis 时不得静默遮蔽——旧实现形状探测"observations 键
+    存在即 B"，六维观测全空、覆盖 0/6，完整档案被静默丢弃。
+    现规则：空壳让位给形状 A 解析，并打 stderr 告警说明接管原因。"""
+    vision_a = {"舌诊": {"舌质颜色": "淡红", "舌苔厚薄": "薄白"}}
+    # 空 dict 空壳
+    rec = DailyRecord({"date": "2026-01-01", "observations": {},
+                       "vision_analysis": vision_a})
+    assert rec.shape == "A"
+    assert rec.get_observation(VisionDimension.TONGUE)["body_color"] == "淡红"
+    err = capsys.readouterr().err
+    assert "observations" in err and "空壳" in err and "vision_analysis" in err
+    # None 空壳
+    rec2 = DailyRecord({"date": "2026-01-01", "observations": None,
+                        "vision_analysis": vision_a})
+    assert rec2.shape == "A"
+    assert rec2.get_observation(VisionDimension.TONGUE)["coating_thickness"] == "薄白"
+    assert "空壳" in capsys.readouterr().err
+    # 全空叶子 dict（叶子全为空串/空白）同样是空壳
+    rec3 = DailyRecord({"date": "2026-01-01",
+                        "observations": {"tongue": {"body": {"color": "  "}}},
+                        "vision_analysis": vision_a})
+    assert rec3.shape == "A"
+    assert "空壳" in capsys.readouterr().err
+
+
+def test_nonempty_observations_still_beats_vision_analysis(capsys):
+    """B02 兼容性：非空 observations 的 B > A 优先级不变，且无告警。"""
+    rec = DailyRecord({
+        "date": "2026-01-01",
+        "observations": {"tongue": {"body": {"color": "绛红"}}},
+        "vision_analysis": {"舌诊": {"舌质颜色": "淡红"}},
+    })
+    assert rec.shape == "B"
+    assert rec.get_observation(VisionDimension.TONGUE)["body_color"] == "绛红"
+    assert capsys.readouterr().err == ""
+
+
+def test_shell_observations_without_vision_analysis_stays_b(capsys):
+    """B02 兼容性：空壳 observations 但没有 vision_analysis 可接管时
+    保持形状 B 且静默——含与 C 键混用、纯空壳两种既有形态
+    （test_observations_takes_priority_over_c_keys / 已知形状零告警
+    两条既有测试钉死了该行为，不得回退）。"""
+    rec = DailyRecord({"date": "2026-01-01", "observations": {},
+                       "tongue": {"body_color": "淡红"}})
+    assert rec.shape == "B"
+    assert capsys.readouterr().err == ""
+    rec2 = DailyRecord({"date": "2026-01-01", "observations": None})
+    assert rec2.shape == "B"
+    assert capsys.readouterr().err == ""
 
 
 def test_unknown_shape_warns_and_stays_b(capsys):
@@ -181,7 +332,7 @@ def test_inquiry_coverage_tolerates_dirty_values():
         "observations": {},
         "inquiry_coverage": {"covered": "N/A", "total": None},
     })
-    assert rec.get_inquiry_coverage() == (0, 0)
+    assert rec.get_inquiry_coverage() == (0, 17)
 
 
 def test_malformed_containers_do_not_crash():
@@ -194,7 +345,7 @@ def test_malformed_containers_do_not_crash():
         "diagnosis": "整段文本",
     })
     assert rec.get_covered_dimension_count() == 0
-    assert rec.get_inquiry_coverage() == (0, 0)
+    assert rec.get_inquiry_coverage() == (0, 17)
     assert rec.get_formula() == {}
     assert rec.get_pattern_differentiation() == {}
 
@@ -223,6 +374,14 @@ def test_has_formula_content_fallback_scan():
     # 无剂量、无方名的描述不算方剂内容
     assert has_formula_content({"note": "无"}) is False
     assert has_formula_content({"description": "暂不需要"}) is False
+
+
+def test_has_formula_name_reuses_core_formula_pattern():
+    from src.record import has_formula_name
+    assert has_formula_name('桂枝汤加减') is True
+    assert has_formula_name('小柴胡汤') is True
+    assert has_formula_name('仅记录剂量 9g') is False
+    assert has_formula_name('暂不需要') is False
 
 
 def test_shape_a_body_luster_moisture_path():

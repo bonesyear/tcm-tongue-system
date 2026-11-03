@@ -2,6 +2,17 @@
 {% block title %}拍照向导 · 六维望诊{% endblock %}
 {% block content %}
 <style>
+  #danger-modal {
+    width: min(560px, calc(100vw - 32px)); max-height: 85vh; overflow-y: auto;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-card);
+    background: var(--paper); color: var(--ink); padding: 22px;
+  }
+  #danger-modal:modal { overscroll-behavior: contain; }
+  #danger-modal::backdrop {
+    background: rgba(46, 42, 35, .45); overflow: hidden; overscroll-behavior: contain;
+  }
+  #danger-change:empty { visibility: hidden; }
+  .danger-choice { gap: 8px; margin: 8px 0 12px; }
   .capture-zone {
     border: 2px dashed var(--line-strong); border-radius: var(--radius-card);
     background: var(--card-sunken); min-height: 220px; display: flex;
@@ -10,6 +21,9 @@
     transition: border-color .15s, background .15s; overflow: hidden;
   }
   .capture-zone:hover { border-color: var(--cinnabar); background: #f8f2e8; }
+  .capture-zone:focus-within { outline: 2px solid var(--cinnabar); outline-offset: 3px; }
+  .capture-zone[aria-busy="true"] { cursor: wait; opacity: .65; }
+  #file-input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
   .capture-zone svg { opacity: .55; }
   .capture-zone img { width: 100%; height: 100%; object-fit: cover; }
   .capture-zone.done { border-style: solid; border-color: var(--sev-0); }
@@ -77,6 +91,12 @@
   <h1 class="page-title">拍照向导</h1>
   <p class="page-sub num">{{ state.date }} · 一步一个部位，全部数据仅存本机</p>
 </div>
+
+{% if resumed %}
+<div class="alert-note">已恢复 {{ state.date }} 的未完成草稿，后续操作和提交仍归入该日。<a href="/wizard?new=1">改从 {{ server_date }} 新建</a>。</div>
+{% endif %}
+<div class="alert-note" id="date-warning" style="display:none;"></div>
+<div id="wizard-alert" style="display:none;" aria-live="assertive"></div>
 
 {% if state.existing %}
 <div class="alert-note">
@@ -147,6 +167,29 @@
   </div>
 </div>
 
+<details class="card" id="context-card">
+  <summary>补充最小上下文（可选）</summary>
+  <p class="faint" style="font-size:12.5px;">只用于本次望诊，不要求收齐；不收集姓名、证件号、精确出生日期、住址或联系方式。</p>
+  <form method="post" action="/wizard/context">
+    <input type="hidden" name="date" value="{{ state.date }}">
+    {% if context_error %}<div class="alert-danger">{{ context_error }}</div>{% endif %}
+    {% for field in context_spec %}
+    <div style="margin:9px 0;">
+      <label for="ctx-{{ field.key }}">{{ field.label }}</label>
+      {% if field.options %}
+      <select id="ctx-{{ field.key }}" name="{{ field.key }}">
+        <option value="">未提供</option>
+        {% for option in field.options %}<option value="{{ option }}" {% if state.context.get(field.key) == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <input id="ctx-{{ field.key }}" name="{{ field.key }}" type="text" maxlength="300" autocomplete="off" value="{{ state.context.get(field.key, '') }}">
+      {% endif %}
+    </div>
+    {% endfor %}
+    <button class="btn btn-subtle btn-sm" type="submit">保存上下文</button>
+  </form>
+</details>
+
 <div class="card">
   <div class="card-head">
     <h2 id="step-title"></h2>
@@ -157,7 +200,7 @@
 
   <div class="grid cols-2" style="align-items:start;">
     <label class="capture-zone" id="capture">
-      <input type="file" id="file-input" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="file-input" accept="image/*" capture="environment" aria-label="选择或拍摄当前部位照片">
       <span id="capture-inner" style="display:contents;">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
           <rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.6"/><path d="M8.5 7l1.2-2.4h4.6L15.5 7"/></svg>
@@ -178,6 +221,25 @@
     <div class="obs-preview" id="obs-preview"></div>
   </div>
 
+  <div class="row wrap" style="gap:8px; font-size:12.5px; margin-top:10px;">
+    <label for="capture-method">采集方式</label>
+    <select id="capture-method">
+      <option value="manual">人工/肉眼录入</option>
+      <option value="palpation">人工触诊</option>
+      <option value="inquiry">问诊/自陈</option>
+      <option value="measurement">有比例尺测量</option>
+      <option value="video">视频/动态观察</option>
+    </select>
+    <label for="has_scale" id="scale-label"><input id="has_scale" type="checkbox" value="1">有可靠比例尺（舌底）</label>
+    <label for="lid-exposed" id="lid-label"><input id="lid-exposed" type="checkbox" value="1">已暴露下睑结膜（眼部）</label>
+    <label for="evidence-kind" id="kind-label">证据类型</label>
+    <select id="evidence-kind">
+      <option value="">普通部位照片</option>
+      <option value="clothing">衣物证据（黄汗）</option>
+    </select>
+  </div>
+  <p class="faint" style="font-size:12px;">凹陷须触诊/自陈；黄汗须问诊或衣物证据；下睑未暴露不计覆盖。测量值须带单位（如 3mm）。</p>
+
   <div id="manual-box" style="display:none; margin-top:12px;">
     <div class="muted" style="font-size:12.5px; letter-spacing:.12em; margin-bottom:6px; font-family:var(--font-serif);">手动录入（肉眼判断，逐项选择；留空 = 未检出，再点一次选中项 = 撤销）</div>
     <div id="manual-danger" class="alert-danger" style="display:none; margin-bottom:8px;"></div>
@@ -192,10 +254,12 @@
     <span class="spacer"></span>
     <button class="btn btn-ghost btn-sm" id="skip-normal">跳过（声明正常）</button>
     <button class="btn btn-ghost btn-sm" id="skip-uncovered">跳过（未覆盖）</button>
+    <button class="btn btn-ghost btn-sm" id="skip-refused">拒绝拍摄</button>
+    <button class="btn btn-ghost btn-sm" id="skip-unavailable">无法拍摄</button>
   </div>
   <p class="skip-hint" style="margin:10px 2px 0;">
-    「声明正常」= 未拍摄但确认无异常，计入覆盖度；「未覆盖」= 未拍摄且无法确认，该维度不计分。
-    两种跳过都会在记录中明确标注，不会伪造观察值。
+    「声明正常」= 未拍摄但用户声明无异常，仅作声明，不计真实观察覆盖；「未覆盖」= 未拍摄且无法确认，该维度不计分。
+    拒绝拍摄与无法拍摄也分别记录为声明，均不写入观察值。
   </p>
 </div>
 
@@ -207,31 +271,43 @@
   </div>
 </div>
 
-<!-- 危险信号拦截弹层 -->
-<div class="overlay" id="danger-modal" style="display:none;">
-  <div class="modal">
-    <div class="alert-danger" style="margin-bottom:14px;">
-      <svg class="seal-mini" width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
-        <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
-        <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="22" font-weight="700" fill="#fff8f3">警</text>
-      </svg>
-      <div>
-        <strong>安全红线触发</strong>
-        <div style="font-size:13.5px; margin-top:2px;" id="danger-list"></div>
-      </div>
-    </div>
-    <p class="muted" style="font-size:13px; margin:10px 0 0;">
-      {% if manual_mode %}录入值可能有误。请先逐项复核；确认无误请选择保留警示，误判请选择修正。{% else %}模型判读可能误判。请先肉眼复核照片与实际情况；确认无误请选择保留警示，误判请选择修正。{% endif %}
-    </p>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="danger-fix">误判，去修正观察值</button>
-      <button class="btn btn-primary" id="danger-keep">已肉眼复核，保留警示</button>
+<!-- 危险信号拦截弹层：默认保留；误报逐键裁决并留审计 -->
+<dialog id="danger-modal" aria-labelledby="danger-title" aria-describedby="danger-help">
+  <div class="alert-danger" style="margin-bottom:14px;">
+    <svg class="seal-mini" width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="3" y="3" width="42" height="42" rx="7" fill="#b0442a"/>
+      <text x="24" y="33" text-anchor="middle" font-family="'Songti SC','SimSun',serif" font-size="22" font-weight="700" fill="#fff8f3">警</text>
+    </svg>
+    <div>
+      <h2 id="danger-title" style="font-size:17px; margin:0;">安全预警复核（筛查不等于确诊）</h2>
+      <div style="font-size:13.5px; margin-top:2px;" id="danger-list"></div>
     </div>
   </div>
-</div>
+  <p class="muted" id="danger-help" style="font-size:13px; margin:10px 0 0;">
+    {% if manual_mode %}请先逐项复核录入值。默认保留警示；只有确认该项为误报时才改为误报，原始值和裁决都会保留。{% else %}请先肉眼复核照片与实际情况。默认保留警示；只有确认该项为误报时才改为误报，原始值和裁决都会保留。{% endif %}
+  </p>
+  <p id="danger-change" role="status" aria-live="polite" style="min-height:1.5em;"></p>
+  <div class="modal-actions">
+    <button class="btn btn-ghost" id="danger-fix" type="button">返回修改观察/问诊</button>
+    <button class="btn btn-primary" id="danger-keep" type="button" autofocus>确认裁决并提交</button>
+  </div>
+</dialog>
 
+<script src="{{ url_for('static', filename='js/feedback.js') }}"></script>
 <script>
 var STATE = {{ state | tojson }};
+var SERVER_DATE = {{ server_date | tojson }};
+(function () {
+  var now = new Date();
+  var localDate = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"),
+                   String(now.getDate()).padStart(2, "0")].join("-");
+  if (localDate !== SERVER_DATE) {
+    var warning = document.getElementById("date-warning");
+    warning.textContent = "服务器日期为 " + SERVER_DATE + "，本机日期为 " + localDate +
+      "；本次会话记录将存为 " + STATE.date + "。";
+    warning.style.display = "";
+  }
+})();
 var MANUAL_MODE = {{ manual_mode | tojson }};
 var DANGER_FLAGS = {{ danger_flags | tojson }};
 var PARTS = STATE.parts;
@@ -268,7 +344,12 @@ function render() {
     p.status === "observed" ? "✓ 已识图" :
     p.status === "manual" ? "✓ 已手动录入" :
     p.status === "skip_normal" ? "✓ 跳过（声明正常）" :
-    p.status === "skip_uncovered" ? "✓ 跳过（未覆盖）" : "";
+    p.status === "skip_uncovered" ? "✓ 跳过（未覆盖）" :
+    p.status === "refused" ? "✓ 拒绝拍摄" :
+    p.status === "unavailable" ? "✓ 无法拍摄" : "";
+  document.getElementById("scale-label").style.display = p.part === "舌底" ? "" : "none";
+  document.getElementById("lid-label").style.display = p.part === "目" ? "" : "none";
+  document.getElementById("kind-label").style.display = p.part === "皮肤" ? "" : "none";
   /* 手动模式：隐藏拍照区/拍摄纪律/指南链接，显示手动录入卡 */
   document.getElementById("capture").style.display = MANUAL_MODE ? "none" : "";
   document.getElementById("tips").closest("div").style.display = MANUAL_MODE ? "none" : "";
@@ -334,6 +415,22 @@ function renderManual(p) {
         chips.appendChild(c);
       });
       v.appendChild(chips);
+      if (m.ind === "sublingual_thickness") {
+        var measurement = document.createElement("input");
+        measurement.value = curVal;
+        measurement.placeholder = "增粗/怒张，或 3mm";
+        measurement.maxLength = 20;
+        measurement.setAttribute("aria-label", m.label + "（枚举或毫米测量值）");
+        var saveMeasurement = document.createElement("button");
+        saveMeasurement.type = "button";
+        saveMeasurement.className = "btn btn-subtle btn-sm";
+        saveMeasurement.textContent = "保存测量值";
+        saveMeasurement.addEventListener("click", function () {
+          manualSave(p, path, m.ind, measurement.value);
+        });
+        v.appendChild(measurement);
+        v.appendChild(saveMeasurement);
+      }
     } else {
       var wrap = document.createElement("div");
       wrap.className = "row";
@@ -357,24 +454,39 @@ function renderManual(p) {
   });
 }
 
+function captureMethod() {
+  return document.getElementById("capture-method").value;
+}
+function captureEvidence() {
+  return {
+    has_scale: document.getElementById("has_scale").checked,
+    exposed: document.getElementById("lid-exposed").checked,
+    kind: document.getElementById("evidence-kind").value
+  };
+}
+
 function manualSave(p, path, ind, value) {
   value = (value || "").trim();
-  postJSON("/wizard/manual", {part: p.part, indicator: ind, value: value})
+  postJSON("/wizard/manual", {
+    part: p.part, indicator: ind, value: value,
+    method: captureMethod(), evidence: captureEvidence()
+  })
     .then(function (d) {
-      if (!d.ok) { alert(d.error || "保存失败"); return; }
+      if (!d.ok) { showError(d.error || "保存失败"); return; }
       if (!p.observation) p.observation = {};
-      setPath(p.observation, path, value);  // 空值 = 撤销该项（服务端同步删除叶子键）
+      setPath(p.observation, path, d.observation_meta ? d.observation_meta.value : "");
       p.status = "manual";
       var md = document.getElementById("manual-danger");
       if (d.danger_names && d.danger_names.length) {
-        md.innerHTML = "<strong>⚠ 触发危险信号：" + d.danger_names.join("、") +
-          "</strong>——提交时会出现拦截确认，请逐项复核";
+        var strong = document.createElement("strong");
+        strong.textContent = "⚠ 触发安全复核（非确诊）：" + d.danger_names.join("、");
+        md.replaceChildren(strong, document.createTextNode("——提交时会出现拦截确认，请逐项复核"));
         md.style.display = "";
       } else {
         md.style.display = "none";
       }
       render();
-    });
+    }).catch(showError);
 }
 
 var inquiryAnswered = {{ (state.inquiry | length > 0) | tojson }};
@@ -410,8 +522,9 @@ function setPath(obj, path, val) {
 function showReviewDanger(names) {
   var box = document.getElementById("review-danger");
   if (!names || !names.length) { box.style.display = "none"; return; }
-  box.innerHTML = "<strong>⚠ 触发危险信号：" + names.join("、") +
-    "</strong>——提交时会出现拦截确认，请逐项肉眼复核";
+  var strong = document.createElement("strong");
+  strong.textContent = "⚠ 触发安全复核（非确诊）：" + names.join("、");
+  box.replaceChildren(strong, document.createTextNode("——提交时会出现拦截确认，请逐项肉眼复核"));
   box.style.display = "";
 }
 
@@ -453,15 +566,19 @@ function mkReviewRow(p, dimEn, r) {
       c.textContent = opt;
       if (r.meta.gloss && r.meta.gloss[opt]) c.title = r.meta.gloss[opt];
       c.addEventListener("click", function () {
-        postJSON("/wizard/field", {part: p.part, indicator: r.meta.ind, value: opt})
+        postJSON("/wizard/field", {
+          part: p.part, indicator: r.meta.ind, value: opt,
+          method: captureMethod(), evidence: captureEvidence()
+        })
           .then(function (d) {
             if (d.ok) {
-              setPath(p.observation, r.path, opt);
-              r.val = opt;
+              var normalized = d.observation_meta ? d.observation_meta.value : "";
+              setPath(p.observation, r.path, normalized);
+              r.val = normalized;
               showReviewDanger(d.danger_names);
               renderReview();
-            } else { alert(d.error || "保存失败"); }
-          });
+            } else { showError(d.error || "保存失败"); }
+          }).catch(showError);
       });
       box.appendChild(c);
     });
@@ -555,9 +672,17 @@ function renderInquiry() {
          化解门禁与退出项死锁）；其余 chip 禁用（含键盘，不只 CSS） */
       if (lockMode && opt !== "没有外感不适") b.disabled = true;
       b.addEventListener("click", function () {
-        postJSON("/wizard/inquiry", {question: q, answer: opt}).then(function (d) {
-          if (d.ok) { delete SKIPS[q]; ANSWERS[q] = opt; inquiryAnswered = true; renderInquiry(); updateNav(); }
-        });
+        b.disabled = true;
+        var answer = ANSWERS[q] === opt ? "" : opt;
+        postJSON("/wizard/inquiry", {question: q, answer: answer}).then(function (d) {
+          if (d.ok) {
+            delete SKIPS[q];
+            if (answer) { ANSWERS[q] = answer; inquiryAnswered = true; }
+            else { delete ANSWERS[q]; inquiryAnswered = Object.keys(ANSWERS).length > 0; }
+            renderInquiry();
+            updateNav();
+          } else { showError(d.error || "保存失败"); }
+        }).catch(showError).finally(function () { b.disabled = false; });
       });
       chips.appendChild(b);
     });
@@ -683,8 +808,10 @@ document.getElementById("inquiry-clear-all").addEventListener("click", function 
       skipBtn.textContent = "全部跳过（不答）";
       renderInquiry();
       updateNav();
+    } else {
+      showError(d.error || "保存失败");
     }
-  });
+  }).catch(showError);
 });
 
 function updateNav() {
@@ -692,76 +819,209 @@ function updateNav() {
   document.getElementById("btn-next").textContent = cur === 7 ? "到最后一步了" : (cur === 6 ? "下一步 · 问诊 ›" : "下一步 · " + PARTS[cur + 1].part + " ›");
   document.getElementById("btn-next").disabled = cur === 7;
   var done = PARTS.filter(function (x) { return x.status !== "pending"; }).length;
+  var uploading = PARTS.some(function (p) { return p.uploading; });
   document.getElementById("progress-text").textContent = "已完成 " + done + " / 7 部位" + (inquiryAnswered ? "，问诊已答" : "");
-  document.getElementById("btn-submit").disabled = done < 7;
+  document.getElementById("btn-submit").disabled = done < 7 || submitting || uploading;
+  var currentUploading = !!(PARTS[cur] && PARTS[cur].uploading);
+  document.getElementById("file-input").disabled = currentUploading || submitting;
+  document.getElementById("capture").setAttribute("aria-busy", String(currentUploading));
+  ["skip-normal", "skip-uncovered", "skip-refused", "skip-unavailable"].forEach(function (id) {
+    document.getElementById(id).disabled = currentUploading || submitting;
+  });
+  document.getElementById("danger-keep").disabled = submitting;
 }
 
 document.getElementById("btn-prev").addEventListener("click", function () { if (cur > 0) { cur--; render(); } });
 document.getElementById("btn-next").addEventListener("click", function () { if (cur < 7) { cur++; render(); } });
 
+function showError(error) {
+  var box = document.getElementById("wizard-alert");
+  box.className = "alert-danger";
+  box.setAttribute("role", "alert");
+  box.textContent = error && error.message ? error.message : String(error);
+  box.style.display = "";
+}
+
+function responseJSON(response) {
+  if (response.type === "opaqueredirect" || response.redirected) {
+    throw new Error("会话已失效，请刷新页面");
+  }
+  if (!(response.headers.get("content-type") || "").includes("application/json")) {
+    throw new Error("服务未返回 JSON（HTTP " + response.status + "），请刷新后重试");
+  }
+  return response.json().then(function (data) {
+    if (!response.ok && !data.need_danger_ack) {
+      throw new Error(data.error || (data.errors || []).join("；") ||
+                    "请求失败（HTTP " + response.status + "）");
+    }
+    return data;
+  });
+}
+
 function postJSON(url, body) {
-  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
-    .then(function (r) { return r.json(); });
+  var payload = Object.assign({date: STATE.date}, body || {});
+  return fetch(url, {method: "POST", redirect: "manual",
+                     headers: {"Content-Type": "application/json"},
+                     body: JSON.stringify(payload)}).then(responseJSON);
 }
 
 document.getElementById("skip-normal").addEventListener("click", function () { skip("normal"); });
 document.getElementById("skip-uncovered").addEventListener("click", function () { skip("uncovered"); });
+document.getElementById("skip-refused").addEventListener("click", function () { skip("refused"); });
+document.getElementById("skip-unavailable").addEventListener("click", function () { skip("unavailable"); });
 function skip(m) {
-  var obs = PARTS[cur].observation;
+  var idx = cur;
+  if (PARTS[idx].uploading || submitting) return;
+  var obs = PARTS[idx].observation;
   var n = obs && typeof obs === "object" ? Object.keys(obs).length : 0;
-  if (n > 0 && !confirm("「" + PARTS[cur].part + "」已录入 " + n + " 组数据，跳过将丢弃它们。确定？")) return;
-  postJSON("/wizard/skip", {part: PARTS[cur].part, mode: m}).then(function (d) {
-    if (d.ok) { PARTS[cur].status = "skip_" + m; PARTS[cur].observation = null; render(); }
-  });
+  if (n > 0 && !confirm("「" + PARTS[idx].part + "」已录入 " + n + " 组数据，跳过将丢弃它们。确定？")) return;
+  postJSON("/wizard/skip", {part: PARTS[idx].part, mode: m}).then(function (d) {
+    if (d.ok) {
+      PARTS[idx].status = m === "normal" || m === "uncovered" ? "skip_" + m : m;
+      PARTS[idx].observation = null;
+      PARTS[idx].observation_meta = {};
+      render();
+    } else {
+      showError(d.error || "保存失败");
+    }
+  }).catch(showError);
 }
 
 document.getElementById("file-input").addEventListener("change", function (e) {
   var file = e.target.files[0];
   if (!file) return;
-  var part = PARTS[cur].part;
-  var statusEl = document.getElementById("step-status");
-  statusEl.textContent = "上传并识图中（视觉模型调用可能需数十秒）…";
+  var idx = cur;
+  if (PARTS[idx].uploading || submitting) return;
+  PARTS[idx].uploading = true;
+  updateNav();
+  document.getElementById("step-status").textContent = "上传并识图中（视觉模型调用可能需数十秒）…";
   var fd = new FormData();
-  fd.append("part", part);
+  fd.append("date", STATE.date);
+  fd.append("part", PARTS[idx].part);
   fd.append("file", file);
-  fetch("/wizard/photo", {method: "POST", body: fd})
-    .then(function (r) { return r.json(); })
+  fd.append("has_scale", document.getElementById("has_scale").checked ? "1" : "");
+  fd.append("exposed", document.getElementById("lid-exposed").checked ? "1" : "");
+  fd.append("evidence_kind", document.getElementById("evidence-kind").value);
+  fetch("/wizard/photo", {method: "POST", redirect: "manual", body: fd})
+    .then(responseJSON)
     .then(function (d) {
       if (d.ok) {
-        PARTS[cur].status = "observed";
-        PARTS[cur].observation = d.observation;
+        PARTS[idx].status = "observed";
+        PARTS[idx].observation = d.observation;
+        PARTS[idx].observation_meta = d.observation_meta || {};
+        var review = [];
         if (d.unmapped && d.unmapped.length) {
-          alert("部分识图字段未识别，已保留在记录 _raw 中：" + d.unmapped.join("、"));
+          review.push("未知字段已保留在记录 _raw 中：" + d.unmapped.join("、"));
         }
+        (d.type_errors || []).forEach(function (error) {
+          review.push("字段「" + error.key + "」：" + error.error +
+                      "；原值已保留在 _raw，未作为已确认观察，请人工复核。");
+        });
+        if (review.length) alert(review.join("\n"));
       } else {
-        alert(d.error || "识图失败");
+        showError(d.error || "识图失败");
       }
-      render();
     })
-    .catch(function (e) { alert("请求失败：" + e); render(); });
-  e.target.value = "";
+    .catch(showError)
+    .finally(function () {
+      PARTS[idx].uploading = false;
+      e.target.value = "";
+      e.target.disabled = false;
+      render();
+    });
 });
 
 var pendingSubmit = null;
-document.getElementById("btn-submit").addEventListener("click", function () { submit(""); });
-function submit(ack) {
-  postJSON("/wizard/submit", {mode: mode, acknowledge: ack}).then(function (d) {
+var submitting = false;
+document.getElementById("btn-submit").addEventListener("click", function () { submit(); });
+function submit(acknowledge) {
+  if (submitting) return;
+  submitting = true;
+  var navigating = false;
+  updateNav();
+  var body = {mode: mode};
+  if (acknowledge !== undefined) {
+    body.acknowledge = acknowledge;
+    body.danger_token = pendingSubmit ? pendingSubmit.danger_token : "";
+  }
+  postJSON("/wizard/submit", body).then(function (d) {
     if (d.ok) {
+      navigating = true;
+      tcmFlashWarnings(d.warnings, d.date);
       location.href = "/record/" + d.date;
     } else if (d.need_danger_ack) {
       pendingSubmit = d;
-      document.getElementById("danger-list").innerHTML = d.danger.map(function (f) {
-        return "<strong>" + f.name + "</strong>" +
-               (f.sign ? "（体征：" + f.sign + "）" : "") + "：" + f.note;
-      }).join("<br>");
-      document.getElementById("danger-modal").style.display = "flex";
+      pendingSubmit.decisions = Object.create(null);
+      var items = d.danger.map(function (f) {
+        pendingSubmit.decisions[f.key] = "keep";
+        var kind = f.state && f.state !== "triggered" ? "历史/外部标记，需复核" :
+          (f.kind === "critical_rule" ? "组合危重规则，请立即线下评估" : "单项/部分证据筛查，非确诊");
+        var item = document.createElement("div");
+        var strong = document.createElement("strong");
+        strong.textContent = f.name;
+        item.appendChild(strong);
+        item.appendChild(document.createTextNode("（" + kind + "）"));
+        [["规则体征：", f.sign],
+         ["已见：", (f.matched_clauses || []).join("、")],
+         ["还缺：", (f.missing_clauses || []).join("、")],
+         ["", f.note]].forEach(function (entry) {
+          if (!entry[1]) return;
+          item.appendChild(document.createElement("br"));
+          item.appendChild(document.createTextNode(entry[0] + entry[1]));
+        });
+        var group = document.createElement("div");
+        group.className = "row wrap danger-choice";
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", f.name + "的裁决");
+        [["keep", "保留警示"], ["dismiss", "判为误报"]].forEach(function (choice) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-sm " + (choice[0] === "keep" ? "btn-primary" : "btn-ghost");
+          button.textContent = choice[1];
+          button.setAttribute("aria-pressed", choice[0] === "keep" ? "true" : "false");
+          if (choice[0] === "dismiss" && !f.can_dismiss) {
+            button.disabled = true;
+            button.title = "本轮未触及的旧项不能判为误报";
+          }
+          button.addEventListener("click", function () {
+            pendingSubmit.decisions[f.key] = choice[0];
+            group.querySelectorAll("button").forEach(function (other) {
+              var selected = other === button;
+              other.setAttribute("aria-pressed", selected ? "true" : "false");
+              other.className = "btn btn-sm " + (selected ? "btn-primary" : "btn-ghost");
+            });
+          });
+          group.appendChild(button);
+        });
+        item.appendChild(group);
+        if (!f.can_dismiss) {
+          var scopeNote = document.createElement("div");
+          scopeNote.className = "faint";
+          scopeNote.textContent = "本轮未触及的旧项：可保留，不能判为误报。";
+          item.appendChild(scopeNote);
+        }
+        return item;
+      });
+      document.getElementById("danger-list").replaceChildren.apply(
+        document.getElementById("danger-list"), items);
+      document.getElementById("danger-change").textContent = d.error || "";
+      var dialog = document.getElementById("danger-modal");
+      var wasOpen = dialog.open;
+      if (!wasOpen) dialog.showModal();
+      else document.getElementById("danger-keep").focus({preventScroll: true});
     } else {
-      alert(d.error || (d.errors || []).join("；") || "提交失败");
+      showError(d.error || (d.errors || []).join("；") || "提交失败");
     }
+  }).catch(showError).finally(function () {
+    if (!navigating) { submitting = false; updateNav(); }
   });
 }
-document.getElementById("danger-keep").addEventListener("click", function () { submit("keep"); });
-document.getElementById("danger-fix").addEventListener("click", function () { submit("fix"); });
+document.getElementById("danger-keep").addEventListener("click", function () {
+  if (pendingSubmit) submit(pendingSubmit.decisions);
+});
+document.getElementById("danger-fix").addEventListener("click", function () {
+  document.getElementById("danger-modal").close();
+});
 
 render();
 </script>

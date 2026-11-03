@@ -15,9 +15,7 @@ import records_store  # noqa: E402
 import wizard_store  # noqa: E402
 from app import create_app  # noqa: E402
 
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d494844520000000100000001080600000"
-    "01f15c4890000000d4944415478da63fc3f40401f0005fb018a845d3d")
+from test_web_wizard import PNG
 ALL_PARTS = [p["part"] for p in wizard_store.PARTS]
 
 
@@ -35,7 +33,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     return c
 
 
@@ -48,7 +46,7 @@ def _upload(client, part):
 def test_danger_detected_from_observation_text(client, monkeypatch):
     """真实路径可达：识图文本含「焦黑」→ 提交时弹拦截层（无需注入草稿）。"""
     monkeypatch.setattr(wizard_store, "observe_photo",
-                        lambda part, p: ({"舌质颜色": "紫暗", "舌苔": {"颜色": "焦黑"}}, []))
+                        lambda part, p, **options: ({"舌质颜色": "紫暗", "舌苔": {"颜色": "焦黑"}}, []))
     _upload(client, "舌面")
     for part in ALL_PARTS[1:]:
         client.post("/wizard/skip", json={"part": part, "mode": "normal"})
@@ -59,23 +57,26 @@ def test_danger_detected_from_observation_text(client, monkeypatch):
     assert data["danger"][0]["sign"]      # 体征字段不为空
 
 
-def test_danger_fix_exit_moves_flag_out_of_triggered(client, data_root, monkeypatch):
-    """「误判，去修正」：落盘时红线移入 not_triggered（与「保留警示」分岔）。"""
+def test_danger_dismiss_exit_preserves_evidence_and_audit(client, data_root, monkeypatch):
+    """误报单独审计，不把仍存在的观察证据写成未触发。"""
     monkeypatch.setattr(wizard_store, "observe_photo",
-                        lambda part, p: ({"舌质颜色": "紫暗", "舌苔": {"颜色": "焦黑"}}, []))
+                        lambda part, p, **options: ({"舌质颜色": "紫暗", "舌苔": {"颜色": "焦黑"}}, []))
     _upload(client, "舌面")
     for part in ALL_PARTS[1:]:
         client.post("/wizard/skip", json={"part": part, "mode": "normal"})
-    # 先触发拦截再选 fix
     resp = client.post("/wizard/submit", json={"mode": "new"})
     assert resp.get_json()["need_danger_ack"] is True
-    resp = client.post("/wizard/submit", json={"mode": "new", "acknowledge": "fix"})
+    resp = client.post("/wizard/submit", json={
+        "mode": "new", "acknowledge": "fix",
+        "danger_token": resp.get_json()["danger_token"]})
     assert resp.get_json()["ok"] is True
     raw = records_store.load_record(
         os.path.join(data_root, "records", "daily"),
         resp.get_json()["date"]).raw
     assert raw["danger_flags"]["triggered"] == []
-    assert "tongue_critical" in raw["danger_flags"]["not_triggered"]
+    assert "tongue_critical" in raw["danger_flags"]["dismissed"]
+    assert "tongue_critical" not in raw["danger_flags"]["not_triggered"]
+    assert raw["danger_review"][-1]["decision"] == "dismiss"
 
 
 def test_merge_rejects_non_shape_b(client, data_root):
@@ -105,7 +106,7 @@ def test_merge_preserves_existing_extras(client, data_root, monkeypatch):
         json.dump({"date": today, "tags": ["晨起"], "custom_note": "旧注记",
                    "observations": {"tongue": {"body": {"color": "红绛"}}}},
                   f, ensure_ascii=False)
-    _mock = lambda part, p: ({"肤色": "偏淡"}, [])  # noqa: E731
+    _mock = lambda part, p, **options: ({"肤色": "正常"}, [])  # noqa: E731
     monkeypatch.setattr(wizard_store, "observe_photo", _mock)
     _upload(client, "皮肤")
     for part in ALL_PARTS[:-1]:
@@ -115,13 +116,13 @@ def test_merge_preserves_existing_extras(client, data_root, monkeypatch):
     raw = records_store.load_record(daily, today).raw
     assert raw["tags"] == ["晨起"] and raw["custom_note"] == "旧注记"
     assert raw["observations"]["tongue"]["body"]["color"] == "红绛"
-    assert raw["observations"]["skin"]["color"] == "偏淡"
+    assert raw["observations"]["skin"]["color"] == "正常"
 
 
 def test_skip_uncovered_is_marked(client, data_root, monkeypatch):
     """「跳过（未覆盖）」在记录中显式标注（双跳过都留痕）。"""
     monkeypatch.setattr(wizard_store, "observe_photo",
-                        lambda part, p: ({"舌质颜色": "淡红"}, []))
+                        lambda part, p, **options: ({"舌质颜色": "淡红"}, []))
     _upload(client, "舌面")
     client.post("/wizard/skip", json={"part": "舌底", "mode": "uncovered"})
     for part in ALL_PARTS[2:]:
@@ -142,4 +143,4 @@ def test_corrupted_draft_warns_not_silent(tmp_path, capsys):
     draft = wizard_store.load_draft(str(daily), "2026-10-12")
     assert draft["parts"] == {}
     assert "草稿" in capsys.readouterr().err
-    assert os.path.exists(str(daily / ".wizard-2026-10-12.json.corrupt"))
+    assert list(daily.glob(".wizard-2026-10-12.json.*.corrupt"))

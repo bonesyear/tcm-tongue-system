@@ -12,9 +12,16 @@
   .cmp-col .cmp-label { font-size: 12.5px; letter-spacing: .1em; color: var(--ink-2); margin-bottom: 8px; }
   .week-nav { display: flex; align-items: stretch; gap: 8px; }
   .week-nav .tag { display: inline-flex; align-items: center; padding: 5px 14px; font-size: 13px; }
+  @media (max-width: 760px) {
+    .week-header { flex-wrap: wrap; }
+    .week-header > .spacer { display: none; }
+    .week-nav { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .week-nav .tag { grid-column: 1 / -1; grid-row: 1; justify-content: center; }
+    .trend-row { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 
-<div class="row">
+<div class="row week-header">
   <div>
     <h1 class="page-title">趋势</h1>
     <p class="page-sub num">
@@ -23,9 +30,9 @@
   </div>
   <span class="spacer"></span>
   <div class="week-nav">
-    <a class="btn btn-ghost btn-sm" href="/trends?week={{ prev_week }}">‹ 上一周</a>
+    {% if prev_week %}<a class="btn btn-ghost btn-sm" href="/trends?week={{ prev_week }}">‹ 上一周</a>{% endif %}
     <span class="tag cinnabar num">{{ week.week_id if week else "—" }}</span>
-    <a class="btn btn-ghost btn-sm" href="/trends?week={{ next_week }}">下一周 ›</a>
+    {% if next_week %}<a class="btn btn-ghost btn-sm" href="/trends?week={{ next_week }}">下一周 ›</a>{% endif %}
   </div>
 </div>
 
@@ -40,6 +47,16 @@
   {% endif %}
 </div>
 {% else %}
+
+{% if week.unknown_count %}
+<p class="faint" style="font-size:12.5px;">本周 {{ week.unknown_count }} 项评分未知，未按正常 0 分计。</p>
+{% endif %}
+<p class="faint" style="font-size:12.5px;">
+  评分规则：{{ week.scoring_ruleset_version }} · 来源版本：{{ week.rule_versions | join("、") }}{% if week.mixed_rule_versions %}（不同版本混用，按当前规则重算）{% endif %}
+</p>
+<p class="faint" style="font-size:12.5px;">
+  观察汇总与偏离值均为未经验证的界面指标，不作为疾病严重度或处方依据；总分及历史重算结果未获独立医学验证。
+</p>
 
 <div class="card">
   <div class="card-head"><h2>本周摘要</h2></div>
@@ -101,8 +118,20 @@ var WEEK = {{ week | tojson }};
 var SEV_COLORS = ["#b0442a", "#b05e21", "#9a7b2d", "#4d7c58", "#6f6558", "#a2937f"];
 var INK2 = "#6f6558", LINE = "#eae2d2", PAPER_FONT = "'Songti SC','SimSun',serif";
 var DIM_NAMES = Object.keys(WEEK.dim_series);
+var charts = [
+  echarts.init(document.getElementById("chart-dims")),
+  echarts.init(document.getElementById("chart-radar")),
+  echarts.init(document.getElementById("chart-heat"))
+];
+var resizeTimer = null;
+window.addEventListener("resize", function () {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function () {
+    charts.forEach(function (chart) { chart.resize(); });
+  }, 100);
+});
 
-echarts.init(document.getElementById("chart-dims")).setOption({
+charts[0].setOption({
   color: SEV_COLORS,
   grid: { left: 40, right: 16, top: 42, bottom: 28 },
   legend: { top: 2, left: "center", icon: "circle", itemWidth: 9, itemHeight: 9,
@@ -116,10 +145,10 @@ echarts.init(document.getElementById("chart-dims")).setOption({
   }),
 });
 
-echarts.init(document.getElementById("chart-radar")).setOption({
+charts[1].setOption({
   color: ["#a2937f", "#b0442a"],
   legend: { top: 2, left: "center", icon: "circle", itemWidth: 9, itemHeight: 9,
-            itemGap: 14, data: ["周首日", "周末日"], textStyle: { color: INK2, fontSize: 12 } },
+            itemGap: 14, data: [WEEK.radar.first_date, WEEK.radar.last_date], textStyle: { color: INK2, fontSize: 12 } },
   radar: {
     indicator: WEEK.radar.axes.map(function (a) { return { name: a, max: 10 }; }),
     radius: "60%", center: ["50%", "58%"],
@@ -129,8 +158,8 @@ echarts.init(document.getElementById("chart-radar")).setOption({
     axisLine: { lineStyle: { color: LINE } },
   },
   series: [{ type: "radar", data: [
-    { value: WEEK.radar.first, name: "周首日", areaStyle: { opacity: 0.12 } },
-    { value: WEEK.radar.last,  name: "周末日", areaStyle: { opacity: 0.22 } },
+    { value: WEEK.radar.first, name: WEEK.radar.first_date, areaStyle: { opacity: 0.12 } },
+    { value: WEEK.radar.last,  name: WEEK.radar.last_date, areaStyle: { opacity: 0.22 } },
   ]}],
 });
 
@@ -142,7 +171,7 @@ echarts.init(document.getElementById("chart-radar")).setOption({
       if (v !== null && v !== undefined) data.push([d, a, v]);
     });
   });
-  echarts.init(document.getElementById("chart-heat")).setOption({
+  charts[2].setOption({
     grid: { left: 96, right: 24, top: 14, bottom: 64 },
     tooltip: {},
     xAxis: { type: "category", data: WEEK.dates, axisLabel: { color: INK2 }, axisLine: { lineStyle: { color: LINE } } },

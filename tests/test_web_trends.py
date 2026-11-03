@@ -47,7 +47,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     return c
 
 
@@ -58,6 +58,16 @@ def test_trends_renders_week_charts(client):
     assert "chart-dims" in html and "chart-radar" in html and "chart-heat" in html
     assert "本周摘要" in html
     assert "舌诊" in html  # 折线系列名进入嵌入 JSON
+
+
+def test_trends_and_record_mark_scores_as_unvalidated_interface_metrics(client):
+    for path in ("/trends?week=2026-06-25", "/record/2026-06-25"):
+        resp = client.get(path)
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "未经验证的界面指标" in html
+        assert "不作为疾病严重度或处方依据" in html
+        assert "总分及历史重算结果未获独立医学验证" in html
 
 
 def test_trends_empty_week(client):
@@ -219,7 +229,7 @@ def test_trends_all_empty_keeps_original_guidance(tmp_path, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=str(d))
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     html = c.get("/trends?week=2025-01-01").get_data(as_text=True)
     assert "没有任何记录" in html
     assert "去看看" not in html
@@ -293,35 +303,37 @@ def test_report_guard_warns_formula_on_all_zero(tmp_path, monkeypatch):
 
 
 def test_report_includes_kb_refs(client, data_root, monkeypatch):
-    """辨证输入含知识库参考段；报告落 kb_refs 溯源（命中词/文件/行号）。"""
+    """候选条文随输入和报告保存，但不宣称为模型实际引用。"""
     monkeypatch.setattr(llm_client, "chat",
                         lambda *a, **k: _contract("# 报告\n\n饮食参考库内条文。"))
     monkeypatch.setenv("LLM_API_KEY", "sk-x")
     monkeypatch.setenv("LLM_MODEL", "m")
     monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
-    # fixture 有 面色晦暗 5 分（≥4 分体征词会进检索词条）
     resp = client.post("/record/2026-06-25/report")
     assert resp.status_code == 200, resp.get_json()
     with open(os.path.join(data_root, "records", "daily",
                            "2026-06-25_analysis.json"), encoding="utf-8") as f:
         raw = json.load(f)
     rep = raw["diagnosis"]["report"]
-    # 有命中则带 kb_refs 溯源；无命中（冷门词）也合法，但结构须在
     import trends_store
     import records_store
     rec = records_store.load_record(os.path.join(data_root, "records", "daily"),
                                     "2026-06-25")
     text = trends_store.build_report_input(rec, rep.get("kb_refs"))
-    if rep.get("kb_refs"):
-        assert "知识库参考" in text
-        assert rep["kb_refs"][0]["file"]
-        assert rep["kb_refs"][0]["line"] > 0
-        html = client.get("/record/2026-06-25").get_data(as_text=True)
-        assert "知识库引用" in html
+    assert rep["kb_refs"], "通用锚词应保证候选参考非空"
+    assert "知识库候选参考" in text
+    assert "不等同模型实际引用" in text
+    assert rep["kb_status"] == "retrieved"
+    assert rep["kb_root"] and rep["kb_revision"]
+    assert rep["kb_refs"][0]["file"]
+    assert rep["kb_refs"][0]["line"] > 0
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "知识库候选参考" in html
+    assert "不等同实际引用" in html
 
 
 def test_kb_references_fail_safe(client, data_root, monkeypatch):
-    """检索失败不阻断报告（告警后照出，无 KB 段）。"""
+    """检索失败不阻断报告，但明确保存并展示 error 状态。"""
     import trends_store
     monkeypatch.setattr("src.retrieval.retrieve",
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
@@ -333,19 +345,202 @@ def test_kb_references_fail_safe(client, data_root, monkeypatch):
     assert resp.status_code == 200, resp.get_json()
     with open(os.path.join(data_root, "records", "daily",
                            "2026-06-25_analysis.json"), encoding="utf-8") as f:
-        assert "kb_refs" not in json.load(f)["diagnosis"]["report"]
+        report = json.load(f)["diagnosis"]["report"]
+    assert "kb_refs" not in report
+    assert report["kb_status"] == "error" and report["kb_error"] == "boom"
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "知识库不可用" in html and "报告未经库内校核" in html
+
+
+def test_env_file_kb_root_drives_report_and_staleness(tmp_path, data_root, monkeypatch):
+    first = tmp_path / 'first-kb'
+    second = tmp_path / 'second-kb'
+    for root, text in ((first, '第一份合成资料'), (second, '第二份合成资料')):
+        root.mkdir()
+        (root / 'custom.md').write_text(f'忌口：{text}\n', encoding='utf-8')
+    monkeypatch.delenv('TCM_KB_ROOT', raising=False)
+    monkeypatch.setenv('LLM_API_KEY', 'sk-x')
+    monkeypatch.setenv('LLM_MODEL', 'm')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://x.com/v1/chat/completions')
+    monkeypatch.setattr(llm_client, 'chat', lambda *a, **k: _contract('# ok'))
+    import envfile
+    env = tmp_path / '.env'
+    envfile.write_env(str(env), {'TCM_KB_ROOT': str(first)})
+    app = create_app(env_file=str(env), data_root=data_root)
+    app.config['TESTING'] = True
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/record/2026-06-25/report')
+    assert response.status_code == 200, response.get_json()
+    with open(os.path.join(data_root, 'records', 'daily',
+                           '2026-06-25_analysis.json'), encoding='utf-8') as f:
+        report = json.load(f)['diagnosis']['report']
+    assert report['kb_status'] == 'retrieved'
+    assert report['kb_root'] == str(first)
+    assert report['kb_refs'][0]['excerpt'].endswith('第一份合成资料')
+
+    envfile.write_env(str(env), {'TCM_KB_ROOT': str(second)})
+    html = client.get('/record/2026-06-25').get_data(as_text=True)
+    assert '报告已过期' in html
+    assert '知识库目录或内容已变化' in html
+
+
+def test_no_kb_report_discloses_state_in_prompt_metadata_and_page(
+        tmp_path, data_root, monkeypatch):
+    monkeypatch.delenv('TCM_KB_ROOT', raising=False)
+    monkeypatch.setenv('LLM_API_KEY', 'sk-x')
+    monkeypatch.setenv('LLM_MODEL', 'm')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://x.com/v1/chat/completions')
+    captured = {}
+
+    def fake_chat(user_input, *args, **kwargs):
+        captured['input'] = user_input
+        return _contract('# ok')
+
+    monkeypatch.setattr(llm_client, 'chat', fake_chat)
+    app = create_app(env_file=str(tmp_path / '.env'), data_root=data_root)
+    app.config['TESTING'] = True
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/record/2026-06-25/report')
+    assert response.status_code == 200, response.get_json()
+    with open(os.path.join(data_root, 'records', 'daily',
+                           '2026-06-25_analysis.json'), encoding='utf-8') as f:
+        report = json.load(f)['diagnosis']['report']
+    assert report['kb_status'] == 'unconfigured' and report['kb_revision'] == ''
+    assert captured['input'].count('状态：未配置') == 3
+    assert '不得输出体质、四证、六经等辨证内容' in captured['input']
+    assert '不得输出饮食宜忌或食疗建议' in captured['input']
+    assert '不得输出具体方剂、方义或剂量' in captured['input']
+    html = client.get('/record/2026-06-25').get_data(as_text=True)
+    assert '缺少中医体质辨证知识库' in html
+    assert '缺少食疗知识库' in html and '缺少方剂知识库' in html
+    assert '辨证报告·全案' not in html
+
+
+def test_missing_formula_rejects_formula_output_without_saving(
+        tmp_path, data_root, monkeypatch):
+    constitution = tmp_path / 'constitution'
+    diet = tmp_path / 'diet'
+    for root in (constitution, diet):
+        root.mkdir()
+    (constitution / 'body.md').write_text('体质合成内容\n', encoding='utf-8')
+    (diet / 'food.md').write_text('忌口：合成食材\n', encoding='utf-8')
+    monkeypatch.delenv('TCM_KB_ROOT', raising=False)
+    monkeypatch.setenv('LLM_API_KEY', 'sk-x')
+    monkeypatch.setenv('LLM_MODEL', 'm')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://x.com/v1/chat/completions')
+    structured = {
+        'three_views': {'表里': '里'}, 'four_patterns': {},
+        'six_diseases': '太阴', 'core_pathomechanism': '合成病机',
+        'diet_advice': {'daily_foods': [
+            {'name': '合成食材', 'nature': '平', 'purpose': '测试',
+             'amount': '1份', 'note': '合成'}]},
+        'lifestyle': {},
+    }
+    monkeypatch.setattr(llm_client, 'chat',
+                        lambda *a, **k: _contract('# 全案\n## 五、方剂建议\n桂枝汤 9g', structured))
+    import envfile
+    env = tmp_path / '.env'
+    envfile.write_env(str(env), {
+        'TCM_KB_CONSTITUTION_ROOT': str(constitution),
+        'TCM_KB_DIET_ROOT': str(diet)})
+    app = create_app(env_file=str(env), data_root=data_root)
+    app.config['TESTING'] = True
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/record/2026-06-25/report')
+    assert response.status_code == 400
+    assert '缺少方剂知识库' in response.get_json()['error']
+    with open(os.path.join(data_root, 'records', 'daily',
+                           '2026-06-25_analysis.json'), encoding='utf-8') as f:
+        raw = json.load(f)
+    assert 'diagnosis' not in raw
+    html = client.get('/record/2026-06-25').get_data(as_text=True)
+    assert '桂枝汤' not in html and '辨证报告·全案' not in html
+    assert '缺少方剂知识库' in html
+
+
+def test_missing_diet_or_constitution_rejects_structured_output(tmp_path, monkeypatch):
+    monkeypatch.delenv('TCM_KB_ROOT', raising=False)
+    daily = tmp_path / 'records' / 'daily'
+    daily.mkdir(parents=True)
+    with open(FIXTURE, encoding='utf-8') as f:
+        raw = json.load(f)
+    with open(daily / '2026-06-25_analysis.json', 'w', encoding='utf-8') as f:
+        json.dump(raw, f, ensure_ascii=False)
+    cases = [
+        ({'diet_advice': {'daily_foods': []}}, '缺少食疗知识库'),
+        ({'six_diseases': '太阴'}, '缺少中医体质辨证知识库'),
+    ]
+    for structured, expected in cases:
+        monkeypatch.setattr(llm_client, 'chat', lambda *a, **k: _contract('# ok', structured))
+        result = trends_store.generate_and_store_report(
+            str(daily), str(tmp_path / 'records' / '_backup'), '2026-06-25',
+            lambda: ('m', 'u', 'k'))
+        assert result['ok'] is False and expected in result['error']
+
+
+def test_configured_kb_without_hits_has_distinct_status(tmp_path, data_root, monkeypatch):
+    root = tmp_path / 'kb'
+    root.mkdir()
+    (root / 'custom.md').write_text('没有相关锚词的合成内容\n', encoding='utf-8')
+    monkeypatch.delenv('TCM_KB_ROOT', raising=False)
+    monkeypatch.setenv('LLM_API_KEY', 'sk-x')
+    monkeypatch.setenv('LLM_MODEL', 'm')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://x.com/v1/chat/completions')
+    monkeypatch.setattr(llm_client, 'chat', lambda *a, **k: _contract('# ok'))
+    import envfile
+    env = tmp_path / '.env'
+    envfile.write_env(str(env), {'TCM_KB_ROOT': str(root)})
+    app = create_app(env_file=str(env), data_root=data_root)
+    app.config['TESTING'] = True
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/record/2026-06-25/report')
+    assert response.status_code == 200, response.get_json()
+    with open(os.path.join(data_root, 'records', 'daily',
+                           '2026-06-25_analysis.json'), encoding='utf-8') as f:
+        report = json.load(f)['diagnosis']['report']
+    assert report['kb_status'] == 'no_hits' and 'kb_refs' not in report
+    html = client.get('/record/2026-06-25').get_data(as_text=True)
+    assert '本次未命中知识库条文' in html
+
+
+def test_kb_reference_excerpts_have_per_item_and_total_limits(data_root, monkeypatch):
+    import records_store
+    rec = records_store.load_record(os.path.join(data_root, 'records', 'daily'),
+                                    '2026-06-25')
+    calls = []
+
+    def fake_retrieve(term, **kwargs):
+        calls.append((term, kwargs.get('kb_root')))
+        return {'results': [{'file': 'long.md', 'line': len(calls),
+                             'content': 'x' * 5000}]}
+
+    monkeypatch.setattr('src.retrieval.retrieve', fake_retrieve)
+    refs = trends_store._kb_references(rec, kb_root='synthetic-root')
+    assert len(refs) == 10
+    assert all(len(ref['excerpt']) <= trends_store.MAX_KB_EXCERPT_CHARS for ref in refs)
+    assert sum(len(ref['excerpt']) for ref in refs) <= trends_store.MAX_KB_TOTAL_CHARS
+    assert calls and all(root == 'synthetic-root' for _, root in calls)
 
 
 def test_chat_truncation_fails_loudly(monkeypatch):
     """截断即失败（可诊断不静默）：finish_reason=length → RuntimeError 指明提额。"""
+    import io
+    import safe_fetch
+
     class TruncatedResp:
-        def read(self):
-            return json.dumps({"choices": [{"message": {"content": "写了一半"},
-                                            "finish_reason": "length"}]}).encode()
+        def __init__(self):
+            self.stream = io.BytesIO(json.dumps(
+                {"choices": [{"message": {"content": "写了一半"},
+                              "finish_reason": "length"}]}).encode())
+        def read(self, size=-1): return self.stream.read(size)
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
-    monkeypatch.setattr(llm_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: TruncatedResp())
     with pytest.raises(RuntimeError) as e:
         llm_client.chat("hi", "", "m", "https://x.com/v1/chat/completions", "sk-x")
@@ -360,3 +555,301 @@ def test_mdmini_blockquote_and_hr_and_h4():
     assert "<hr" in html
     assert "<h5>" in html or "<h6>" in html  # #### → h5 以上
     assert "####" not in html
+
+
+def test_trends_uses_filename_date_when_record_date_differs(client, data_root):
+    daily = os.path.join(data_root, "records", "daily")
+    for name in os.listdir(daily):
+        os.unlink(os.path.join(daily, name))
+    with open(FIXTURE, encoding="utf-8") as f:
+        raw = json.load(f)
+    with open(os.path.join(daily, "2026-06-30_analysis.json"), "w",
+              encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+
+    resp = client.get("/trends?week=2026-06-30")
+
+    assert resp.status_code == 200
+    assert "chart-radar" in resp.get_data(as_text=True)
+
+
+def test_kb_references_reserve_space_for_daily_signs(client, data_root, monkeypatch):
+    def fake_retrieve(term, **kwargs):
+        return {"results": [
+            {"file": f"{term}.md", "line": line, "content": f"{term} 条文"}
+            for line in (1, 2)
+        ]}
+
+    monkeypatch.setattr("src.retrieval.retrieve", fake_retrieve)
+    monkeypatch.setenv("LLM_API_KEY", "sk-x")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
+    monkeypatch.setattr(llm_client, "chat", lambda *a, **k: _contract("# ok"))
+
+    resp = client.post("/record/2026-06-25/report")
+
+    assert resp.status_code == 200, resp.get_json()
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), encoding="utf-8") as f:
+        refs = json.load(f)["diagnosis"]["report"]["kb_refs"]
+    anchor_terms = {"忌口", "适宜", "食疗", "煎服", "温覆"}
+    assert refs
+    assert {h["term"] for h in refs} - anchor_terms
+
+
+def test_radar_uses_actual_record_dates(client, data_root):
+    payload = trends_store.week_payload(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+
+    assert payload["radar"]["first_date"] == "2026-06-23"
+    assert payload["radar"]["last_date"] == "2026-06-25"
+    html = client.get("/trends?week=2026-06-25").get_data(as_text=True)
+    assert "周首日" not in html and "周末日" not in html
+    assert "WEEK.radar.first_date" in html
+    assert "WEEK.radar.last_date" in html
+
+
+def test_report_input_lists_unknown_and_blocks_healthy_exit():
+    from src.record import DailyRecord
+    rec = DailyRecord({"date": "2026-06-25", "observations": {
+        "tongue": {"coating": {"moisture": "无法判读的描述"}},
+    }, "inquiry": {}})
+
+    text = trends_store.build_report_input(rec)
+
+    assert "未知指标：coating_moisture" in text
+    assert "不得进入平人出口" in text
+
+
+@pytest.mark.parametrize("raw", [
+    {"date": "2026-06-26", "observations": {"tongue": {"body": {"color": "淡红"}}},
+     "inquiry": {"恶寒or恶热？": {"asked": True, "answer": "恶寒"}},
+     "danger_flags": {"triggered": [], "not_triggered": []}},
+    {"date": "2026-06-26", "observations": {"tongue": {"body": {"color": "无法判读"}}},
+     "inquiry": {}, "danger_flags": {"triggered": [], "not_triggered": []}},
+], ids=["positive-inquiry", "unknown-observation"])
+def test_report_guard_does_not_treat_non_eligible_as_healthy(data_root, monkeypatch, raw):
+    daily = os.path.join(data_root, "records", "daily")
+    with open(os.path.join(daily, "2026-06-26_analysis.json"), "w",
+              encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+    monkeypatch.setattr(llm_client, "chat",
+                        lambda *a, **k: _contract("桂枝汤 12g"))
+
+    result = trends_store.generate_and_store_report(
+        daily, os.path.join(data_root, "records", "_backup"), "2026-06-26",
+        lambda: ("m", "u", "k"))
+
+    assert result["ok"] is True
+    assert "warning" not in result
+
+
+def test_report_state_legacy_only_stale_after_modification():
+    from src.record import DailyRecord
+    raw = {"date": "2026-06-25", "observations": {"tongue": {"body": {"color": "淡红"}}},
+           "diagnosis": {"report": {"markdown": "OLD", "generated_at": "2026-01-01T00:00:00"}}}
+    rec = DailyRecord(raw)
+    assert trends_store.report_state(rec)["stale"] is False
+
+    raw["manually_corrected"] = True
+    raw["corrected_at"] = "2026-02-01T00:00:00"
+    rec = DailyRecord(raw)
+    state = trends_store.report_state(rec)
+    assert state["stale"] is True
+    assert state["reasons"]
+
+    raw["corrected_at"] = "2025-12-01T00:00:00"
+    raw["derived_meta"] = {"updated_at": "2026-03-01T00:00:00"}
+    rec = DailyRecord(raw)
+    assert trends_store.report_state(rec)["stale"] is True
+
+
+def test_report_state_compares_hash_and_ruleset():
+    from src.derived import observation_input_hash
+    from src.record import DailyRecord
+    from src.scoring import SCORING_RULESET_VERSION
+    raw = {"date": "2026-06-25", "observations": {"tongue": {"body": {"color": "淡红"}}},
+           "diagnosis": {"report": {"markdown": "CURRENT", "generated_at": "2026-01-01T00:00:00"}}}
+    rec = DailyRecord(raw)
+    report = raw["diagnosis"]["report"]
+    report["input_hash"] = observation_input_hash(rec)
+    report["ruleset_version"] = SCORING_RULESET_VERSION
+    report["prompt_template_version"] = trends_store._template_version(
+        os.path.join(_ROOT, "templates", "adaptive_analysis_prompt.md"))
+
+    assert trends_store.report_state(rec)["stale"] is False
+    rec = DailyRecord({**raw, "observations": {"tongue": {"body": {"color": "红"}}}})
+    assert trends_store.report_state(rec)["stale"] is True
+
+
+def test_generate_report_stores_derived_metadata(client, data_root, monkeypatch):
+    import records_store
+    from src.derived import observation_input_hash
+    from src.scoring import SCORING_RULESET_VERSION
+    monkeypatch.setattr(llm_client, "chat", lambda *a, **k: _contract("# current"))
+
+    resp = client.post("/record/2026-06-25/report")
+
+    assert resp.status_code == 200, resp.get_json()
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), encoding="utf-8") as f:
+        raw = json.load(f)
+    rep = raw["diagnosis"]["report"]
+    rec = records_store.load_record(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+    assert rep["input_hash"] == observation_input_hash(rec)
+    assert rep["ruleset_version"] == SCORING_RULESET_VERSION
+    assert rep["generator_version"]
+    assert raw["derived_meta"]["input_hash"] == rep["input_hash"]
+    assert raw["derived_meta"]["scoring_ruleset_version"] == SCORING_RULESET_VERSION
+
+
+def test_merge_marks_existing_report_stale():
+    import wizard_store
+    existing = {
+        "date": "2026-06-25",
+        "observations": {"tongue": {"body": {"color": "淡红"}}},
+        "diagnosis": {"report": {"markdown": "OLD-REPORT",
+                                 "generated_at": "2026-01-01T00:00:00"}},
+        "danger_flags": {"triggered": [], "not_triggered": []},
+    }
+    parts = {}
+    for part in wizard_store.PARTS:
+        name = part["part"]
+        if name == "头面":
+            parts[name] = {"status": "manual", "observation": {"face": {"color": "苍白"}}}
+        else:
+            parts[name] = {"status": "skip_uncovered"}
+
+    merged = wizard_store.assemble_record(
+        {"date": "2026-06-25", "parts": parts}, "test",
+        existing_raw=existing, merge_only_uncovered=True)
+
+    assert trends_store.report_state(merged)["stale"] is True
+
+
+def test_stale_report_hidden_from_current_detail(client, data_root):
+    raw = {
+        "date": "2026-06-25",
+        "observations": {"tongue": {"body": {"color": "淡红"}}},
+        "pattern_differentiation": {"six_diseases": "OLD-PATTERN"},
+        "diagnosis": {"report": {"markdown": "OLD-REPORT",
+                                 "generated_at": "2026-01-01T00:00:00"}},
+        "manually_corrected": True,
+        "corrected_at": "2026-02-01T00:00:00",
+    }
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+
+    assert "报告已过期" in html
+    assert "OLD-REPORT" not in html
+    assert "OLD-PATTERN" not in html
+
+
+def test_current_report_with_matching_metadata_is_visible(client, data_root):
+    from src.derived import DERIVED_GENERATOR_VERSION, observation_input_hash
+    from src.record import DailyRecord
+    from src.scoring import SCORING_RULESET_VERSION
+    raw = {
+        "date": "2026-06-25",
+        "observations": {"tongue": {"body": {"color": "淡红"}}},
+        "pattern_differentiation": {"six_diseases": "CURRENT-PATTERN"},
+        "diagnosis": {"report": {"markdown": "CURRENT-REPORT",
+                                 "generated_at": "2026-01-01T00:00:00"}},
+    }
+    rec = DailyRecord(raw)
+    report = raw["diagnosis"]["report"]
+    report.update({
+        "input_hash": observation_input_hash(rec),
+        "ruleset_version": SCORING_RULESET_VERSION,
+        "generator_version": DERIVED_GENERATOR_VERSION,
+        "prompt_template_version": trends_store._template_version(
+            os.path.join(_ROOT, "templates", "adaptive_analysis_prompt.md")),
+    })
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+
+    assert "CURRENT-REPORT" in html
+    assert "CURRENT-PATTERN" in html
+    assert "报告已过期" not in html
+
+
+def test_stale_report_offers_regeneration_when_llm_ready(client, data_root):
+    import envfile
+    raw = {
+        "date": "2026-06-25",
+        "observations": {"tongue": {"body": {"color": "淡红"}}},
+        "pattern_differentiation": {"six_diseases": "OLD-PATTERN"},
+        "diagnosis": {"report": {"markdown": "OLD-REPORT",
+                                 "generated_at": "2026-01-01T00:00:00"}},
+        "manually_corrected": True,
+        "corrected_at": "2026-02-01T00:00:00",
+    }
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), "w", encoding="utf-8") as f:
+        json.dump(raw, f, ensure_ascii=False)
+    envfile.write_env(os.path.join(os.path.dirname(data_root), ".env"), {
+        "LLM_API_KEY": "sk-x", "LLM_MODEL": "m",
+        "LLM_BASE_URL": "https://x.com/v1/chat/completions",
+    })
+
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+
+    assert "报告已过期" in html
+    assert 'id="btn-report"' in html
+    assert "重新生成" in html
+
+
+def test_trends_payload_and_page_expose_unknown_and_versions(client, data_root):
+    from src.scoring import SCORING_RULESET_VERSION
+    payload = trends_store.week_payload(
+        os.path.join(data_root, "records", "daily"), "2026-06-25")
+
+    assert payload["unknown_count"] == 6
+    assert payload["rule_versions"] == ["legacy"]
+    assert payload["mixed_rule_versions"] is False
+    assert payload["scoring_ruleset_version"] == SCORING_RULESET_VERSION
+
+    html = client.get("/trends?week=2026-06-25").get_data(as_text=True)
+    assert "6 项评分未知" in html
+    assert "legacy" in html
+
+
+def test_report_uses_env_limits_and_shared_json_extraction(client, tmp_path, monkeypatch):
+    import envfile
+    envfile.write_env(str(tmp_path / ".env"), {
+        "LLM_MAX_TOKENS": "4321", "LLM_TIMEOUT": "17"})
+    seen = {}
+
+    def fake_chat(*args, **kwargs):
+        seen.update(kwargs)
+        return "<think>推理</think>前置说明\n```json\n" + _contract("# 报告") + "\n```"
+
+    monkeypatch.setattr(llm_client, "chat", fake_chat)
+    resp = client.post("/record/2026-06-25/report")
+    assert resp.status_code == 200, resp.get_json()
+    assert seen["max_tokens"] == 4321
+    assert seen["timeout"] == 17
+
+
+def test_report_invalid_llm_limit_returns_400_without_call(client, tmp_path, data_root,
+                                                            monkeypatch):
+    import envfile
+    envfile.write_env(str(tmp_path / ".env"), {"LLM_MAX_TOKENS": "not-a-number"})
+    path = os.path.join(data_root, "records", "daily", "2026-06-25_analysis.json")
+    with open(path, "rb") as file:
+        before = file.read()
+    monkeypatch.setattr(llm_client, "chat",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("非法配置不应发起调用")))
+    resp = client.post("/record/2026-06-25/report")
+    assert resp.status_code == 400
+    assert "LLM_MAX_TOKENS" in resp.get_json()["error"]
+    with open(path, "rb") as file:
+        assert file.read() == before

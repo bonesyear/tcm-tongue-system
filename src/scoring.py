@@ -17,13 +17,10 @@ observation 可为 Record.get_observation() 返回的 {指标: 文本}（推荐�
     1. 精确匹配优先（整段文本 == 关键词）
     2. 子串匹配降级 —— 取命中最长的关键词（"红如妆" 优先于 "红"，
        "淡红" 优先于 "红"），消除歧义
-    3. 否定守卫（双向） —— 前置：关键词前 6 字内、同一小句（以标点/空白
-       为界）出现否定词（无/不/未/没；"非" 不作否定词——"非正常/非典型"
-       类表述中"非"修饰的是"正常/典型"，误判为否定会漏报异常）；
-       后置：关键词后紧跟否定短语（不明显/不显著/未见/阴性 等）。
-       覆盖 "无明显浮肿"、"未见浮肿"、"没有黄染"、"浮肿不明显" 等真实
-       LLM 产出中的常见否定表达；且按关键词的**全部出现位置**判定——
-       "舌质不红，但舌边红" 中第二个 "红" 是真阳性，正常计分。
+    3. 文本证据由 `src.text_analysis` 与预警共享：同一小句内处理
+       前置/后置否定（含并非、绝非、排除），跨逗号/分号及无标点转折复位；
+       鉴别比较与光学反光不计患者阳性。"非典型"不当作否定。
+       每个关键词均检查全部出现位置，"舌不红但舌边红" 中第二个红为真阳性。
 
 评分基线约定：**正常表现一律 0 分**（淡红舌、薄白苔、润苔、适中
 均为 0）。0 = 正常，10 = 极重度异常，全表统一，杜绝"正常人踩关注线"。
@@ -32,9 +29,11 @@ observation 可为 Record.get_observation() 返回的 {指标: 文本}（推荐�
 """
 
 import re
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 from .dimensions import VisionDimension
+from .text_analysis import find_term
 
 
 # ============================================================
@@ -209,9 +208,9 @@ FACE_LUSTER_MAP = {
 
 # 巩膜颜色
 SCLERA_COLOR_MAP = {
-    "黄染": 7,     # 黄疸
+    "无黄染": 0,   # 旧记录的正常表述；阳性黄染只由 jaundice 评分
     "苍白": 5,     # 血虚/虚寒
-    "蓝巩膜": 8,   # 缺铁/虫积
+    "蓝巩膜": 8,   # 弥漫蓝色观察；与白睛蓝斑及病因判断分开
 }
 
 
@@ -249,17 +248,17 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "face_color":    {"萎黄": 5, "晦暗": 5, "黧黑": 5, "青灰": 5, "红如妆": 9,
                           "苍白": 7, "㿠白": 7,  # 2026-10-16 P0（原著审查）：
                                      # 面色苍白/㿠白为伤精血少重证（《经方探源》
-                                     # L2769），此前无词条被 fail-open 静默归零
-                          "淡白": 4,            # 面色淡白 = 血虚（同书 L5565 唇甲
-                                     # 淡黄或苍白为血少明证）；封闭词表含此值
+                                     # L3603），此前无词条被 fail-open 静默归零
+                          "淡白": 4,            # 面色淡白 = 血虚（同书 L7228 唇甲
+                                     # 暗黄或淡白为血少明证）；封闭词表含此值
                           "红赤": 3,            # 2026-10-20：太阳面赤（热证表证），
                                      # 分值 3 参照唇色「红:3」先例（待主人签认）；
                                      # 识图 prompt 枚举词此前静默归零
                                      },
         "face_luster":   FACE_LUSTER_MAP,
-        "face_edema":    {"明显浮肿": 4, "轻度浮肿": 2, "面目鲜泽": 4, "卧蚕": 4},
+        "face_edema":    {"明显浮肿": 4, "轻度浮肿": 2, "面目鲜泽": 4},
         "lip_color":     {"淡白": 5, "暗黄": 5,  # 2026-10-16 P0（原著审查）：
-                                     # 唇甲淡黄或淡白为血少定性证据（L5565），
+                                     # 唇甲暗黄或淡白为血少定性证据（L7228），
                                      # 此前无词条被 fail-open 静默归零
                           "淡红": 0,  # 轮次 8 新增：**盾牌词** —— 压制裸「红: 3」；
                                      # 否则「淡红」会误命中「红」（同「红润:0」压
@@ -293,7 +292,7 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
         "lower_lid":    {"淡红": 0,  # 基线（prompt 指示正常填淡红，缺它会
                                     # 每条正常记录收「词表外措辞」告警）
                          "淡白": 5, "淡黄": 5, "苍白": 5,  # 2026-10-16 P1：
-                                    # 下睑淡黄/苍白为血少定性证据（L5565）
+                                    # 下睑淡黄/苍白为血少定性证据（L7228）
                          },
     },
     VisionDimension.EAR: {
@@ -305,7 +304,7 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
     VisionDimension.HAND: {
         # 轮次 9（2026-09-18）：palm_temp 从评分表降级——掌温需触诊/问诊，
         # 静态照片判不了，违反统一原则「评分层只收静态照片可客观判读的指标」
-        # （docs/REPAIR_PLAN_2026-08-25.md）；且为 6 维度中唯一零语料指标
+        # （历史轮次记录已归入 CHANGELOG.md）；且为 6 维度中唯一零语料指标
         # （从无档案赋值）。降级到辨证层（由问诊采集掌温，见 docs/user-guide.md）。
         # 观测层（record.py 指标路径）保留——问诊文本仍可进辨证 prompt。
         # 原词表留存备查（移除理由与日期如上）：
@@ -319,7 +318,7 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
                         "淡白": 2, "暗红": 2, "紫暗": 4},
         "nail_color":  {"紫暗": 4, "暗紫": 4,
                         "淡白": 4,  # 2026-10-16 P0（原著审查）：甲床淡白为血少
-                                    # 定性证据（L5565），原值 2 偏低，与唇色对齐
+                                    # 定性证据（L7228），原值 2 偏低，与唇色对齐
                         "红润": 0,  # 2026-10-20：正常基线（同 palm_color/lip_color
                                     # 「红润:0」先例）——prompt 枚举词此前静默 0
                                     # 且每条正常甲床记录收词表外告警
@@ -330,7 +329,7 @@ DIMENSION_RULES: Dict[VisionDimension, Dict[str, Dict[str, int]]] = {
     VisionDimension.SKIN: {
         "color":        {"黄如橘皮": 8, "橘皮": 8, "烟熏": 5, "萎黄": 3},
         "cuo":          {"甲错": 5,  # 2026-10-16 P0（原著审查）：肌肤甲错为
-                                    # 伤营/瘀血皮肤体征（L2763）；此前仅有
+                                    # 伤营/瘀血皮肤体征（L3595）；此前仅有
                                     # 「广泛/局部」程度词，直书「甲错」MISS 归零。
                                     # 「无甲错」由否定守卫拦截，不误中
                          "广泛": 5, "局部": 2},
@@ -364,47 +363,9 @@ TONGUE_RADAR_METRIC_KEYS = {
 # 匹配策略
 # ============================================================
 
-# 否定词：无/不/未/没 + 双字真否定 并非/绝非。"非" 单独不算否定词——
-# "非正常红润""非典型黄染" 中"非"修饰的是"正常/典型"，当作否定词会把
-# 真异常误杀为正常（漏报）；但"并非/绝非"是真否定短语（"苔并非黄厚"），
-# 移除"非"时把它们连带弄丢了（fail-open），故显式加回双字形式。
-_NEGATION_RE = re.compile(r"无|不|未|没|并非|绝非")
-# 后置否定短语（"浮肿不明显""黄染未见" 等"关键词+否定"句式），
-# 必须锚定在关键词之后的小句开头，避免"充血无改善"这类误杀
-_POST_NEGATION_RE = re.compile(r"不明显|不显著|不突出|不著|未见|阴性")
-# 否定守卫回看/后看窗口（字数）。窗口内以最近的标点/空白截断，
-# 否定词只在与关键词同一小句内才生效（"无瘀点，散在瘀斑" 的 "无" 不跨逗号）。
-_NEGATION_WINDOW = 6
-_CLAUSE_SPLIT_RE = re.compile(r"[，。；、,;:：\s]")
-
-
-def _is_negated(text: str, idx: int, kw_len: int) -> bool:
-    """判断 text 中 idx 处开始、长 kw_len 的关键词该次出现是否被否定。
-
-    前置否定：关键词前同一小句、窗口内出现否定字（无明显浮肿/未见黄染）。
-    后置否定：关键词后紧跟否定短语（浮肿不明显/黄染未见/充血阴性）。
-    """
-    before = text[max(0, idx - _NEGATION_WINDOW):idx]
-    before = _CLAUSE_SPLIT_RE.split(before)[-1]  # 只保留最近标点之后（同一小句）
-    if _NEGATION_RE.search(before):
-        return True
-    after = text[idx + kw_len: idx + kw_len + _NEGATION_WINDOW]
-    after = _CLAUSE_SPLIT_RE.split(after)[0]     # 只看关键词所在小句的剩余部分
-    return bool(_POST_NEGATION_RE.match(after))
-
-
 def _has_unnegated_occurrence(text: str, kw: str) -> bool:
-    """kw 在 text 中是否存在**未被否定**的出现。
-
-    必须检查全部出现位置，不能只看首个——"舌质不红，但舌边红" 中
-    首个 "红" 被否定，第二个 "红" 是真阳性，只查首位会漏报异常。
-    """
-    idx = text.find(kw)
-    while idx != -1:
-        if not _is_negated(text, idx, len(kw)):
-            return True
-        idx = text.find(kw, idx + 1)
-    return False
+    """文本与预警共享同一肯定匹配；鉴别和反光语境不计阳性。"""
+    return find_term(text, kw).state == "matched"
 
 
 def match_keyword(rules: Dict[str, int], text: str) -> Optional[str]:
@@ -414,9 +375,12 @@ def match_keyword(rules: Dict[str, int], text: str) -> Optional[str]:
     同长度取分值最高者），供校验器判断「值是否落在词表内」——
     单一事实来源，避免校验器与评分层的匹配逻辑各自漂移。
     """
+    if not isinstance(text, str):
+        return None
+    from .textnorm import normalize_text
+    text = normalize_text(text.strip())
     if not text:
         return None
-    text = text.strip()
 
     # 1. 精确匹配优先（"不温" 等含否定字的枚举值经此路径直接命中）
     if text in rules:
@@ -427,7 +391,7 @@ def match_keyword(rules: Dict[str, int], text: str) -> Optional[str]:
     #    应命中"滑"=7，不能因"润"=0 排在前面而漏掉湿盛信号）
     best_kw = None
     for kw in rules:
-        if kw not in text:
+        if normalize_text(kw) not in text:
             continue
         if not _has_unnegated_occurrence(text, kw):
             continue
@@ -438,12 +402,7 @@ def match_keyword(rules: Dict[str, int], text: str) -> Optional[str]:
 
 
 def _match_score(rules: Dict[str, int], text: str) -> int:
-    """单指标打分：命中的词表键对应分值；无命中返回 0。
-
-    匹配判据见 match_keyword。已知局限：无标点连写（如"手足不温伴厥冷"）
-    中，否定词可能误伤窗口内的下一个关键词；规范指标文本通常简短，
-    实际影响有限。
-    """
+    """单指标打分：命中的词表键对应分值；非字符串或无命中返回 0。"""
     kw = match_keyword(rules, text)
     return rules[kw] if kw is not None else 0
 
@@ -460,6 +419,14 @@ def _normalize_observation(observation) -> Dict[str, str]:
     return {"__text__": text}
 
 
+def _normalize_dimension_observation(dim: VisionDimension, observation) -> Dict[str, str]:
+    obs = _normalize_observation(observation)
+    if "__text__" not in obs:
+        from .indicators import INDICATOR_REGISTRY
+        return INDICATOR_REGISTRY.normalize_observation(dim, obs)
+    return obs
+
+
 def _indicator_text(obs: Dict[str, str], indicator: str) -> str:
     """从规范化观测中取某指标的文本。"""
     if indicator in obs:
@@ -473,7 +440,7 @@ def score_indicators(dimension: VisionDimension,
     """返回某维度各规范指标的分数（0-10）。"""
     dim = dimension if isinstance(dimension, VisionDimension) else VisionDimension(dimension)
     rules_map = DIMENSION_RULES.get(dim, {})
-    obs = _normalize_observation(observation)
+    obs = _normalize_dimension_observation(dim, observation)
     return {
         indicator: _match_score(rules, _indicator_text(obs, indicator))
         for indicator, rules in rules_map.items()
@@ -489,8 +456,8 @@ def score(dimension: VisionDimension, observation) -> float:
     其余维度取各项指标之和并封顶 10（与原 compute_dimension_deviation 一致，
     非舌维度指标少、多项轻度异常按累积负荷计）。
 
-    注意：observation 传**纯文本**时，同一段话会对每个指标分别匹配，
-    可能重复计分（如"黄染明显"同时命中 jaundice 与 sclera_color）；
+    observation 传纯文本时会对每个指标分别匹配；结构化 dict 中的旧
+    sclera_color 黄染别名会归入 jaundice，不再重复计分。
     需要精确口径请传 Record.get_observation() 的结构化 dict。
     """
     dim = dimension if isinstance(dimension, VisionDimension) else VisionDimension(dimension)
@@ -504,3 +471,99 @@ def score(dimension: VisionDimension, observation) -> float:
     # 其余维度：累加并封顶；float() 统一返回类型——round(int, 1) 在
     # Python 3 返回 int，会让 mean 出现 0（int）与 max 0.0（float）并列
     return round(float(min(sum(indicators.values()), 10)), 1)
+
+
+SCORING_RULESET_VERSION = "2026-10-26.b06.1"
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    state: str
+    value: float | None
+    matched_terms: Dict[str, str] = field(default_factory=dict)
+    unknown_indicators: tuple = ()
+    missing_indicators: tuple = ()
+    ruleset_version: str = SCORING_RULESET_VERSION
+
+    @property
+    def unknown_count(self) -> int:
+        return len(self.unknown_indicators)
+
+
+_EXPLICIT_NORMAL_TEXTS = frozenset({
+    "无", "正常", "未见异常", "未见", "阴性", "生理性", "非病理", "不明显", "光滑",
+})
+
+
+def _is_explicit_normal(rules: Dict[str, int], text: str) -> bool:
+    stripped = text.strip()
+    if stripped in _EXPLICIT_NORMAL_TEXTS:
+        return True
+    if "正常" in stripped and "不正常" not in stripped:
+        return True
+    if re.match(r"^不(?:粗|红|肿|黄|黑|紫|热|冷|干|湿|腻|厚|硬|软|长|短|大|小|多|少|明显)", stripped):
+        return True
+    return any(kw in text and not _has_unnegated_occurrence(text, kw)
+               for kw in rules)
+
+
+def assess_indicators(dimension: VisionDimension, observation) -> Dict[str, ScoreResult]:
+    """逐指标返回状态化评分；旧 score_indicators 的数值契约保持不变。"""
+    dim = dimension if isinstance(dimension, VisionDimension) else VisionDimension(dimension)
+    rules_map = DIMENSION_RULES.get(dim, {})
+    obs = _normalize_dimension_observation(dim, observation)
+    results = {}
+    for indicator in sorted(set(rules_map) | set(obs)):
+        rules = rules_map.get(indicator)
+        if not rules:
+            results[indicator] = ScoreResult("not_applicable", None)
+            continue
+        text = _indicator_text(obs, indicator)
+        if not isinstance(text, str):
+            results[indicator] = ScoreResult(
+                "unknown" if text else "not_applicable", None)
+            continue
+        if not text.strip():
+            results[indicator] = ScoreResult("not_applicable", None)
+            continue
+        keyword = match_keyword(rules, text)
+        if keyword is None:
+            if _is_explicit_normal(rules, text):
+                results[indicator] = ScoreResult("normal", 0.0)
+            else:
+                results[indicator] = ScoreResult("unknown", None)
+            continue
+        value = rules[keyword]
+        state = "normal" if value == 0 else "abnormal"
+        results[indicator] = ScoreResult(state, float(value), {indicator: keyword})
+    return results
+
+
+def assess(dimension: VisionDimension, observation) -> ScoreResult:
+    """聚合一个维度；有异常先聚合，未知存在时不把全维称为正常。"""
+    dim = dimension if isinstance(dimension, VisionDimension) else VisionDimension(dimension)
+    obs = _normalize_dimension_observation(dim, observation)
+    details = assess_indicators(dim, obs)
+    abnormal = [r for r in details.values() if r.state == "abnormal"]
+    unknown = sorted(ind for ind, r in details.items() if r.state == "unknown")
+    normal = [r for r in details.values() if r.state == "normal"]
+    missing = sorted(
+        ind for ind, r in details.items()
+        if r.state == "not_applicable" and ind in DIMENSION_RULES.get(dim, {})
+        and (not isinstance(_indicator_text(obs, ind), str)
+             or not _indicator_text(obs, ind).strip())
+    )
+    matched = {}
+    for indicator, result in details.items():
+        matched.update(result.matched_terms)
+
+    if abnormal:
+        values = [r.value for r in abnormal]
+        value = max(values) if dim == VisionDimension.TONGUE else min(sum(values), 10)
+        return ScoreResult("abnormal", round(float(value), 1), matched,
+                           tuple(unknown), tuple(missing))
+    if unknown:
+        return ScoreResult("unknown", None, matched, tuple(unknown), tuple(missing))
+    if normal:
+        return ScoreResult("normal", 0.0, matched, (), tuple(missing))
+    return ScoreResult("not_applicable", None, matched, (), tuple(missing))

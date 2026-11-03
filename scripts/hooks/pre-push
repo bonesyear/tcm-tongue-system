@@ -1,175 +1,74 @@
 #!/usr/bin/env bash
-# Hermes 隐私守卫（pre-push hook）
-#
-# 目的：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」，并强制版本一致性。
-# 四层内容检查 + 一层提交信息检查：
-#   ① 敏感词表（本地 .privacy-words，gitignored —— 因为词表里含真实姓名，不能进仓库）
-#   ② 凭证模式（sk-/ghp_/github_pat_/LTAI/AKLT/私钥头）
-#   ③ 真实凭证指纹（读作者环境的多个 .env 路径，见下方 _ENV_FILES；取每个 KEY 值的前 14 字符在待推送内容中比对）
-#   ④ 版本一致性（VERSION 文件 ↔ CHANGELOG.md 最新条目；防「只改一处」的版本漂移）
-#   ⑤ 提交信息检查（commit message 里的敏感词/凭证模式）
-#
-# 为何需要 ⑤：①③ 都基于「快照」（git grep <词> <commit>），而 commit message
-# 不属于任何快照 —— 敏感词写在提交信息里可绕过全部快照检查。同理，
-# git filter-repo 的 --replace-text 只替换 blob 内容、不覆盖 message，
-# 历史清理时若漏加 --replace-message 会留下 message 残留。
-#
-# 误报豁免：git push --no-verify（仅在已人工复核确认无害时使用）
+# 公开仓库 pre-push 隐私与版本守卫：只拦截，不打印敏感内容。
 set -uo pipefail
 
 REPO="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-WORDS_FILE="$REPO/.privacy-words"
+COMMON_GIT_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+case "$COMMON_GIT_DIR" in
+  */worktrees/*) COMMON_GIT_DIR="${COMMON_GIT_DIR%%/worktrees/*}" ;;
+esac
+WORDS_FILE="${PRIVACY_WORDS_FILE:-$COMMON_GIT_DIR/../.privacy-words}"
+SCANNER="$REPO/scripts/hooks/privacy_scan.py"
 FAIL=0
 CHECKED=0
 
-# 取待推送内容里所有匹配（用指定 commit 的树，避免工作区干扰）
-scan_fixed() {  # $1=词  $2=commit
-  git grep -I -n -F -- "$1" "$2" -- . ':(exclude)scripts/hooks/*' 2>/dev/null | head -3
-}
-scan_regex() {  # $1=正则  $2=commit
-  git grep -I -n -E -- "$1" "$2" -- . ':(exclude)scripts/hooks/*' 2>/dev/null | head -5
-}
+if [ ! -f "$WORDS_FILE" ]; then
+  echo "❌ 未找到敏感词表 $WORDS_FILE；拒绝放行。可显式创建空词表或设置 PRIVACY_WORDS_FILE" >&2
+  exit 1
+fi
+if [ ! -f "$SCANNER" ]; then
+  echo "❌ 未找到隐私扫描器 $SCANNER，拒绝放行" >&2
+  exit 1
+fi
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=python
+else
+  echo "❌ 未找到 Python，无法执行隐私扫描，拒绝放行" >&2
+  exit 1
+fi
 
-# ① 敏感词表
-check_words() {
-  local commit="$1"
-  [ -f "$WORDS_FILE" ] || { echo "  (未找到 $WORDS_FILE，跳过敏感词检查)"; return; }
-  while IFS= read -r w; do
-    w="${w%$'\r'}"
-    [ -z "$w" ] && continue
-    case "$w" in \#*) continue ;; esac
-    local hits
-    hits="$(scan_fixed "$w" "$commit")"
-    if [ -n "$hits" ]; then
-      echo "  ❌ 敏感词「$w」命中："
-      echo "$hits" | sed 's/^/     /'
-      FAIL=1
-    fi
-  done < "$WORDS_FILE"
-}
-
-# ② 凭证模式
-check_patterns() {
-  local commit="$1"
-  local pat='sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|LTAI[A-Za-z0-9]{12,}|AKLT[A-Za-z0-9]{10,}|AIza[A-Za-z0-9_-]{30,}|xoxb-|BEGIN [A-Z ]*PRIVATE KEY'
-  local hits
-  hits="$(scan_regex "$pat" "$commit")"
-  if [ -n "$hits" ]; then
-    echo "  ❌ 疑似凭证模式命中："
-    echo "$hits" | sed 's/^/     /'
-    FAIL=1
-  fi
-}
-
-# ③ 真实凭证指纹（只比对前缀，不打印完整凭证）
-check_key_fingerprints() {
-  local commit="$1"
-  local envf
-  # 作者环境的凭据文件清单（此处为作者本地路径；使用者 fork 后请改为自己的路径，
-  # 或以环境变量 _PRIVACY_ENV_FILES 覆盖。改动本清单不影响前三层检查之外的任何行为。）
-  for envf in ${_PRIVACY_ENV_FILES:-"$HOME/.hermes/.env" "$HOME/.hermes/profiles/tcm-tongue/.env"}; do
-    [ -f "$envf" ] || continue
-    while IFS= read -r line; do
-      line="${line%$'\r'}"
-      case "$line" in ''|\#*) continue ;; esac
-      local var="${line%%=*}"
-      local val="${line#*=}"
-      val="${val%\"}"; val="${val#\"}"
-      val="${val%\'}"; val="${val#\'}"
-      # 只查 KEY/TOKEN/SECRET/ID 类变量，且值足够长
-      case "$var" in
-        *KEY*|*TOKEN*|*SECRET*|*_ID|*ID_*) ;;
-        *) continue ;;
-      esac
-      [ "${#val}" -ge 20 ] || continue
-      local frag="${val:0:14}"
-      local hits
-      hits="$(scan_fixed "$frag" "$commit")"
-      if [ -n "$hits" ]; then
-        echo "  ❌ 真实凭证指纹命中（变量 $var，前缀 ${frag:0:6}…）："
-        echo "$hits" | sed 's/^/     /'
-        FAIL=1
-      fi
-    done < "$envf"
-  done
-}
-
-# ④ 版本一致性（VERSION ↔ CHANGELOG 最新条目）
-# 背景：曾把所有版本统一后，「只改 CHANGELOG 未同步 VERSION」又连续发生两次漂移。
-# 靠人记得改两处必然再犯 → 机械强制。检查对象同样是待推送的树。
 check_version_consistency() {
   local commit="$1"
   local ver cl
   ver="$(git show "$commit:VERSION" 2>/dev/null | tr -d '[:space:]')"
   cl="$(git show "$commit:CHANGELOG.md" 2>/dev/null | grep -m1 -oE '^## v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^## v//')"
+  if git show "$commit:CHANGELOG.md" 2>/dev/null | grep -qE '^##[[:space:]]+Unreleased'; then
+    echo "  ❌ CHANGELOG 仍有未归类的 Unreleased 版本段"
+    FAIL=1
+  fi
   if [ -z "$ver" ] || [ -z "$cl" ]; then
     echo "  (VERSION 或 CHANGELOG 缺失 / 无版本条目 —— 跳过版本一致性检查)"
     return
   fi
   if [ "$ver" != "$cl" ]; then
-    echo "  ❌ 版本不一致：VERSION=$ver，但 CHANGELOG 最新条目=v$cl"
-    echo "     修复：把 VERSION 改成 v$cl（或将 CHANGELOG 最新条目改成 v$ver），二者必须相同。"
+    echo "  ❌ 版本不一致：VERSION=$ver，CHANGELOG 最新条目=v$cl"
+    echo "     修复：把 VERSION 改成 $cl（不带 v），或修改 CHANGELOG 使二者一致。"
     FAIL=1
   else
     echo "  ✓ 版本一致：v$ver"
   fi
 }
 
-# ⑤ 提交信息检查（commit message 里的敏感词 / 凭证模式）
-# 只报告位置与规则长度，**不打印敏感词本身**（避免守卫日志成为新的泄露面）。
-check_messages() {
-  local commit="$1" remote="$2"
-  local range
-  if [ -n "$remote" ] && [ "$remote" != "0000000000000000000000000000000000000000" ]; then
-    range="$remote..$commit"
-  else
-    local root
-    root="$(git rev-list --max-parents=0 "$commit" 2>/dev/null | tail -1)"
-    range="${root:+$root..}$commit"
-  fi
-
-  # 用临时文件而非 shell 变量：实测「变量 + printf | grep」对大段 UTF-8 文本
-  # 会漏命中（同一内容写成文件则命中），故此处一律走文件。
-  local tmp
-  tmp="$(mktemp)"
-  git log --format='%B' "$range" > "$tmp" 2>/dev/null || true
-  if [ ! -s "$tmp" ]; then rm -f "$tmp"; return; fi
-
-  # ① 敏感词
-  if [ -f "$WORDS_FILE" ]; then
-    while IFS= read -r w; do
-      w="${w%$'\r'}"
-      [ -z "$w" ] && continue
-      case "$w" in \#*) continue ;; esac
-      if grep -qF -- "$w" "$tmp"; then
-        echo "  ❌ 提交信息含敏感词（规则长度 ${#w}，词本身不打印）—— 命中位置："
-        grep -nF -- "$w" "$tmp" | cut -d: -f1 | head -3 | sed 's/^/     提交信息第 /;s/$/ 行/'
-        FAIL=1
-      fi
-    done < "$WORDS_FILE"
-  fi
-
-  # ② 凭证模式
-  local pat='sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|LTAI[A-Za-z0-9]{12,}|AKLT[A-Za-z0-9]{10,}|AIza[A-Za-z0-9_-]{30,}|xoxb-|BEGIN [A-Z ]*PRIVATE KEY'
-  if grep -qE -- "$pat" "$tmp"; then
-    echo "  ❌ 提交信息含疑似凭证模式"
-    FAIL=1
-  fi
-
-  rm -f "$tmp"
-}
-
 echo "════════ Hermes 隐私守卫（pre-push）════════"
 while read -r local_ref local_sha remote_ref remote_sha; do
-  # stdin 已被 read 消费，后续子命令统一 </dev/null
   [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
-  echo "▶ 检查 $local_ref → $remote_ref  ($local_sha)"
+  if ! commits="$(git rev-list "$local_sha" --not --remotes="$1" 2>/dev/null)"; then
+    echo "❌ 无法计算 $local_ref 的新提交范围，拒绝放行" >&2
+    exit 1
+  fi
+  [ -z "$commits" ] && continue
+  echo "▶ 检查 $local_ref → $remote_ref"
   CHECKED=$((CHECKED+1))
-  check_words "$local_sha" </dev/null
-  check_patterns "$local_sha" </dev/null
-  check_key_fingerprints "$local_sha" </dev/null
   check_version_consistency "$local_sha" </dev/null
-  check_messages "$local_sha" "$remote_sha" </dev/null
+
+  args=("$SCANNER" --repo "$REPO" --words "$WORDS_FILE" --commits "$commits")
+  if [[ "$local_ref" == refs/tags/* ]] \
+      && [ "$(git cat-file -t "$local_sha")" = "tag" ]; then
+    args+=(--tag "$local_sha")
+  fi
+  "$PYTHON" "${args[@]}" </dev/null || FAIL=1
 done
 echo "═══════════════════════════════════════════"
 
@@ -177,18 +76,14 @@ if [ "$CHECKED" -eq 0 ]; then
   echo "（没有需要检查的新提交）"
   exit 0
 fi
-
 if [ "$FAIL" -eq 1 ]; then
   cat <<'EOF'
-🚫 守卫检查未通过 —— push 已阻止（涉及隐私 / 凭证 / 版本一致性）。
-
-处置：
-  1) 若确认是误报（如术语、说明性文字），人工复核后用：git push --no-verify
-  2) 若确实是使用者信息/凭证：先清理该提交内容（amend 或新提交），再 push
-  3) 若已进入历史：见 skill「public-repo-privacy」的历史清理流程（filter-repo）
+🚫 守卫检查未通过 —— push 已阻止（隐私 / 凭证 / 版本一致性）。
+含敏感内容的提交必须从历史中 amend / rebase 清除；新增删除提交不能清除历史。
+确认是误报时可人工复核后用 git push --no-verify，并记录豁免理由。
 EOF
   exit 1
 fi
 
-echo "✅ 守卫通过 —— 未发现使用者信息 / 凭证 / 真实凭证指纹；版本一致"
+echo "✅ 守卫通过 —— 提交范围、内容、消息与版本检查完成"
 exit 0

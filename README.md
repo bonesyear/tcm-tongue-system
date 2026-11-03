@@ -13,15 +13,15 @@
 一套望诊领域的 Python 模块，负责：
 
 - **维度规范**：六维望诊（舌/头面/目/耳/手/皮肤）的枚举定义与中英双向适配
-- **记录解析**：兼容两种 LLM 输出格式（中文键 vs 英文键）的统一数据层
+- **记录解析**：兼容 A 中文键 / B observations / C 顶层英文键的统一数据层
 - **定性→定量评分**：从自然语言描述到 0-10 分的映射引擎
 - **置信度与安全边界**：覆盖度→置信度→方剂建议安全控制
 - **知识检索**：Grep 优先 + 别名词典展开 + RAG 兜底的混合检索
-- **结构化知识库**：8 个 Markdown/YAML 文件，涵盖辨证框架、方剂体系、煎服法、体质分型、食疗等
+- **外置知识库**：通过 `TCM_KB_ROOT` 配置有权使用的私有内容；公开仓不再附带原文和别名词典
 
 **它不做什么**：不调用 LLM API、不接收或上传图片、不发起任何 HTTP 请求——以上均由外层 Agent 负责。
 
-> ⚠️ **望诊质量与你接入的视觉模型直接相关。** 本库负责规范化、评分、置信度与检索，**不做图像判读**——「舌苔是腻还是腐」「舌色是淡红还是偏红」这类判断全部来自你配置的视觉模型。模型的多模态能力决定判读上限：能力不足时会给出含糊或错位的描述，异常体征可能因此被评分层静默归零。**请务必按下文「配置自己的视觉模型」完成接入，并做完标定步骤，不要跳过。**
+> ⚠️ **望诊质量与你接入的视觉模型直接相关。** 本库负责规范化、评分、置信度与检索，**不做图像判读**——「舌苔是腻还是腐」「舌色是淡红还是偏红」这类判断全部来自你配置的视觉模型。模型可能给出含糊、错位或漏判的描述；新 `assess*` 接口会把无法判读或词表外文本标为 `unknown`，旧 `score*` 接口为兼容仍返回 0，**不能把兼容值 0 当作确认正常**。请务必按下文「配置自己的视觉模型」完成接入，并做完核对步骤，不要跳过。
 
 ---
 
@@ -47,15 +47,22 @@
 | 模块 | Interface | 职责 |
 |:---|:---|:---|
 | `src/dimensions.py` | `VisionDimension` 枚举、`from_chinese`/`from_english` | 六维规范（中英名/子域/计数规则） |
-| `src/record.py` | `DailyRecord.parse`、`get_observation(dim)`、`get_formula()`… | 记录形状兼容（中文键↔英文键归一） |
-| `src/scoring.py` | `score(dim, obs)`、`score_indicators(dim, obs)` | 定性→定量评分（0=正常基线），精确/最长子串/否定守卫 |
+| `src/indicators.py` | `INDICATOR_REGISTRY`、`DIMENSION_INDICATORS` | 45 项指标的路径、选项、别名、术语、出处与复核元数据 |
+| `src/observations.py` | `Observation`、`Declaration`、`capture_observation()` | 采集方式约束、原始值/规范化值、未知与声明分离 |
+| `src/record.py` | `DailyRecord.parse`、`get_observation(dim)`、`get_inquiry_answers()`、`get_formula_material()` | A/B/C 与形状 B v2 兼容，17 题问诊统一读取，汇总结构化方剂与报告相关段落 |
+| `src/textnorm.py` | `normalize_text()`、`canonical_option()`、`display_text()` | 定向 Unicode/选项规范化，报告外部文本单行限长；不做整串 NFKC |
+| `src/scoring.py` | `assess(dim, obs)`、`assess_indicators(dim, obs)`；兼容 `score()` / `score_indicators()` | 定性→状态化评分（正常/异常/未知/不适用），精确/最长子串/否定守卫 |
+| `src/text_analysis.py` | `find_term(text, term)` | 评分与预警共享的否定、转折和排除语境分析 |
+| `src/alerts.py` | `evaluate_alert()`、`evaluate_alerts()`、`danger_flags_for()` | 单项筛查/组合规则、三态评估、证据与出处；`src/danger.py` 保留兼容接口 |
+| `src/danger_review.py` | `refresh_danger()`、`review_snapshot()`、`apply_decision()` | 证据快照、确认令牌、keep/dismiss/clear 审计与 merge 范围；不改变医学规则 |
 | `src/confidence.py` | `from_coverage(n)`、`allows_formula(level)`、`allows_dosage(level)`、`is_consistent` | 覆盖度→置信度→安全边界 |
+| `src/governance.py` | `build_decision_inventory()`、`validate_decision_table()`、`validate_calibration_report()` | 医学裁决清单、签认/迁移材料与真实标定报告的结构校验；不自动改医学规则 |
 | `src/paths.py` | `REPO_ROOT`、`DATA_ROOT`、`ensure_data_dirs()` | 路径配置（`TCM_DATA_ROOT` 环境变量覆盖） |
 | `src/retrieval/` | `retrieve(query)` → 结果列表 + 来源标注 | Grep + 同义词 + RAG 混合检索。⚠️ `search()` 接受原始正则，不受信输入请一律走 `retrieve()` |
-| `knowledge_base/` | 8 个 Markdown/YAML 文件 | 辨证框架、方剂体系、煎服法、体质分型、食疗、别名词典 |
+| `knowledge_base/README.md` | 私有知识库配置说明 | 公开仓不附带原知识库；用 `TCM_KB_ROOT` 指向有权使用的目录 |
 | `templates/` | prompt 模板 + JSON 记录模板 | LLM 分析指令、多维记录 schema |
 
-四个核心 module（`dimensions` / `record` / `scoring` / `confidence`）仅依赖 Python 标准库。
+核心 module（`dimensions` / `indicators` / `record` / `observations` / `scoring` / `alerts` / `text_analysis` / `confidence` / `governance`）仅依赖 Python 标准库。医学治理的 pending 语义、未标定辅助模式、可选标定和趋势边界见 [医学治理与边界](docs/GOVERNANCE_2026-10-27.md)。
 
 ---
 
@@ -70,17 +77,33 @@ pip install -r requirements.txt   # matplotlib numpy（周报画图）+ Pillow�
 ### Web 界面（推荐）
 
 ```bash
-pip install -r web/requirements.txt   # Flask（独立声明，不污染核心依赖）
-python web/app.py                     # http://127.0.0.1:8600
+pip install -r web/requirements.txt   # Flask + Waitress（独立声明，不污染核心依赖）
+python web/app.py                     # Waitress → http://127.0.0.1:8600
 ```
 
 完整操作指引（首次配置、拍照向导、修正、趋势、局域网手机访问）见 [docs/web-quickstart.md](docs/web-quickstart.md)。
+
+### 导入或自建知识库
+
+公开仓不提供原知识库文件或在线下载。「设置 → 知识库」支持分别导入**中医体质辨证、食疗、方剂**三类 ZIP（Markdown/YAML，每包不超过 8 MiB），对应 `TCM_KB_CONSTITUTION_ROOT`、`TCM_KB_DIET_ROOT`、`TCM_KB_FORMULA_ROOT`，导入副本分别为 `<TCM_DATA_ROOT>/private_kb/<类别>/`。分类 ZIP 必须含匹配的 `kb.yaml`（`schema_version: 1` 和 `category`）。新 clone 默认不读取外部旧知识库，程序管理的导入副本会自动启用。旧综合导入接口继续兼容并保留分类子目录。每次导入只覆盖本类副本，**不移动、覆盖或删除其他类别或外部原始知识库**。非法包或激活失败保留旧副本；配置写回失败会同时恢复配置和目录；环境变量锁定时不改配置。
+
+格式、安全限制、回滚语义和许可责任见 [自建知识库规范](docs/KB_AUTHORING.md)，可直接使用 [非医学合成模板](templates/kb/README.md) 验证链路。自定义内容只影响检索与候选参考，不自动修改医学权重、红线、评分或剂量规则，也不是模型训练。
+
+每类可单独「重置」：只删除本类导入副本并设置 `TCM_KB_<类别>_DISABLED=1`，停用优先于综合库回退，外部原库和其他类别不受影响。每次新 ZIP 都在完整校验后重置本类旧副本、激活新内容并清除停用标记；失败按事务前字节恢复配置和目录。
+
+每类独立区分未配置、空库、可用和错误；缺少体质库隐藏体质/辨证内容，缺食疗库隐藏饮食建议，缺方剂库隐藏方药及完整方药报告，旧记录内容也不能绕过。开启 `TCM_KB_STRICT_CATEGORIES=1` 后不再回退综合库，只认各类专用根。报告生成使用各类别当前配置根，保存 `kb_categories` 及兼容字段；目录或内容变化会使旧报告过期。缺方剂的方名/剂量、缺食疗的结构化饮食、缺体质的结构化辨证输出会在写入前拒绝。报告尾部的条文是**送入模型的候选参考，不等同实际引用**；本地速览始终使用项目内置规则计算，但只有对应类别可用时才展示。
+
+局域网使用须先在设置页配置 `WEB_ADMIN_TOKEN`，再以 `python web/app.py --lan` 启动；
+无口令的非回环监听会拒绝启动。手机在设置页输入口令建立会话，记录、趋势和照片
+均需验证后访问；不要把口令放进 URL。welcome 的须知确认不代替身份验证。
 
 ### 跑测试
 
 ```bash
 python3 -m pytest tests/ -v       # 跑全部测试，确认环境 OK（自带脱敏 fixture，开箱即跑）
 ```
+
+共享 fixture 为每项测试隔离 HOME、模型环境和数据目录；真实配置与健康记录不参与测试，模型调用一律 mock。
 
 ### 作为库使用
 
@@ -126,7 +149,7 @@ print(allows_formula(level))  # True/False
 
 > **本系统不内置判读模型**——识图质量完全取决于你在此处接入的模型。同一张舌照，不同模型给出的描述可能相差很大，**判读能力越强的模型，望诊质量越高**。下面的三件套配置只是让流程「跑起来」；后文的**五步 checklist 才是让它「跑得准」**，其中第 3、5 步不可跳过。
 
-`scripts/vision_client.py` 是识图统一入口，支持任意 **OpenAI 兼容多模态模型**，全部通过环境变量配置（模板见根目录 [.env.example](.env.example)，复制为 `.env` 或直接导出环境变量）：
+`scripts/vision_client.py` 是识图统一入口，支持任意 **OpenAI 兼容多模态模型**，通过环境变量或项目根 `.env` 配置（环境变量优先；模板见根目录 [.env.example](.env.example)）：
 
 | 变量 | 必填 | 默认 | 含义 |
 |:---|:---|:---|:---|
@@ -135,9 +158,9 @@ print(allows_formula(level))  # True/False
 | `VISION_API_KEY` | ✅ | — | 该端点的 API key |
 | `VISION_TEMPERATURE` | 否 | 不发送该键 | ⚠️ 设 0 ≠ 确定性输出：部分模型有官方下限（更低值被服务端静默改写），查官方文档 default/range/clamp 三栏 |
 | `VISION_MAX_TOKENS` | 否 | 600 | 思考型（reasoning）模型的思考过程占用该额度，建议 ≥8000 |
-| `VISION_TIMEOUT` | 否 | 150 | observe 单次请求超时秒数（classify 固定 60） |
+| `VISION_TIMEOUT` | 否 | 150 | observe 连接、重定向、重试和读取的总时限（classify 固定 60） |
 
-> ⚠️ 代码默认值（`qwen3.8-max` + DashScope 端点）**仅为示例**，目的是 clone 后不配置也能看到结构；**请务必替换为你自己的模型与端点**。
+> ⚠️ 默认模型名 `qwen3.8-max` **仅为示例**，请替换。`VISION_BASE_URL` **没有默认值，必须显式配置**；未配置端点时会报错，不会把 key 或照片发往默认第三方。合法的本地/Ollama HTTP 端点仍可正常使用。
 
 > 兼容说明：旧变量 `DASHSCOPE_API_KEY` 仍作为历史兼容回退被识别（作者早期环境遗留），**新配置一律用 `VISION_API_KEY`**；实际用到旧变量时脚本会打一条 stderr 弃用提示。
 
@@ -149,7 +172,7 @@ print(allows_formula(level))  # True/False
 4. 输出为空或被截断 → 设 `VISION_MAX_TOKENS=8000`；输出措辞太随意 → 查官方文档后设 `VISION_TEMPERATURE`
 5. 同一张照片连跑 5 次，对照肉眼签认；抖动大的字段以肉眼为准，并记录为该模型的已知弱项
 
-> ⚠️ **换模型必须重新标定**：`vision_client.py` 的 prompt 采用封闭词表（如腻腐只填 无/微腻/稍腻/偏腻/腻/厚腻/腐苔），与 `src/scoring.py` 的评分词表**逐键对齐**——词表之外的措辞会被评分层**静默读作 0 分 = 正常**，不产生任何报错。因此换模型后第 3、5 步不是可选项：必须用真实照片验证新模型的措辞落在封闭词表内，否则异常体征会被静默归零。
+> ⚠️ **换模型必须重新核对**：`vision_client.py` 的 prompt 采用封闭词表（如腻腐只填 无/微腻/稍腻/偏腻/腻/厚腻/腐苔），与 `src/scoring.py` 的评分词表逐键对齐。词表之外的措辞在新 `assess*` 接口返回 `unknown`，旧 `score*` 接口为兼容仍返回 0，但 0 **不等于确认正常**。因此换模型后第 3、5 步不是可选项：使用你有权使用的照片核对措辞落域与重复识图稳定性，并对照原图人工复核。上述核查不等于独立医学标定；当前按主人定策以未标定辅助模式运行，不把模型自评当作医学真值，也不宣称疾病诊断或剂量推荐已经验证。详见[医学治理与边界](docs/GOVERNANCE_2026-10-27.md)。
 
 ---
 
@@ -165,7 +188,13 @@ python3 scripts/generate_weekly_report.py 2026-07-09
 
 数据目录默认在仓库根下的 `records/`、`charts/`；部署机可用环境变量
 `TCM_DATA_ROOT` 指到别处（如 `/root/tcm-tongue-system`），知识库位置
-同理可用 `TCM_KB_ROOT` 覆盖（对 grep 与 RAG 同时生效）。
+同理可用 `TCM_KB_ROOT` 覆盖（对 grep、RAG 与默认别名词典同时生效；相对路径统一
+按仓库根解析）。RAG 只保留相关度过线的证据，AND 查询按真实文件复核全部条件；
+手工修改进程内知识库内容后需重启或清理索引缓存，ZIP 导入和回滚会自动清理该根缓存。
+
+部署时可用 `TCM_TIMEZONE` 指定 IANA 时区（如 `Asia/Shanghai`）；Web 也可在 `.env`
+配置。未设置时使用系统时区，无效值告警并回退系统时区。记录日期、周报和新的修正/
+报告时间戳使用同一口径；旧记录中的 naive 时间戳保留原样，不做时区猜测。
 
 > ⚠️ `TCM_DATA_ROOT` / `TCM_KB_ROOT` / `kb_root` 参数是**部署配置**，
 > 不应来自用户输入——知识库根指向任意目录即可读出其中全部 .md 文件。
@@ -181,17 +210,18 @@ src/
   scoring.py               # 定性→定量评分引擎（0=正常基线）
   confidence.py            # 置信度 + 安全边界
   paths.py                 # 路径配置（TCM_DATA_ROOT 可覆盖）
+  daily_files.py           # 每日记录一次扫描、统一选档与副本排除
   retrieval/               # 混合检索（Grep + 同义词 + RAG）
 scripts/
   input_validator.py       # 记录校验（安全边界违反=退出码 1）
   generate_weekly_report.py # 周报生成
   vision_client.py         # 识图统一入口（OpenAI 兼容视觉模型，可用环境变量插拔）
   backup_to_oss.sh         # OSS 备份（已排除健康数据与版权全文）
-templates/                 # Prompt 模板 + JSON schema
+templates/                 # Prompt + JSON schema + 非医学自建知识库模板
 web/                       # Flask Web 入口（welcome 门禁/记录/详情/趋势/拍照向导/设置，
                            # `python web/app.py` 启动，--lan 开局域网）
 tests/                    # pytest 套件（fixtures/ 内置脱敏样例记录；数量随开发变化，以实际运行为准）
-knowledge_base/            # 经方体系知识库（含版权说明见其 README）
+knowledge_base/            # 公开仓仅含私有知识库配置说明，不附带原文或词典
 docs/                      # 用户指南、架构分析、审查报告
 ```
 
@@ -205,7 +235,7 @@ docs/                      # 用户指南、架构分析、审查报告
   （评分词表、危重舌象形态识别）。九体质（学会标准）不进主流程。
   词表逐条出处见 `docs/VOCAB_PROVENANCE_2026-10-16.md`；新增词条/判据必须
   先标出处再入库，**不得伪托**。
-- **纯 Python，零框架依赖**：四个核心 module 仅用标准库；matplotlib/numpy 仅周报画图可选
+- **纯 Python，零框架依赖**：核心 module 仅用标准库；matplotlib/numpy 仅周报画图可选
 - **深 module / 浅 interface**：每个 module 用小 interface 背后藏大量行为
 - **安全边界可断言**：`allows_formula(LOW) == False` 把"宁缺毋滥"变成可执行测试
 - **框架层 LLM 无关**：`src/` 不 import 任何 LLM SDK、不绑定 provider；`scripts/vision_client.py` 是可插拔的识图脚本，按你在 `.env` 中配置的端点发起调用（默认配置仅作示例，可整体替换）
@@ -218,8 +248,8 @@ docs/                      # 用户指南、架构分析、审查报告
 
 **本项目方不收集、不存储、不接收你的任何数据**——本库无遥测、无统计上报、无向项目方或任何第三方的数据回传。你的数据只会在一种情况下离开本机：你主动配置并使用了云端视觉/语言模型服务（见下），此时数据的接收方是你自己选择的服务商，而非本项目。
 
-- **数据流向由你掌控**：照片、望诊记录（`records/`）、图表（`charts/`）全部保存在你的机器上。`src/` 框架代码不发起任何网络请求、不含任何分析/追踪 SDK，也不硬编码任何 provider 或 endpoint。本库中唯一会联网处理数据的是 `scripts/vision_client.py`：它把照片与 prompt 发送到你**自行配置**的视觉模型端点（`VISION_BASE_URL`，**默认配置为阿里云 DashScope 兼容端点，仅作示例，可整体替换为任意 OpenAI 兼容服务，包括本地部署的模型**）。若你选用云端模型（无论由本脚本直接调用，还是由外层 Agent 调用），相应照片与文本会传输至该服务商——是否采用云端服务、如何保护数据由你决定，API key 亦由你自备。
-- **备份默认不碰健康数据**：OSS 备份脚本已排除全部 `records/`、`charts/` 与版权全文，需主动配置才会启用。
+- **数据流向由你掌控**：照片、望诊记录（`records/`）、图表（`charts/`）全部保存在你的机器上。`src/` 框架代码不发起任何网络请求、不含任何分析/追踪 SDK，也不硬编码任何 provider 或 endpoint。`scripts/vision_client.py` 只把照片与 prompt 发送到你**显式配置**的视觉模型端点（`VISION_BASE_URL` 必填，无默认第三方；支持兼容的本地服务）。上传和 CLI 图片会先按 EXIF 方向重排像素并剥离 GPS/设备元数据，再编码为 JPEG；模型只收到清洗后的字节。若你选用云端模型，处理后的图片与文本仍会传输至该服务商——是否采用云端服务、如何保护数据由你决定，API key 亦由你自备。
+- **备份默认不碰健康数据**：OSS 备份脚本只打包经过敏感路径筛选的 git 跟踪文件，排除 `records/`、`charts/`、配置与版权文件；需显式配置 `TCM_OSS_BUCKET`，未设置则拒绝上传。
 - **使用者的责任**：健康数据属敏感个人信息，请妥善保管本地目录与备份权限；若面向他人提供服务，请遵守当地个人信息保护法规。
 
 由于本项目方不收集任何数据，也不运营任何服务端，因此不存在需向本项目方请求查询、导出或删除的个人数据。就本声明的问题或改进建议，欢迎提交 [GitHub Issue](https://github.com/bonesyear/tcm-tongue-system/issues)。
@@ -228,6 +258,6 @@ docs/                      # 用户指南、架构分析、审查报告
 
 ## 许可
 
-本项目代码（`src/`、`tests/`、`scripts/`）采用 [GNU General Public License v3.0](LICENSE)。
+项目代码（`src/`、`scripts/`、`web/`、`tests/`）及项目自有模板（`templates/`）采用 [GNU General Public License v3.0](LICENSE)。仓库附许可证全文；`/license` 页面可直接查看。
 
-知识库内容（`knowledge_base/`）版权说明见 [knowledge_base/README.md](knowledge_base/README.md)。
+原始引文、例图及第三方组件保留各自的版权与许可边界，不因代码采用 GPL 而获得再分发授权。原知识库已移入私有目录，公开仓只保留 [配置说明](knowledge_base/README.md)；请用 `TCM_KB_ROOT` 指向你有权使用的目录，详见 [公私分离迁移](docs/MIGRATION_2026-11-03_KB_SPLIT.md)。

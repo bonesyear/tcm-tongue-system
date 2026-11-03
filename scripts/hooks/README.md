@@ -1,45 +1,44 @@
-# scripts/hooks/ —— 仓库 git hooks
+# scripts/hooks/ — 仓库 git hooks
 
-## pre-push：仓库守卫（隐私 + 版本一致性）
+## pre-push：隐私与版本守卫
 
-**用途**：公开仓库 push 前自动阻断「使用者信息 / 凭证 / 真实凭证指纹」，并强制版本号一致。四层检查：
+公开仓库 push 前，按 `git rev-list <local_sha> --not --remotes=<remote>` 计算**真正新增的提交**，不依赖某个 remote SHA 是否存在，也不只检查 tip。根提交、附注标签、force push 和 worktree 都走同一套检查。
 
-| 层 | 检查内容 |
+| 检查 | 当前行为 |
 |---|---|
-| ① 敏感词表 | 读仓库根的 `.privacy-words`（该文件**被 .gitignore 排除** —— 因为里面含真实姓名，绝不进仓库） |
-| ② 凭证模式 | `sk-` / `sk-ant-` / `ghp_` / `github_pat_` / `LTAI` / `AKLT` / `AIza` / `BEGIN … PRIVATE KEY` |
-| ③ 真实凭证指纹 | 读作者环境的多个 `.env` 路径（实际清单见 `scripts/hooks/pre-push` 顶部常量），取每个 KEY/TOKEN/SECRET/ID 变量值的前 14 字符，在**待推送的树**中比对（只比对前缀，不打印完整凭证） |
-| ④ 版本一致性 | 比对**待推送树**里的 `VERSION` 文件与 `CHANGELOG.md` 最新 `## vX.Y.Z` 条目，不一致则拒绝推送（防「只改一处」的版本漂移 —— 曾连续发生两次） |
+| 提交内容 | 扫描新增提交各版本中的文件内容，不只检查最后提交；后续删除不能掩盖中间提交 |
+| 文本变体 | UTF-8 / UTF-16、JSON Unicode 转义、大小写折叠、文件名、提交和附注标签消息 |
+| 凭证 | 匹配常见 API key/私钥模式；从配置的环境文件中取 KEY/TOKEN/SECRET/PASS/PWD/CREDENTIAL/ID 类值的指纹 |
+| 二进制 | 常见图片仍做原始字节检查；不能确认编码的内容 fail closed，不静默放行 |
+| 日志 | 只给规则编号、变量名和经过脱敏的位置，不打印敏感词、完整密钥或命中行 |
+| 版本 | 比对 `VERSION` 与 CHANGELOG 最新 `## vX.Y.Z`；拒绝未归类的 `## Unreleased` 段 |
 
-检查范围是**待推送的提交**（用 `local_sha` 的树，不看工作区），所以工作区里的临时文件不会误报。
+`privacy_scan.py` 只对**扫描器自身的正则定义**做精确剔除，防止自匹配；`scripts/hooks/` 目录和其他文件没有整目录豁免。
 
-> ⚠️ **检查时排除 `scripts/hooks/` 自身**：否则脚本里的凭证正则字面量与本文档里的模式列举会命中自己（"检测器检测自己"，实测踩过 —— 首次 push 即被自己的规则拦下）。
+### 敏感词表
 
-## 启用（每台新环境执行一次）
+默认词表为主工作树 `.privacy-words`，由 common git dir 定位，linked worktree 也能找到；可用 `PRIVACY_WORDS_FILE` 指定其他文件。文件被 `.gitignore` 排除，不要提交。
+
+- 每行一个词，支持 UTF-8 BOM、首尾空白与 `#` 注释行；空行忽略。
+- **缺失或不可读时拒绝放行**，不会打印“未发现敏感信息”后放行。没有敏感词的环境可显式创建空文件或指定空词表。
+- `_PRIVACY_ENV_FILES` 可提供指纹配置路径：JSON 字符串数组，或 `os.pathsep` 分隔的列表；也兼容旧的空白分隔。默认检查项目 `.env` 与若干用户配置路径，缺失文件跳过。
+- 指纹只取长度至少 20 的值的前 14 字符，不在日志中输出完整凭证或片段。
+
+### 启用
 
 ```bash
 git config core.hooksPath scripts/hooks
 chmod +x scripts/hooks/pre-push
 ```
 
-## 维护 `.privacy-words`
+### 验证
 
-出现新的敏感词（姓名、独特病程叙述、真实舌象值、联系方式）时追加到 `.privacy-words`，一行一个。**该文件不要提交**（已在 .gitignore）。
+```bash
+python3 -m pytest tests/test_pre_push.py tests/test_oss_backup.py tests/test_push_script.py -q
+```
 
-## 误报处理
+测试使用临时仓库、临时 bare remote、合成敏感词和本地 stub。不会执行真实 GitHub 推送、OSS 上传或历史修改。
 
-确认是术语或说明性文字时可用 `git push --no-verify`，但应在提交信息或工作记录里写明豁免理由。
+### 误报处理
 
-## 已验证（2026-09-18 实测）
-
-| 场景 | 结果 |
-|---|---|
-| 干净提交 | ✅ 放行 |
-| 提交中含真实姓名 | ✅ 拦截，并报出文件:行号 |
-| 提交中含凭证指纹（假 key 探针） | ✅ 拦截，并报出变量名与前缀 |
-| 版本一致（`VERSION` == `CHANGELOG` 最新条目） | ✅ 放行，打印 `✓ 版本一致：vX.Y.Z` |
-| 版本不一致（故意把 `VERSION` 改成 9.9.9 后提交） | ✅ 拦截，exit=1，并给出「改成哪一边」的修复指引 |
-
-## 与 skill 的关系
-
-历史清理流程（filter-repo / force push / 服务端 dangling commit 的诚实边界）见 skill `public-repo-privacy`。**本 hook 只防"未来的推送"，不能清理已进入历史的内容。**
+确认是术语或说明性文字时可用 `git push --no-verify`，但应记录豁免理由。含敏感内容的提交必须从历史中 amend / rebase 清除；新增删除提交不能清除历史。历史清理流程见 skill `public-repo-privacy`，hook 只防未来推送，不能清理已经进入历史的内容。

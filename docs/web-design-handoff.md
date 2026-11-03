@@ -83,18 +83,19 @@ web/design/
    `scripts/input_validator.py` 的 `validate_record()`；保存触发自动重评分、覆盖写回
    （**形状感知**，参考 `src/record.py` `_DIMENSION_INDICATORS`）、旧版备份
    `records/_backup/`、记录打 `manually_corrected: true` + 时间戳。
-4. **拍照向导双跳过**：「跳过（声明正常）」计入覆盖度 /「跳过（未覆盖）」不计分，
-   两者都需在记录中显式标注，**不得伪造观察值**（KNOWN_ISSUES #10 定策）。
-   拍摄纪律文案含锁定项：舌底/手掌**禁闪光灯**。
+4. **拍照向导声明**：声明正常、跳过、拒绝、无法拍摄分别写入 `declarations`，
+   不计真实覆盖，**不得伪造观察值**。形状 B v2 另存 `observation_meta` 记录采集
+   来源、方式、原始值、确定性和证据；比例尺、下睑暴露、触诊/自陈与衣物证据
+   必须可由用户选择。拍摄纪律文案含锁定项：舌底/手掌**禁闪光灯**。
 5. **danger_flags 拦截**：弹层为**拦截式**（overlay + modal），文案须含 flag 中文名、
-   体征、禁忌与「肉眼复核」出口；九项键名与中文名对照已做成字典 `DANGER_FLAGS`
-   （mock-data.js，键对齐 `templates/multi_dim_record_template.json`，
-   名对齐 `templates/adaptive_analysis_prompt.md` §4.5）。两个出口按钮：
+   体征、禁忌与「肉眼复核」出口；`src/alerts.py` 区分单项筛查/组合规则与未知。
+   规则以 `DANGER_FLAGS` / `DANGER_PROVENANCE` 为准，mock 仅作展示。两个出口按钮：
    「误判，去修正观察值」「已肉眼复核，保留警示」。
 6. **当日已有记录再走向导**：三选条「补充未覆盖维度 / 重新分析（旧版自动备份）/ 取消」。
 7. **设置页**：`VISION_*`（现状键名，见 `scripts/vision_client.py`）+ 新增 `LLM_*`
    （辨证模型）；每个字段下标注对应环境变量名；连通性测试按钮 + 结果位（成功/未测试/失败）；
-   绑定默认 127.0.0.1，选 0.0.0.0 须先设 `WEB_ADMIN_TOKEN`，否则局域网只读（演示态在页底）。
+   绑定默认 127.0.0.1，非回环监听必须先设 `WEB_ADMIN_TOKEN`，否则拒绝保存/启动；
+   局域网口令经 POST 验证换取会话，未验证时设置只读且健康数据不可读（演示态在页底）。
 8. **空库首启**：首页顶部「载入示例数据」条（demo 数据源：
    `tests/fixtures/2026-06-25_analysis.json`，其 `formula` 为合成数据，UI 须保留合成标注）。
 

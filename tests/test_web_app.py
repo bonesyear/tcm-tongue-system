@@ -27,10 +27,11 @@ def client(env_path, monkeypatch):
     for k in ("VISION_API_KEY", "VISION_MODEL", "VISION_BASE_URL",
               "LLM_API_KEY", "WEB_ADMIN_TOKEN", "WEB_HOST"):
         monkeypatch.delenv(k, raising=False)
-    app = create_app(env_file=env_path)
+    app = create_app(env_file=env_path,
+               data_root=os.path.join(os.path.dirname(env_path), "data"))
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")  # 完成启动声明确认，免打扰其余用例
+    c.post("/welcome", headers={"Origin": "http://localhost"})  # 完成启动声明确认，免打扰其余用例
     return c
 
 
@@ -72,22 +73,32 @@ def test_envfile_missing_returns_empty(env_path):
 def test_first_visit_redirects_to_welcome(env_path, monkeypatch):
     for k in ("VISION_API_KEY",):
         monkeypatch.delenv(k, raising=False)
-    app = create_app(env_file=env_path)
+    app = create_app(env_file=env_path,
+               data_root=os.path.join(os.path.dirname(env_path), "data"))
     app.config["TESTING"] = True
     c = app.test_client()
     resp = c.get("/")
     assert resp.status_code == 302
     assert "/welcome" in resp.headers["Location"]
     # 确认后放行，且未配 key 时落到设置页
-    resp = c.post("/welcome")
+    resp = c.post("/welcome", headers={"Origin": "http://localhost"})
     assert resp.status_code == 302
     assert "/settings" in resp.headers["Location"]
     assert c.get("/").status_code == 200
 
 
+def test_welcome_discloses_model_limits_and_unknown_semantics(client):
+    html = client.get("/welcome").get_data(as_text=True)
+    assert "不构成医疗诊断" in html
+    assert "你在设置页自配置的视觉模型" in html
+    assert "新流程会标为「未知」" in html
+    assert "兼容 0 分也不代表确认正常" in html
+    assert "对照原图人工复核" in html
+
+
 def test_welcome_ack_lands_home_when_configured(client, env_path):
     envfile.write_env(env_path, {"VISION_API_KEY": "sk-x"})
-    resp = client.post("/welcome")
+    resp = client.post("/welcome", headers={"Origin": "http://localhost"})
     assert resp.headers["Location"] == "/"
     # 已确认用户可随时回看须知页
     assert client.get("/welcome").status_code == 200
@@ -108,7 +119,8 @@ def test_index_ok_when_configured(client, env_path):
 
 def test_license_served_locally_without_ack(env_path, monkeypatch):
     monkeypatch.delenv("VISION_API_KEY", raising=False)
-    app = create_app(env_file=env_path)
+    app = create_app(env_file=env_path,
+               data_root=os.path.join(os.path.dirname(env_path), "data"))
     app.config["TESTING"] = True
     c = app.test_client()  # 未确认须知也可直接读 LICENSE
     resp = c.get("/license")
@@ -178,10 +190,11 @@ def test_test_endpoint_rejects_unknown_target(client):
 def test_env_var_sourced_fields_locked(env_path, monkeypatch):
     """环境变量来源的字段：页面锁定 + 醒目提示（防止「保存了又变回」的困惑）。"""
     monkeypatch.setenv("VISION_BASE_URL", "https://env-var.example.com/v1/chat/completions")
-    app = create_app(env_file=env_path)
+    app = create_app(env_file=env_path,
+               data_root=os.path.join(os.path.dirname(env_path), "data"))
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     html = c.get("/settings").get_data(as_text=True)
     assert "来自系统环境变量" in html
     assert "VISION_BASE_URL" in html
@@ -207,19 +220,21 @@ def test_list_models_url_derivation():
 
 
 def test_settings_models_endpoint(client, env_path, monkeypatch):
-    """拉模型列表：mock urlopen，验证解析与排序。"""
+    """拉模型列表：mock 安全传输，验证解析与排序。"""
     import io as _io
     import json as _json
     sys.path.insert(0, os.path.join(_ROOT, "web"))
-    import llm_client
+    import safe_fetch
 
     class Resp:
-        def read(self):
-            return _json.dumps({"data": [{"id": "qwen3.8-max"}, {"id": "glm-5.3"}]}).encode()
+        def __init__(self):
+            self.stream = _io.BytesIO(_json.dumps(
+                {"data": [{"id": "qwen3.8-max"}, {"id": "glm-5.3"}]}).encode())
+        def read(self, size=-1): return self.stream.read(size)
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
-    monkeypatch.setattr(llm_client.urllib.request, "urlopen",
+    monkeypatch.setattr(safe_fetch, "urlopen",
                         lambda req, timeout=None: Resp())
     envfile.write_env(env_path, {
         "VISION_API_KEY": "sk-x",
@@ -263,24 +278,25 @@ def test_models_endpoint_requires_admin(client):
     assert resp.status_code == 403
 
 
-def test_vision_config_not_self_latching(client, env_path, monkeypatch):
-    """_configure_vision 把生效配置注入 os.environ 后，cfg() 仍读 .env 新值
-    （回归：进程内注入不得自我锁存，改配置后无需重启服务）。"""
+def test_vision_config_fresh_request_snapshot(client, env_path, monkeypatch):
+    """每个请求独立读取快照，修改配置后无需重启或 reload。"""
+    import io as _io
     import json as _json
-    import vision_client
+    import safe_fetch
     seen = []
 
     class Resp:
-        def read(self):
-            return _json.dumps({"choices": [{"message": {"content": "舌面"}}]}).encode()
+        def __init__(self):
+            self.stream = _io.BytesIO(_json.dumps(
+                {"choices": [{"message": {"content": "舌面"}}]}).encode())
+        def read(self, size=-1): return self.stream.read(size)
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
-    # reload 会重建 vision_client.call，只能钉在更底层 urlopen 上
     def fake_urlopen(req, timeout=None):
         seen.append(_json.loads(req.data.decode())["model"])
         return Resp()
-    monkeypatch.setattr(vision_client.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(safe_fetch, "urlopen", fake_urlopen)
     envfile.write_env(env_path, {
         "VISION_API_KEY": "sk-x", "VISION_MODEL": "model-a",
         "VISION_BASE_URL": "https://x.com/v1/chat/completions"})
@@ -294,12 +310,13 @@ def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
     """拉模型列表优先用表单里未保存的端点/Key（先填后拉再存的引导序）。"""
     import io as _io
     import json as _json
-    import llm_client
+    import safe_fetch
     seen = {}
 
     class Resp:
-        def read(self):
-            return _json.dumps({"data": [{"id": "m1"}]}).encode()
+        def __init__(self):
+            self.stream = _io.BytesIO(_json.dumps({"data": [{"id": "m1"}]}).encode())
+        def read(self, size=-1): return self.stream.read(size)
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
@@ -308,7 +325,7 @@ def test_models_endpoint_uses_unsaved_form_values(client, monkeypatch):
         seen["auth"] = req.headers.get("Authorization")
         return Resp()
 
-    monkeypatch.setattr(llm_client.urllib.request, "urlopen", capture)
+    monkeypatch.setattr(safe_fetch, "urlopen", capture)
     resp = client.post("/settings/models", json={
         "target": "vision",
         "base_url": "https://fresh.example.com/v1",
@@ -330,7 +347,8 @@ def test_guide_serves_user_guide_html(client):
 def test_guide_reachable_without_boot_ack(env_path, monkeypatch):
     """手册在 welcome 门禁之外（welcome 页本身就链它，否则死循环）。"""
     monkeypatch.delenv("VISION_API_KEY", raising=False)
-    app = create_app(env_file=env_path)
+    app = create_app(env_file=env_path,
+               data_root=os.path.join(os.path.dirname(env_path), "data"))
     app.config["TESTING"] = True
     c = app.test_client()  # 不做 /welcome 确认
     resp = c.get("/guide/", follow_redirects=True)
@@ -414,7 +432,8 @@ def test_saved_banner_host_sentence_conditional(client, env_path):
     assert "监听地址的变更" not in html
     html2 = client.get("/settings?saved=1&host_changed=1").get_data(as_text=True)
     assert "监听地址的变更" in html2
-    # 真改 WEB_HOST → 跳转带标记
+    # 真改 WEB_HOST → 跳转带标记；非回环监听须已有管理口令
+    client.post("/settings", data={"WEB_ADMIN_TOKEN": "test-secret"})
     resp = client.post("/settings", data={"WEB_HOST": "0.0.0.0"})
     assert "host_changed=1" in resp.headers["Location"]
 
@@ -456,3 +475,151 @@ def test_llm_banner_returns_when_reenabled(client):
     assert "LLM_API_KEY" not in client.get("/").get_data(as_text=True)
     client.post("/settings", data={"FORM_LLM": "1", "LLM_ENABLED": "1"})
     assert "LLM_API_KEY" in client.get("/").get_data(as_text=True)
+
+
+def test_vision_settings_reach_photo_observation(tmp_path, monkeypatch):
+    import io
+    import wizard_store
+
+    for key in ("VISION_API_KEY", "VISION_MODEL", "VISION_BASE_URL",
+                "VISION_TEMPERATURE", "VISION_TIMEOUT", "VISION_MAX_TOKENS"):
+        monkeypatch.delenv(key, raising=False)
+    env_path = str(tmp_path / ".env")
+    app = create_app(env_file=env_path, data_root=str(tmp_path / "data"))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+    client.post("/settings", data={
+        "FORM_VISION": "1", "VISION_ENABLED": "1", "VISION_API_KEY": "sk-test",
+        "VISION_MODEL": "model-from-settings",
+        "VISION_BASE_URL": "https://example.invalid/v1/chat/completions",
+        "VISION_TEMPERATURE": "0.6", "VISION_TIMEOUT": "9",
+        "VISION_MAX_TOKENS": "7000",
+    })
+    seen = {}
+
+    def fake_observe(part, img_path, **options):
+        seen.update(options)
+        return {"舌质颜色": "淡红"}, []
+
+    monkeypatch.setattr(wizard_store, "observe_photo", fake_observe)
+    resp = client.post("/wizard/photo", data={
+        "part": "舌面", "file": (io.BytesIO(__import__("test_web_wizard").PNG), "photo.jpg"),
+    }, content_type="multipart/form-data")
+
+    assert resp.status_code == 200, resp.get_json()
+    assert seen == {
+        "model": "model-from-settings",
+        "url": "https://example.invalid/v1/chat/completions",
+        "key": "sk-test", "timeout": 9, "max_tokens": 7000, "temperature": 0.6,
+    }
+
+
+@pytest.mark.parametrize("key", ["VISION_TEMPERATURE", "VISION_TIMEOUT"])
+def test_invalid_vision_number_returns_400(tmp_path, monkeypatch, key):
+    import io
+    import wizard_store
+
+    for name in ("VISION_API_KEY", "VISION_MODEL", "VISION_BASE_URL",
+                 "VISION_TEMPERATURE", "VISION_TIMEOUT"):
+        monkeypatch.delenv(name, raising=False)
+    app = create_app(env_file=str(tmp_path / ".env"),
+                     data_root=str(tmp_path / "data"))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+    envfile.write_env(str(tmp_path / ".env"), {
+        "VISION_API_KEY": "sk-test", "VISION_MODEL": "m",
+        "VISION_BASE_URL": "https://example.invalid/v1/chat/completions",
+        key: "not-a-number",
+    })
+    monkeypatch.setattr(wizard_store, "observe_photo",
+                        lambda *args, **kwargs: ({"舌质颜色": "淡红"}, []))
+
+    resp = client.post("/wizard/photo", data={
+        "part": "舌面", "file": (io.BytesIO(__import__("test_web_wizard").PNG), "photo.jpg"),
+    }, content_type="multipart/form-data")
+
+    assert resp.status_code == 400
+    assert key in resp.get_json()["error"]
+
+
+def test_wizard_submit_rejects_unknown_acknowledgement(tmp_path, monkeypatch):
+    import wizard_store
+
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    app = create_app(env_file=str(tmp_path / ".env"),
+                     data_root=str(tmp_path / "data"))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+    today = wizard_store.datetime.date.today().isoformat()
+    daily = tmp_path / "data" / "records" / "daily"
+    draft = {
+        "date": today,
+        "parts": {p["part"]: {"status": "skip_uncovered"}
+                  for p in wizard_store.PARTS},
+        "danger_flags": {"triggered": ["daiyang"], "not_triggered": []},
+    }
+    wizard_store.save_draft(str(daily), draft)
+
+    resp = client.post("/wizard/submit",
+                       json={"mode": "new", "acknowledge": "bogus"})
+
+    assert resp.status_code == 400
+    assert not (daily / f"{today}_analysis.json").exists()
+
+
+@pytest.mark.parametrize("key", ["VISION_TEMPERATURE", "VISION_TIMEOUT"])
+def test_settings_rejects_invalid_vision_number(client, env_path, key):
+    resp = client.post("/settings", data={
+        "FORM_VISION": "1", "VISION_ENABLED": "1", key: "not-a-number",
+    })
+
+    assert resp.status_code == 400
+    assert key in resp.get_data(as_text=True)
+    assert key not in envfile.read_env(env_path)
+
+
+def test_boot_ack_rejects_forged_cookie(client):
+    client.set_cookie("boot_ack", "forged")
+    resp = client.get("/")
+    assert resp.status_code == 302
+    assert "/welcome" in resp.headers["Location"]
+
+
+@pytest.mark.parametrize("path", [
+    "/demo", "/settings", "/settings/models", "/settings/test",
+    "/record/2026-06-25/field", "/record/2026-06-25/report",
+    "/record/2026-06-25/restore", "/wizard/photo", "/wizard/field",
+    "/wizard/manual", "/wizard/inquiry", "/wizard/context",
+    "/wizard/skip", "/wizard/submit",
+])
+def test_lan_write_endpoints_reject_missing_credentials(client, env_path, path):
+    resp = client.post(path, json={}, environ_overrides={"REMOTE_ADDR": "192.168.1.20"})
+    assert resp.status_code == 403, (path, resp.status_code)
+    target = os.path.join(os.path.dirname(env_path), "data", "records", "daily",
+                          "2026-06-25_analysis.json")
+    assert not os.path.exists(target), path
+
+
+def test_upload_rejects_non_image_extension(client, env_path):
+    import io
+    resp = client.post("/wizard/photo", data={
+        "part": "舌面", "file": (io.BytesIO(b"not-an-image"), "payload.exe"),
+    }, content_type="multipart/form-data")
+    assert resp.status_code == 400
+    photos = os.path.join(os.path.dirname(env_path), "data", "records", "photos")
+    assert not os.path.exists(photos)
+
+
+def test_photo_route_rejects_invalid_date_and_traversal(client):
+    assert client.get("/photos/not-a-date/x.jpg").status_code == 404
+    assert client.get("/photos/2026-06-25/..%2F..%2F.env").status_code in (400, 404)
+
+
+def test_default_data_root_and_external_config_are_isolated(tmp_path):
+    from src import paths
+    assert paths.DATA_ROOT == str(tmp_path / "data")
+    with pytest.raises(PermissionError):
+        envfile.read_env(os.path.join(_ROOT, ".env"))

@@ -16,14 +16,18 @@
   - 原查询词始终并入模式（与别名词典给出的标准术语一起 OR）。
   - query 不是别名词典的键时，pattern = re.escape(query)，synonyms_used = []。
 
-本模块是 leaf：不依赖 retrieval 内其它模块，可独立测试。
+本模块仅依赖 kb_paths 提供路径，可独立测试。
 """
 
 from __future__ import annotations
 
 import os
 import re
+import sys
+import threading
 from dataclasses import dataclass, field
+
+from .kb_paths import kb_map_path
 
 
 # ============================================================
@@ -82,31 +86,47 @@ def _parse_simple_yaml(text: str) -> dict[str, list[str]]:
     return result
 
 
-def load_map(path: str | None = None) -> dict[str, list[str]]:
-    """加载别名词典为 {临床词: [标准术语,...]}。
+MAX_SYNONYM_KEYS = 512
+MAX_SYNONYMS_PER_KEY = 64
+MAX_SYNONYM_TERM_CHARS = 128
 
-    优先 PyYAML；未安装则用手写解析器。path 默认 knowledge_base/synonym_map.yaml。
-    """
-    p = os.path.abspath(path or DEFAULT_MAP_PATH)
-    with open(p, encoding="utf-8") as f:
+
+def load_map(path: str | None = None) -> dict[str, list[str]]:
+    """加载别名词典；默认跟随当前 KB_ROOT，直接调用时严格报告格式错误。"""
+    p = os.path.abspath(path or kb_map_path())
+    with open(p, encoding="utf-8-sig") as f:
         text = f.read()
     try:
         import yaml  # type: ignore
-        data = yaml.safe_load(text)
     except ImportError:
-        return _parse_simple_yaml(text)
+        data = _parse_simple_yaml(text)
+    else:
+        try:
+            data = yaml.load(text, Loader=yaml.BaseLoader)
+        except yaml.YAMLError as error:
+            raise ValueError(f"别名词典 YAML 格式无效: {error}") from error
     if not isinstance(data, dict):
         raise ValueError(f"别名词典顶层必须是 dict，实际: {type(data).__name__}")
-    # 规范化：值统一为 list[str]
+    if len(data) > MAX_SYNONYM_KEYS:
+        raise ValueError(f"别名词典键数量超过 {MAX_SYNONYM_KEYS} 上限")
     normalized: dict[str, list[str]] = {}
     for key, val in data.items():
+        if not isinstance(key, str):
+            raise ValueError("别名词典键必须是字符串")
+        if len(key) > MAX_SYNONYM_TERM_CHARS:
+            raise ValueError("别名词典键过长")
         if val is None:
-            normalized[str(key)] = []
-        elif isinstance(val, list):
-            normalized[str(key)] = [str(v) for v in val]
+            normalized[key] = []
+        elif isinstance(val, str):
+            normalized[key] = [val]
+        elif isinstance(val, list) and all(isinstance(v, str) for v in val):
+            normalized[key] = val
         else:
-            # 单值容忍为单项列表
-            normalized[str(key)] = [str(val)]
+            raise ValueError(f"别名词典 {key!r} 的值必须是字符串或字符串列表")
+        if len(normalized[key]) > MAX_SYNONYMS_PER_KEY:
+            raise ValueError(f"别名词典 {key!r} 的别名数量超过 {MAX_SYNONYMS_PER_KEY} 上限")
+        if any(len(value) > MAX_SYNONYM_TERM_CHARS for value in normalized[key]):
+            raise ValueError(f"别名词典 {key!r} 含过长词条")
     return normalized
 
 
@@ -114,17 +134,29 @@ def load_map(path: str | None = None) -> dict[str, list[str]]:
 # 缓存（按路径+mtime 失效，避免每次 expand 都读盘）
 # ============================================================
 _CACHE: dict[str, tuple[float, dict[str, list[str]]]] = {}
+_CACHE_LOCK = threading.RLock()
 
 
 def _load_map_cached(path: str | None = None) -> dict[str, list[str]]:
-    p = os.path.abspath(path or DEFAULT_MAP_PATH)
-    mtime = os.path.getmtime(p)
-    cached = _CACHE.get(p)
-    if cached and cached[0] == mtime:
-        return cached[1]
-    m = load_map(p)
-    _CACHE[p] = (mtime, m)
-    return m
+    p = os.path.abspath(path or kb_map_path())
+    with _CACHE_LOCK:
+        mtime = 0
+        try:
+            mtime = os.path.getmtime(p)
+            cached = _CACHE.get(p)
+            if cached and cached[0] == mtime:
+                return cached[1]
+            m = load_map(p)
+        except FileNotFoundError:
+            m = {}
+        except (OSError, UnicodeError, ValueError) as error:
+            cached = _CACHE.get(p)
+            if cached and cached[0] == 0:
+                return cached[1]
+            print(f"⚠️ 警告: 别名词典不可用，按原词检索 {p}: {error}", file=sys.stderr)
+            m = {}
+        _CACHE[p] = (mtime, m)
+        return m
 
 
 # ============================================================
@@ -175,6 +207,7 @@ def expand_many(queries: list[str], syn_map: dict[str, list[str]] | None = None)
     """
     sm = syn_map if syn_map is not None else _load_map_cached()
     seen: set[str] = set()
+    seen_syns: set[str] = set()
     all_terms: list[str] = []
     all_syns: list[str] = []
     for q in queries:
@@ -184,8 +217,8 @@ def expand_many(queries: list[str], syn_map: dict[str, list[str]] | None = None)
                 seen.add(t)
                 all_terms.append(t)
         for s in r.synonyms_used:
-            if s not in seen:
-                seen.add(s)
+            if s not in seen_syns and s not in queries:
+                seen_syns.add(s)
                 all_syns.append(s)
     pattern = "|".join(re.escape(t) for t in all_terms) if all_terms else ""
     return ExpandResult(

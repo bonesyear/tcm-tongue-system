@@ -1,0 +1,3233 @@
+{
+  "schema_version": 1,
+  "status": "pending",
+  "entries": [
+    {
+      "id": "tongue.body_color.淡红",
+      "dimension": "tongue",
+      "indicator": "body_color.淡红",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_color.淡白",
+      "dimension": "tongue",
+      "indicator": "body_color.淡白",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_color.红",
+      "dimension": "tongue",
+      "indicator": "body_color.红",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_color.红绛",
+      "dimension": "tongue",
+      "indicator": "body_color.红绛",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_color.紫暗",
+      "dimension": "tongue",
+      "indicator": "body_color.紫暗",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.薄",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.薄",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.薄白",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.薄白",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.薄黄",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.薄黄",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.略厚",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.略厚",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.稍厚",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.稍厚",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.偏厚",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.偏厚",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.无苔",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.无苔",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.白厚",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.白厚",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.黄厚",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.黄厚",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.厚腻",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.厚腻",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_thickness.焦黑",
+      "dimension": "tongue",
+      "indicator": "coating_thickness.焦黑",
+      "current_value": 10,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "薄厚苔",
+          "locator": "PDF p107"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_moisture.润",
+      "dimension": "tongue",
+      "indicator": "coating_moisture.润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "润/滑/燥/糙苔",
+          "locator": "PDF p108"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_moisture.滑",
+      "dimension": "tongue",
+      "indicator": "coating_moisture.滑",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "润/滑/燥/糙苔",
+          "locator": "PDF p108"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_moisture.燥",
+      "dimension": "tongue",
+      "indicator": "coating_moisture.燥",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "润/滑/燥/糙苔",
+          "locator": "PDF p108"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_moisture.干裂",
+      "dimension": "tongue",
+      "indicator": "coating_moisture.干裂",
+      "current_value": 10,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "润/滑/燥/糙苔",
+          "locator": "PDF p108"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.tooth_marks.无",
+      "dimension": "tongue",
+      "indicator": "tooth_marks.无",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "齿痕舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.tooth_marks.轻度",
+      "dimension": "tongue",
+      "indicator": "tooth_marks.轻度",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "齿痕舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.tooth_marks.中度",
+      "dimension": "tongue",
+      "indicator": "tooth_marks.中度",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "齿痕舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.tooth_marks.重度",
+      "dimension": "tongue",
+      "indicator": "tooth_marks.重度",
+      "current_value": 10,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "齿痕舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.petechiae.无",
+      "dimension": "tongue",
+      "indicator": "petechiae.无",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "瘀斑/瘀点",
+          "locator": "PDF p101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.petechiae.散在",
+      "dimension": "tongue",
+      "indicator": "petechiae.散在",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "瘀斑/瘀点",
+          "locator": "PDF p101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.petechiae.密集",
+      "dimension": "tongue",
+      "indicator": "petechiae.密集",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "瘀斑/瘀点",
+          "locator": "PDF p101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_varicosity.无",
+      "dimension": "tongue",
+      "indicator": "sublingual_varicosity.无",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉曲张",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_varicosity.轻度",
+      "dimension": "tongue",
+      "indicator": "sublingual_varicosity.轻度",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉曲张",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_varicosity.中度",
+      "dimension": "tongue",
+      "indicator": "sublingual_varicosity.中度",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉曲张",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_varicosity.重度",
+      "dimension": "tongue",
+      "indicator": "sublingual_varicosity.重度",
+      "current_value": 10,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉曲张",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.fissure.无",
+      "dimension": "tongue",
+      "indicator": "fissure.无",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "裂纹舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.fissure.浅裂",
+      "dimension": "tongue",
+      "indicator": "fissure.浅裂",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "裂纹舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.fissure.深裂",
+      "dimension": "tongue",
+      "indicator": "fissure.深裂",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "裂纹舌",
+          "locator": "PDF p104"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.适中",
+      "dimension": "tongue",
+      "indicator": "body_size.适中",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.稍胖",
+      "dimension": "tongue",
+      "indicator": "body_size.稍胖",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.略瘦",
+      "dimension": "tongue",
+      "indicator": "body_size.略瘦",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.偏胖",
+      "dimension": "tongue",
+      "indicator": "body_size.偏胖",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.偏瘦",
+      "dimension": "tongue",
+      "indicator": "body_size.偏瘦",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.胖大",
+      "dimension": "tongue",
+      "indicator": "body_size.胖大",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.瘦小",
+      "dimension": "tongue",
+      "indicator": "body_size.瘦小",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body_size.肿胀",
+      "dimension": "tongue",
+      "indicator": "body_size.肿胀",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胖大舌/瘦薄舌",
+          "locator": "PDF p102"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_peeling.剥落",
+      "dimension": "tongue",
+      "indicator": "coating_peeling.剥落",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "剥落苔/类剥苔/镜面舌",
+          "locator": "PDF p109-110"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_peeling.剥脱",
+      "dimension": "tongue",
+      "indicator": "coating_peeling.剥脱",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "剥落苔/类剥苔/镜面舌",
+          "locator": "PDF p109-110"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_peeling.花剥",
+      "dimension": "tongue",
+      "indicator": "coating_peeling.花剥",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "剥落苔/类剥苔/镜面舌",
+          "locator": "PDF p109-110"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_peeling.地图舌",
+      "dimension": "tongue",
+      "indicator": "coating_peeling.地图舌",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "剥落苔/类剥苔/镜面舌",
+          "locator": "PDF p109-110"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_peeling.镜面",
+      "dimension": "tongue",
+      "indicator": "coating_peeling.镜面",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "剥落苔/类剥苔/镜面舌",
+          "locator": "PDF p109-110"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.微腻",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.微腻",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.稍腻",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.稍腻",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.偏腻",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.偏腻",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.腻",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.腻",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.厚腻",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.厚腻",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_greasy.腐苔",
+      "dimension": "tongue",
+      "indicator": "coating_greasy.腐苔",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "腻苔/腐苔/脓腐苔",
+          "locator": "PDF p108-109"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_color.白",
+      "dimension": "tongue",
+      "indicator": "coating_color.白",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔色",
+          "locator": "PDF p111-112"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_color.黄",
+      "dimension": "tongue",
+      "indicator": "coating_color.黄",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔色",
+          "locator": "PDF p111-112"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_color.灰",
+      "dimension": "tongue",
+      "indicator": "coating_color.灰",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔色",
+          "locator": "PDF p111-112"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_color.黑",
+      "dimension": "tongue",
+      "indicator": "coating_color.黑",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔色",
+          "locator": "PDF p111-112"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.coating_color.灰黑",
+      "dimension": "tongue",
+      "indicator": "coating_color.灰黑",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔色",
+          "locator": "PDF p111-112"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_color.淡紫",
+      "dimension": "tongue",
+      "indicator": "sublingual_color.淡紫",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉颜色",
+          "locator": "PDF p113"
+        },
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "淡紫（正常基线）",
+          "locator": "现代经验基线；VOCAB_PROVENANCE §一"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_color.紫暗",
+      "dimension": "tongue",
+      "indicator": "sublingual_color.紫暗",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉颜色",
+          "locator": "PDF p113"
+        },
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "淡紫（正常基线）",
+          "locator": "现代经验基线；VOCAB_PROVENANCE §一"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_color.青紫",
+      "dimension": "tongue",
+      "indicator": "sublingual_color.青紫",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉颜色",
+          "locator": "PDF p113"
+        },
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "淡紫（正常基线）",
+          "locator": "现代经验基线；VOCAB_PROVENANCE §一"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_thickness.增粗",
+      "dimension": "tongue",
+      "indicator": "sublingual_thickness.增粗",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉粗细",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_thickness.怒张",
+      "dimension": "tongue",
+      "indicator": "sublingual_thickness.怒张",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉粗细",
+          "locator": "PDF p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_petechiae.无",
+      "dimension": "tongue",
+      "indicator": "sublingual_petechiae.无",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下瘀点",
+          "locator": "PDF p101、p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_petechiae.散在",
+      "dimension": "tongue",
+      "indicator": "sublingual_petechiae.散在",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下瘀点",
+          "locator": "PDF p101、p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_petechiae.密集",
+      "dimension": "tongue",
+      "indicator": "sublingual_petechiae.密集",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下瘀点",
+          "locator": "PDF p101、p113"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.萎黄",
+      "dimension": "head_face",
+      "indicator": "face_color.萎黄",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.晦暗",
+      "dimension": "head_face",
+      "indicator": "face_color.晦暗",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.黧黑",
+      "dimension": "head_face",
+      "indicator": "face_color.黧黑",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.青灰",
+      "dimension": "head_face",
+      "indicator": "face_color.青灰",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.红如妆",
+      "dimension": "head_face",
+      "indicator": "face_color.红如妆",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.苍白",
+      "dimension": "head_face",
+      "indicator": "face_color.苍白",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.㿠白",
+      "dimension": "head_face",
+      "indicator": "face_color.㿠白",
+      "current_value": 7,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.淡白",
+      "dimension": "head_face",
+      "indicator": "face_color.淡白",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_color.红赤",
+      "dimension": "head_face",
+      "indicator": "face_color.红赤",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面色/戴阳/青灰",
+          "locator": "PDF p54-58"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_luster.荣润",
+      "dimension": "head_face",
+      "indicator": "face_luster.荣润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "色泽/荣枯",
+          "locator": "PDF p54-56"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_luster.晦暗",
+      "dimension": "head_face",
+      "indicator": "face_luster.晦暗",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "色泽/荣枯",
+          "locator": "PDF p54-56"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_luster.枯槁",
+      "dimension": "head_face",
+      "indicator": "face_luster.枯槁",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "色泽/荣枯",
+          "locator": "PDF p54-56"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_edema.明显浮肿",
+      "dimension": "head_face",
+      "indicator": "face_edema.明显浮肿",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面肿/目胞浮肿",
+          "locator": "PDF p69、p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_edema.轻度浮肿",
+      "dimension": "head_face",
+      "indicator": "face_edema.轻度浮肿",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面肿/目胞浮肿",
+          "locator": "PDF p69、p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.face_edema.面目鲜泽",
+      "dimension": "head_face",
+      "indicator": "face_edema.面目鲜泽",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "面肿/目胞浮肿",
+          "locator": "PDF p69、p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.淡白",
+      "dimension": "head_face",
+      "indicator": "lip_color.淡白",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.暗黄",
+      "dimension": "head_face",
+      "indicator": "lip_color.暗黄",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.淡红",
+      "dimension": "head_face",
+      "indicator": "lip_color.淡红",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.红润",
+      "dimension": "head_face",
+      "indicator": "lip_color.红润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.淡粉红",
+      "dimension": "head_face",
+      "indicator": "lip_color.淡粉红",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.红",
+      "dimension": "head_face",
+      "indicator": "lip_color.红",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.紫暗",
+      "dimension": "head_face",
+      "indicator": "lip_color.紫暗",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_color.青紫",
+      "dimension": "head_face",
+      "indicator": "lip_color.青紫",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇色",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.润",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.稍干",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.稍干",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.偏干",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.偏干",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.干燥",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.干燥",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.燥裂",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.燥裂",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.lip_moisture.干枯",
+      "dimension": "head_face",
+      "indicator": "lip_moisture.干枯",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "唇润燥",
+          "locator": "PDF p74"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.nose_flare.明显",
+      "dimension": "head_face",
+      "indicator": "nose_flare.明显",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "鼻翼扇动/鼻扇",
+          "locator": "PDF p73"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "head_face.nose_flare.轻度",
+      "dimension": "head_face",
+      "indicator": "nose_flare.轻度",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "鼻翼扇动/鼻扇",
+          "locator": "PDF p73"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.redness.充血",
+      "dimension": "eye",
+      "indicator": "redness.充血",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目赤",
+          "locator": "PDF p70-71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.redness.赤丝",
+      "dimension": "eye",
+      "indicator": "redness.赤丝",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目赤",
+          "locator": "PDF p70-71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.redness.红赤",
+      "dimension": "eye",
+      "indicator": "redness.红赤",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目赤",
+          "locator": "PDF p70-71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.redness.红血丝",
+      "dimension": "eye",
+      "indicator": "redness.红血丝",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目赤",
+          "locator": "PDF p70-71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.redness.血丝",
+      "dimension": "eye",
+      "indicator": "redness.血丝",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目赤",
+          "locator": "PDF p70-71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.sclera_color.无黄染",
+      "dimension": "eye",
+      "indicator": "sclera_color.无黄染",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛颜色/白睛蓝斑",
+          "locator": "PDF p71、p290"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.sclera_color.苍白",
+      "dimension": "eye",
+      "indicator": "sclera_color.苍白",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛颜色/白睛蓝斑",
+          "locator": "PDF p71、p290"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.sclera_color.蓝巩膜",
+      "dimension": "eye",
+      "indicator": "sclera_color.蓝巩膜",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛颜色/白睛蓝斑",
+          "locator": "PDF p71、p290"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.jaundice.黄染明显",
+      "dimension": "eye",
+      "indicator": "jaundice.黄染明显",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛发黄/黄疸",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.jaundice.黄染轻度",
+      "dimension": "eye",
+      "indicator": "jaundice.黄染轻度",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛发黄/黄疸",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.jaundice.黄染",
+      "dimension": "eye",
+      "indicator": "jaundice.黄染",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛发黄/黄疸",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.edema.卧蚕",
+      "dimension": "eye",
+      "indicator": "edema.卧蚕",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胞睑肿胀/目下卧蚕",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.edema.浮肿明显",
+      "dimension": "eye",
+      "indicator": "edema.浮肿明显",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胞睑肿胀/目下卧蚕",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.edema.浮肿",
+      "dimension": "eye",
+      "indicator": "edema.浮肿",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胞睑肿胀/目下卧蚕",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.edema.微肿",
+      "dimension": "eye",
+      "indicator": "edema.微肿",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "胞睑肿胀/目下卧蚕",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.dark_orbit.黯黑",
+      "dimension": "eye",
+      "indicator": "dark_orbit.黯黑",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目胞色黑/目眶色黑",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.dark_orbit.黑眼圈",
+      "dimension": "eye",
+      "indicator": "dark_orbit.黑眼圈",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "目胞色黑/目眶色黑",
+          "locator": "PDF p71"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.lower_lid.淡红",
+      "dimension": "eye",
+      "indicator": "lower_lid.淡红",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "下睑淡黄或苍白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.lower_lid.淡白",
+      "dimension": "eye",
+      "indicator": "lower_lid.淡白",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "下睑淡黄或苍白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.lower_lid.淡黄",
+      "dimension": "eye",
+      "indicator": "lower_lid.淡黄",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "下睑淡黄或苍白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "eye.lower_lid.苍白",
+      "dimension": "eye",
+      "indicator": "lower_lid.苍白",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "下睑淡黄或苍白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.color.红赤",
+      "dimension": "ear",
+      "indicator": "color.红赤",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓颜色",
+          "locator": "PDF p72"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.color.青黑",
+      "dimension": "ear",
+      "indicator": "color.青黑",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓颜色",
+          "locator": "PDF p72"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.color.淡白",
+      "dimension": "ear",
+      "indicator": "color.淡白",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓颜色",
+          "locator": "PDF p72"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.helix.润泽",
+      "dimension": "ear",
+      "indicator": "helix.润泽",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓润枯",
+          "locator": "PDF p72-73"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.helix.略枯",
+      "dimension": "ear",
+      "indicator": "helix.略枯",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓润枯",
+          "locator": "PDF p72-73"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "ear.helix.干枯",
+      "dimension": "ear",
+      "indicator": "helix.干枯",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "耳廓润枯",
+          "locator": "PDF p72-73"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.淡红",
+      "dimension": "hand",
+      "indicator": "palm_color.淡红",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.红润",
+      "dimension": "hand",
+      "indicator": "palm_color.红润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.红",
+      "dimension": "hand",
+      "indicator": "palm_color.红",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.淡白",
+      "dimension": "hand",
+      "indicator": "palm_color.淡白",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.暗红",
+      "dimension": "hand",
+      "indicator": "palm_color.暗红",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.palm_color.紫暗",
+      "dimension": "hand",
+      "indicator": "palm_color.紫暗",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "掌色（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.nail_color.紫暗",
+      "dimension": "hand",
+      "indicator": "nail_color.紫暗",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "爪甲色淡",
+          "locator": "PDF p263-265"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "唇甲暗黄或淡白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.nail_color.暗紫",
+      "dimension": "hand",
+      "indicator": "nail_color.暗紫",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "爪甲色淡",
+          "locator": "PDF p263-265"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "唇甲暗黄或淡白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.nail_color.淡白",
+      "dimension": "hand",
+      "indicator": "nail_color.淡白",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "爪甲色淡",
+          "locator": "PDF p263-265"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "唇甲暗黄或淡白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.nail_color.红润",
+      "dimension": "hand",
+      "indicator": "nail_color.红润",
+      "current_value": 0,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "爪甲色淡",
+          "locator": "PDF p263-265"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "唇甲暗黄或淡白",
+          "locator": "抽取文本 L7228"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.nail_shape.甲错",
+      "dimension": "hand",
+      "indicator": "nail_shape.甲错",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "爪甲不荣/干枯脆薄",
+          "locator": "PDF p303"
+        },
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "甲错（历史经验值，无指甲版教材依据）",
+          "locator": "docs/VOCAB_PROVENANCE_2026-10-16.md §五"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.ecchymosis.散在",
+      "dimension": "hand",
+      "indicator": "ecchymosis.散在",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "手掌瘀斑（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "hand.ecchymosis.密集",
+      "dimension": "hand",
+      "indicator": "ecchymosis.密集",
+      "current_value": 9,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "手掌瘀斑（经验项）",
+          "locator": "经验/人工签认"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.color.黄如橘皮",
+      "dimension": "skin",
+      "indicator": "color.黄如橘皮",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤发黄/黄疸",
+          "locator": "PDF p56、p58、p88"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.color.橘皮",
+      "dimension": "skin",
+      "indicator": "color.橘皮",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤发黄/黄疸",
+          "locator": "PDF p56、p58、p88"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.color.烟熏",
+      "dimension": "skin",
+      "indicator": "color.烟熏",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤发黄/黄疸",
+          "locator": "PDF p56、p58、p88"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.color.萎黄",
+      "dimension": "skin",
+      "indicator": "color.萎黄",
+      "current_value": 3,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤发黄/黄疸",
+          "locator": "PDF p56、p58、p88"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.cuo.甲错",
+      "dimension": "skin",
+      "indicator": "cuo.甲错",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "肌肤甲错",
+          "locator": "PDF p88"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "肌肤甲错",
+          "locator": "抽取文本 L3595、L14839、L1669"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.cuo.广泛",
+      "dimension": "skin",
+      "indicator": "cuo.广泛",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "肌肤甲错",
+          "locator": "PDF p88"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "肌肤甲错",
+          "locator": "抽取文本 L3595、L14839、L1669"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.cuo.局部",
+      "dimension": "skin",
+      "indicator": "cuo.局部",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "肌肤甲错",
+          "locator": "PDF p88"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "肌肤甲错",
+          "locator": "抽取文本 L3595、L14839、L1669"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.yellow_sweat.色正黄",
+      "dimension": "skin",
+      "indicator": "yellow_sweat.色正黄",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "黄汗",
+          "locator": "PDF p150-151"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "汗沾衣，色正黄如柏汁",
+          "locator": "抽取文本 L4184"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.yellow_sweat.明显",
+      "dimension": "skin",
+      "indicator": "yellow_sweat.明显",
+      "current_value": 5,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "黄汗",
+          "locator": "PDF p150-151"
+        },
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "汗沾衣，色正黄如柏汁",
+          "locator": "抽取文本 L4184"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.edema.凹陷",
+      "dimension": "skin",
+      "indicator": "edema.凹陷",
+      "current_value": 4,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "肌肤水肿/按之凹陷",
+          "locator": "PDF p88、p227"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.edema.全身浮肿",
+      "dimension": "skin",
+      "indicator": "edema.全身浮肿",
+      "current_value": 8,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "肌肤水肿/按之凹陷",
+          "locator": "PDF p88、p227"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.dryness.龟裂",
+      "dimension": "skin",
+      "indicator": "dryness.龟裂",
+      "current_value": 6,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤干枯/皲裂",
+          "locator": "PDF p88、p227"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "skin.dryness.粗糙",
+      "dimension": "skin",
+      "indicator": "dryness.粗糙",
+      "current_value": 2,
+      "proposed_value": null,
+      "reason": "待主人/医学人员裁决：原著不能单独证明固定分值",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "皮肤干枯/皲裂",
+          "locator": "PDF p88、p227"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.sublingual_color.baseline",
+      "dimension": "tongue",
+      "indicator": "sublingual_color.baseline",
+      "current_value": "淡紫/<2mm",
+      "proposed_value": null,
+      "reason": "教材暗红/2.7mm 与现有淡紫/<2mm 口径须分别裁决，不伪称同一基线",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌下络脉颜色",
+          "locator": "PDF p113"
+        },
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "淡紫（正常基线）",
+          "locator": "现代经验基线；VOCAB_PROVENANCE §一"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue.body.color.five_levels",
+      "dimension": "tongue",
+      "indicator": "body.color.five_levels",
+      "current_value": "五档",
+      "proposed_value": null,
+      "reason": "五档的信息损失与可接受替代待裁决；不恢复未经签认的九档",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "舌色",
+          "locator": "PDF p99-101"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "collapse_yang.yin_yang_classification",
+      "dimension": "collapse_yang",
+      "indicator": "yin_yang_classification",
+      "current_value": "脱阳前兆（未重分类）",
+      "proposed_value": null,
+      "reason": "绝汗亡阴/亡阳分类待医学签认，本清单不先行改类",
+      "evidence_refs": [
+        {
+          "source_id": "jingfang",
+          "source_sha256": "2a4d5c99ec0ed075e645a60573c1dd9c48d3410c91e0133e04c3c8bed938d099",
+          "keyword": "神识昏昧/冷汗如油",
+          "locator": "抽取文本 L8329",
+          "quote": "神识昏昧…冷汗如油"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "acute_jaundice.intercept_level",
+      "dimension": "acute_jaundice",
+      "indicator": "intercept_level",
+      "current_value": "screening/critical_rule",
+      "proposed_value": null,
+      "reason": "急性黄疸拦截级别须结合语境和真实证据，不能仅由颜色决定",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "白睛发黄/黄如橘皮",
+          "locator": "PDF p56、p58、p71、p88",
+          "quote": "白睛发黄为黄疸的主要标志；黄而鲜明如橘皮"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "tongue_critical.retention",
+      "dimension": "tongue_critical",
+      "indicator": "retention",
+      "current_value": "苔焦黑干燥＋舌质干裂起刺",
+      "proposed_value": null,
+      "reason": "该组合的存废与拦截边界待签认，不继续沿用紫暗必需条件",
+      "evidence_refs": [
+        {
+          "source_id": "tcm-textbook",
+          "source_sha256": "88496913d72b514865b8076cfb24e1d5524606b67b7a3facb594d908eefe9db7",
+          "keyword": "苔焦黑干燥/舌质干裂起刺",
+          "locator": "PDF p112",
+          "quote": "苔焦黑干燥，舌质干裂起刺"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "clinical_total.retention",
+      "dimension": "clinical_total",
+      "indicator": "retention",
+      "current_value": "六维启发式汇总",
+      "proposed_value": null,
+      "reason": "总分缺少原著量化依据；去留及历史重算策略待裁决，不当作疾病严重度",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "临床总分",
+          "locator": "docs/AUDIT_2026-10-26_bottom-up-model.md §M9"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    },
+    {
+      "id": "confidence.dose_gate",
+      "dimension": "confidence",
+      "indicator": "dose_gate",
+      "current_value": "covered >= 4 → allows_dosage",
+      "proposed_value": null,
+      "reason": "覆盖维度不能单独授权具体剂量；须独立安全策略和医学签认",
+      "evidence_refs": [
+        {
+          "source_id": "experience",
+          "source_sha256": "",
+          "keyword": "覆盖四维给剂量",
+          "locator": "docs/AUDIT_2026-10-26_bottom-up-model.md §M2"
+        }
+      ],
+      "approved_by": null,
+      "migration": "keep_current",
+      "status": "pending",
+      "calibration": null
+    }
+  ]
+}

@@ -147,7 +147,7 @@ blockquote{
   <div class="toc-row"><span class="toc-label">目录</span><a href="#sec-intro">系统简介</a><a href="#sec-parts">拍摄规范</a><a href="#sec-inquiry">问诊十七项</a><a href="#sec-combo">组合建议</a><a href="#sec-flow">工作流程</a><a href="#sec-report">报告示例</a><a href="#sec-notes">注意事项</a></div>
   <div class="toc-row toc-parts"><span class="toc-label">部位</span><a href="#part-tongue-surface">舌面</a><a href="#part-tongue-bottom">舌底</a><a href="#part-face">头面</a><a href="#part-eyes">目</a><a href="#part-ear">耳</a><a href="#part-hands">手掌</a><a href="#part-skin">皮肤</a></div>
 </nav>
-<p class="meta">版本与变更记录见根目录的 <code>VERSION</code> 和 <code>CHANGELOG.md</code>。识图模型支持任意 OpenAI 兼容的多模态模型，默认配置在 <code>.env.example</code>，更换模型与重新标定的方法见 README 的「配置自己的视觉模型」一节。</p>
+<p class="meta">版本与变更记录见根目录的 <code>VERSION</code> 和 <code>CHANGELOG.md</code>。识图模型支持任意 OpenAI 兼容的多模态模型，默认配置在 <code>.env.example</code>，更换模型后的核对方法与未标定辅助模式边界见 README 的「配置自己的视觉模型」一节。</p>
 <hr />
 <h2 id="sec-intro">系统简介</h2>
 <p>本系统以手机摄像头采集望诊影像：按向导依次拍摄舌面、舌底、头面、目、耳、手掌、皮肤七个部位，由视觉模型识别照片中的体征，依据经方体系（三观→四证→六经）完成辨证，输出评分与报告。全部数据仅保存在本机，不上传。</p>
@@ -161,6 +161,7 @@ blockquote{
 <p>总体原则：能拍的部位拍照，拍不了的部位以问诊补充，均不强制。</p>
 <hr />
 <h2 id="sec-parts">各部位拍摄规范</h2>
+<p><strong>本章例图仅用于取景示意</strong>，不作为真实病例或医学判读依据。</p>
 <h3 id="part-tongue-surface" class="part"><span class="part-num">1</span><span class="part-name">舌面照</span></h3>
 <p class="koujie"><span class="koujie-tag">口诀</span>伸舌自然，光线均匀，对焦清晰。</p>
 <ul>

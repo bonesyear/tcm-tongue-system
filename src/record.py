@@ -31,81 +31,13 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .dimensions import VisionDimension, DIMENSIONS, from_english, from_chinese
+from .indicators import DIMENSION_INDICATORS, INDICATOR_REGISTRY
+from .observations import UNKNOWN_OBSERVATION_MARK
+from .textnorm import normalize_text
 
 
-# ============================================================
-# 形状规范：每个维度的"规范指标"及其在形状 A / B / C 中的字段路径
-# ============================================================
-# 形状 A：模板/校验器期望的 vision_analysis.<中文维度>.<中文路径>
-#         （旧名 doubao_vision_analysis 永久兼容，见 _A_VISION_KEYS）
-# 形状 B：真实记录的 observations.<英文维度>.<英文路径>
-# 形状 C：顶层直接用规范英文维度键（tongue/head_face/...，兼容别名
-#         face→head_face、palm→hand），维度下的指标键即规范指标名，
-#         故 C 路径为恒等映射 ["<指标名>"]。
-# 路径用 list 表示嵌套取值；同一规范指标在各形状下各一条路径。
-#
-# 这里集中维护"形状"，是消除四处各表的核心。
-
-_DIMENSION_INDICATORS: Dict[VisionDimension, Dict[str, Dict[str, List[str]]]] = {
-    VisionDimension.TONGUE: {
-        "body_color":              {"A": ["舌质颜色"],         "B": ["body", "color"],              "C": ["body_color"]},
-        "body_luster":             {"A": ["舌质润燥"],         "B": ["body", "luster"],             "C": ["body_luster"]},
-        "body_size":               {"A": ["舌体胖瘦"],         "B": ["body", "shape"],              "C": ["body_size"]},
-        "petechiae":               {"A": ["瘀斑瘀点"],         "B": ["body", "ecchymosis"],         "C": ["petechiae"]},
-        "tooth_marks":             {"A": ["齿痕"],             "B": ["body", "tooth_marks"],        "C": ["tooth_marks"]},
-        "fissure":                 {"A": ["裂纹"],             "B": ["body", "cracks"],             "C": ["fissure"]},
-        "prickles":                {"A": ["点刺"],             "B": ["body", "prickles"],           "C": ["prickles"]},
-        "body_dynamics":           {"A": ["舌体动态"],         "B": ["body", "dynamics"],           "C": ["body_dynamics"]},
-        "coating_color":           {"A": ["舌苔颜色"],         "B": ["coating", "color"],           "C": ["coating_color"]},
-        "coating_thickness":       {"A": ["舌苔厚薄"],         "B": ["coating", "thickness"],       "C": ["coating_thickness"]},
-        "coating_moisture":        {"A": ["舌苔润燥"],         "B": ["coating", "moisture"],        "C": ["coating_moisture"]},
-        "coating_greasy":          {"A": ["舌苔腻腐"],         "B": ["coating", "greasy"],          "C": ["coating_greasy"]},
-        "coating_peeling":         {"A": ["舌苔剥落"],         "B": ["coating", "peeling"],         "C": ["coating_peeling"]},
-        "coating_distribution":    {"A": ["舌苔分布"],         "B": ["coating", "distribution"],    "C": ["coating_distribution"]},
-        "sublingual_color":        {"A": ["舌下络脉颜色"],     "B": ["sublingual", "vein_color"],   "C": ["sublingual_color"]},
-        "sublingual_thickness":    {"A": ["舌下络脉粗细"],     "B": ["sublingual", "vein_thickness"], "C": ["sublingual_thickness"]},
-        "sublingual_varicosity":   {"A": ["舌下络脉迂曲"],     "B": ["sublingual", "vein_tortuosity"], "C": ["sublingual_varicosity"]},
-        "sublingual_petechiae":    {"A": ["舌下络脉瘀点"],     "B": ["sublingual", "petechiae"],    "C": ["sublingual_petechiae"]},
-    },
-    VisionDimension.HEAD_FACE: {
-        "face_color":    {"A": ["面域", "面色"],     "B": ["face", "color"],   "C": ["face_color"]},
-        "face_edema":    {"A": ["面域", "面部水肿"], "B": ["face", "edema"],   "C": ["face_edema"]},
-        "face_luster":   {"A": ["面域", "光泽"],     "B": ["face", "luster"],  "C": ["face_luster"]},
-        "lip_color":     {"A": ["唇域", "唇色"],     "B": ["lips", "color"],   "C": ["lip_color"]},
-        "lip_moisture":  {"A": ["唇域", "唇润燥"],   "B": ["lips", "moisture"], "C": ["lip_moisture"]},
-        "nose_color":    {"A": ["鼻域", "鼻色"],     "B": ["nose", "color"],   "C": ["nose_color"]},
-        "nose_flare":    {"A": ["鼻域", "鼻翼煽动"], "B": ["nose", "flaring"], "C": ["nose_flare"]},
-        "nose_bleeding": {"A": ["鼻域", "鼻衄"],     "B": ["nose", "bleeding"], "C": ["nose_bleeding"]},
-    },
-    VisionDimension.EYE: {
-        "redness":       {"A": ["目赤"],         "B": ["redness"],          "C": ["redness"]},
-        "jaundice":      {"A": ["巩膜黄染"],     "B": ["scleral_jaundice"], "C": ["jaundice"]},
-        "edema":         {"A": ["眼睑浮肿"],     "B": ["eyelid_edema"],     "C": ["edema"]},
-        "dark_orbit":    {"A": ["目眶黯黑"],     "B": ["orbital_color"],    "C": ["dark_orbit"]},
-        "sclera_color":  {"A": ["巩膜颜色"],     "B": ["sclera_color"],     "C": ["sclera_color"]},
-        # 2026-10-16 P1（原著审查）：下睑/结膜颜色——「下睑淡黄或苍白」为血少明证
-        #（《经方探源》L5565）。拍摄法已要求暴露结膜，此前指标层漏项。
-        "lower_lid":     {"A": ["下睑颜色"],     "B": ["lower_lid_color"],  "C": ["lower_lid"]},
-    },
-    VisionDimension.EAR: {
-        "color":  {"A": ["耳色"], "B": ["color"], "C": ["color"]},
-        "helix":  {"A": ["耳轮"], "B": ["helix"], "C": ["helix"]},
-    },
-    VisionDimension.HAND: {
-        "palm_color":  {"A": ["手掌颜色"], "B": ["palm_color"],       "C": ["palm_color"]},
-        "palm_temp":   {"A": ["手掌温度"], "B": ["palm_temperature"], "C": ["palm_temp"]},
-        "nail_color":  {"A": ["甲床颜色"], "B": ["nail_bed"],         "C": ["nail_color"]},
-        "nail_shape":  {"A": ["甲床形态"], "B": ["nail_shape"],       "C": ["nail_shape"]},
-        "ecchymosis":  {"A": ["手掌瘀斑"], "B": ["ecchymosis"],       "C": ["ecchymosis"]},
-    },
-    VisionDimension.SKIN: {
-        "color":         {"A": ["肤色"], "B": ["color"],        "C": ["color"]},
-        "cuo":           {"A": ["甲错"], "B": ["scaly_skin"],   "C": ["cuo"]},
-        "yellow_sweat":  {"A": ["黄汗"], "B": ["yellow_sweat"], "C": ["yellow_sweat"]},
-        "edema":         {"A": ["水肿"], "B": ["edema"],        "C": ["edema"]},
-        "dryness":       {"A": ["干燥"], "B": ["dryness"],      "C": ["dryness"]},
-    },
-}
+# A/B/C 路径由指标注册表统一持有；旧私有别名保留给既有调用方。
+_DIMENSION_INDICATORS = DIMENSION_INDICATORS
 
 # 形状 C 顶层维度键：规范英文名 + 兼容别名
 _C_DIMENSION_KEYS = frozenset(
@@ -120,11 +52,27 @@ _A_VISION_KEYS = ("vision_analysis", "doubao_vision_analysis")
 _A_DIAGNOSIS_KEYS = ("diagnosis", "deepseek_diagnosis")
 
 
+def _normalized_mapping(value):
+    if not isinstance(value, dict):
+        return {}
+    out = {}
+    for key, item in value.items():
+        normalized = normalize_text(str(key)).replace("．", ".")
+        if normalized in out and out[normalized] != item:
+            print(f"⚠️ 警告: 规范化后重复键 {normalized!r}，保留首个值", file=sys.stderr)
+            continue
+        out[normalized] = item
+    return out
+
+
 def _first_present(raw: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
-    """按 keys 顺序取第一个存在的顶层键的值；都不存在返回 None。"""
-    for k in keys:
-        if k in raw:
-            return raw.get(k)
+    """取第一个非空容器；空 dict 不再遮蔽同族旧名。"""
+    for key in keys:
+        if key in raw:
+            value = raw.get(key)
+            if value is not None and (
+                    not isinstance(value, dict) or not _is_empty_shell(value)):
+                return value
     return None
 
 
@@ -132,6 +80,16 @@ def _first_present(raw: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
 # KNOWN_ISSUES #10 的旧约定「声明正常视同覆盖」已于 v1.7.19 废止
 # （原著审查 P1：占位≠亲眼所见，不计覆盖度与置信度）。
 DECLARED_NORMAL_MARK = "未拍摄（用户声明正常）"
+INQUIRY_TOTAL = 17
+
+
+def is_declared_normal_value(value) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = normalize_text(value).replace("（", "(").replace("）", ")").replace("，", ",")
+    text = re.sub(r"\s+", "", text).strip("。 .")
+    return text in ("未拍摄(用户声明正常)", "正常(用户声明,未拍摄)")
+
 
 # 顶层必填字段 schema（数据驱动 validator 用）。
 # 三种形状的顶层键不同，这里给出共性的"存在性判据"。
@@ -146,15 +104,15 @@ def _dig(obj: Any, path: List[str]) -> str:
     """按路径逐层取值，返回叶子字符串；任一层缺失返回 ''。"""
     cur = obj
     for key in path:
-        if not isinstance(cur, dict) or key not in cur:
+        cur = _normalized_mapping(cur)
+        if key not in cur:
             return ""
         cur = cur[key]
     if cur is None:
         return ""
     if isinstance(cur, (dict, list)):
-        # 嵌套对象：把所有叶子文本拼出（兜底）
-        return _flatten_to_text(cur)
-    return str(cur).strip()
+        return normalize_text(_flatten_to_text(cur))
+    return normalize_text(str(cur).strip())
 
 
 def _safe_int(value: Any) -> int:
@@ -165,39 +123,41 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
-# 方剂内容兜底扫描：剂量模式（如 "桂枝10g"、"10 g"、"10克"）
-_DOSAGE_RE = re.compile(r"\d+\s*[gG克]")
-# 常见经方名（白名单键未命中时，值中出现方名即算有方剂内容）
-_CLASSIC_FORMULA_RE = re.compile(
-    r"桂枝汤|麻黄汤|葛根汤|小青龙汤|大青龙汤|白虎汤|大承气汤|小承气汤|"
-    r"调胃承气汤|小柴胡汤|大柴胡汤|柴胡桂枝干姜汤|半夏泻心汤|生姜泻心汤|"
-    r"甘草泻心汤|五苓散|苓桂术甘汤|真武汤|四逆汤|当归四逆汤|芍药甘草汤|"
-    r"桂枝茯苓丸|桃核承气汤|抵当汤|茵陈蒿汤|栀子豉汤|小建中汤|炙甘草汤"
-)
+# 安全扫描在独立文本副本上做 NFKC，不改写原始方剂或报告。
+_DOSE_NUMBER = r"(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万两半]+)"
+_DOSAGE_RE = re.compile(
+    rf"{_DOSE_NUMBER}\s*(?:g|克|两|钱|枚|升)(?![a-z])", re.IGNORECASE)
+_FORMULA_NAME_RE = re.compile(r"[一-鿿]{1,16}(?:汤|散|丸|饮)")
+
+
+def has_dosage_content(value: Any) -> bool:
+    """识别阿拉伯/中文数字与 g、克、两、钱、枚、升组成的剂量。"""
+    import unicodedata
+    return bool(_DOSAGE_RE.search(unicodedata.normalize(
+        "NFKC", _flatten_to_text(value))))
+
+
+def has_formula_name(value: Any) -> bool:
+    """判断文本是否含以汤、散、丸、饮结尾的中文方名。"""
+    import unicodedata
+    return bool(_FORMULA_NAME_RE.search(unicodedata.normalize(
+        "NFKC", _flatten_to_text(value))))
 
 
 def has_formula_content(formula: Any) -> bool:
-    """判断方剂对象是否携带任何实质内容(方名/成分/药组/剂量)。
-
-    安全边界检查("LOW 禁方剂")专用:只认 name/主方 两个键会漏掉
-    "无方名但携带 12 味药材+具体剂量" 的记录——处方的实质是药物与剂量,
-    不是方名。非 dict 的非空值(如整段方剂文本)同样算有内容,
-    结构异常不能成为安全检查的放行理由(fail-closed)。
-
-    键白名单之外还有兜底扫描：任意值中出现剂量模式（\\d+[g克]）或
-    常见经方名（如桂枝汤/小柴胡汤）即判为有方剂内容——白名单键名
-    漂移（如 {"description": "含桂枝10g"}）不能成为放行理由。
-    """
+    """判断候选材料是否含实质方剂；结构异常不能成为放行理由。"""
     if not formula:
         return False
     if not isinstance(formula, dict):
         return bool(str(formula).strip())
     content_keys = ("name", "主方", "合方", "ingredients", "核心药组",
-                    "剂量建议", "加减", "dosage", "herbs")
+                    "剂量建议", "加减", "dosage", "herbs", "方名", "方剂",
+                    "组成", "药物", "处方", "prescription", "composition")
     if any(formula.get(k) for k in content_keys):
         return True
-    text = _flatten_to_text(formula)
-    return bool(_DOSAGE_RE.search(text) or _CLASSIC_FORMULA_RE.search(text))
+    import unicodedata
+    text = unicodedata.normalize("NFKC", _flatten_to_text(formula))
+    return bool(_DOSAGE_RE.search(text) or _FORMULA_NAME_RE.search(text))
 
 
 def _flatten_to_text(obj: Any) -> str:
@@ -219,6 +179,22 @@ def _flatten_to_text(obj: Any) -> str:
         s = str(obj).strip()
         return s if s else ""
     return " ".join(parts)
+
+
+def _is_empty_shell(obs: Any) -> bool:
+    """判断 observations 是否为「空壳」（B02 形状探测用）。
+
+    空壳定义（与维度空白语义一致）：
+      - None 是空壳；
+      - dict 的全部叶子文本（strip 后）均为空 → 空壳；
+      - 其余非 None 值（字符串、列表等）不是空壳——按"有内容"走形状 B
+        （行为不变：类型错误由 validator 报告，形状探测不做结构裁判）。
+    """
+    if obs is None:
+        return True
+    if isinstance(obs, dict):
+        return not _flatten_to_text(obs)
+    return False
 
 
 # danger_flags 的宽松真值判定：LLM 可能把布尔输出为字符串 "true"/"yes"
@@ -258,19 +234,30 @@ class DailyRecord:
         #     （旧名 doubao_vision_analysis 同样判为 A，新名优先）；
         # C：自由格式，顶层直接含规范英文维度键（tongue/head_face/...，
         #     兼容别名 face/palm）
-        if "observations" in self.raw:
+        # observations 为空壳或类型异常且存在 A 容器时，不得遮蔽完整 A 档。
+        _obs_present = "observations" in self.raw
+        _obs_root = self.raw.get("observations")
+        _obs_nonempty = (_obs_present and isinstance(_obs_root, dict) and any(
+            isinstance(node, dict) and not _is_empty_shell(node)
+            for node in _obs_root.values()))
+        _has_a = any(k in self.raw for k in _A_VISION_KEYS)
+        if _obs_nonempty or (_obs_present and not _has_a):
             self._shape = "B"
-        elif any(k in self.raw for k in _A_VISION_KEYS):
+        elif _has_a:
+            if _obs_present:
+                print(
+                    "⚠️ 警告: observations 是空壳或结构异常，"
+                    "但记录含 vision_analysis——按形状 A 解析，observations "
+                    "已忽略，六维观测取自 vision_analysis。若这不是预期，"
+                    "请核对视觉分析容器键名。",
+                    file=sys.stderr,
+                )
             self._shape = "A"
         elif _C_DIMENSION_KEYS & self.raw.keys():
             self._shape = "C"
+        elif _obs_present:
+            self._shape = "B"
         else:
-            # 三种判据都不满足：默认按 B 处理（行为不变），
-            # 各维度观测将返回空，由 validator/调用方判定。
-            # 但静默落入本分支极难排查（典型场景：使用者把容器键改成
-            # 第三个名字，如 my_model_analysis → 覆盖 0/6 → 推断 LOW），
-            # 故打一条 stderr 提示并列出实际顶层键——不改解析行为、
-            # 不改退出码、不改 stdout 契约（与 [vision_client][warn] 同定位）。
             self._shape = "B"
             top_keys = ", ".join(self.raw.keys()) or "(无)"
             print(
@@ -282,8 +269,8 @@ class DailyRecord:
                 "（旧名 doubao_vision_analysis 仍兼容）。",
                 file=sys.stderr,
             )
-        # 形状 C 混合形状警告的去重记录（每维度至多打一次）
         self._warned_mixed_shape: set = set()
+        self._warned_nodes: set = set()
 
     # ---- 解析入口（interface） ----
     @classmethod
@@ -302,15 +289,14 @@ class DailyRecord:
     def date(self) -> str:
         return str(self.raw.get("date", ""))
 
+    def _warn_once(self, key, message):
+        if key not in self._warned_nodes:
+            self._warned_nodes.add(key)
+            print(message, file=sys.stderr)
+
     # ---- 维度观测根对象 ----
     def _dimension_root(self, dim: VisionDimension) -> Dict[str, Any]:
-        """取某维度在当前形状下的根对象。
-
-        形状 C 的维度节点在顶层，维度键为规范英文名，兼容别名
-        face→head_face、palm→hand（规范键优先于别名）。
-        容器或维度节点类型不对(如 observations 是字符串)一律按空 dict
-        处理——库层不崩,由 validator 的结构校验负责报错。
-        """
+        """取某维度在当前形状下的根对象；异常节点告警并降级为空。"""
         if self._shape == "A":
             container = _first_present(self.raw, _A_VISION_KEYS)
             key = dim.chinese_name
@@ -326,9 +312,16 @@ class DailyRecord:
             container = self.raw.get("observations")
             key = dim.english_name
         if not isinstance(container, dict):
+            self._warn_once("container:" + self._shape,
+                            f"⚠️ 警告: {self._shape} 的维度容器不是对象，按空容器处理")
             return {}
+        container = _normalized_mapping(container)
         root = container.get(key, {})
-        return root if isinstance(root, dict) else {}
+        if not isinstance(root, dict):
+            self._warn_once("node:" + key,
+                            f"⚠️ 警告: 维度节点 {key} 不是对象，按空节点处理")
+            return {}
+        return root
 
     def get_observation(self, dimension: VisionDimension) -> Dict[str, str]:
         """按维度取观测，返回规范化为 {规范指标: 文本} 的字典。
@@ -340,11 +333,37 @@ class DailyRecord:
         root = self._dimension_root(dim)
         shape_key = self._shape
         result: Dict[str, str] = {}
+        metadata = self.raw.get("observation_meta", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
         for indicator, paths in _DIMENSION_INDICATORS[dim].items():
             path = paths.get(shape_key) or paths.get("B") or paths.get("A") or []
-            result[indicator] = _dig(root, path)
+            value = _dig(root, path)
+            meta_path = f"{dim.english_name}." + ".".join(paths["B"])
+            entry = metadata.get(meta_path)
+            if not value and isinstance(entry, dict) and entry.get("certainty") == "unknown":
+                value = UNKNOWN_OBSERVATION_MARK
+            result[indicator] = value
+        for spec in INDICATOR_REGISTRY:
+            if spec.dimension != dim:
+                continue
+            for alias in spec.aliases:
+                source_dim = alias.get("from_dimension", dim)
+                if source_dim == dim:
+                    continue
+                source = alias["from_indicator"]
+                paths = INDICATOR_REGISTRY.for_field(source_dim, source).paths
+                path = paths.get(shape_key) or paths.get("B") or paths.get("A") or []
+                value = _dig(self._dimension_root(source_dim), path)
+                if value:
+                    result[source] = value
         self._warn_if_mixed_shape(dim, root)
-        return result
+        return INDICATOR_REGISTRY.normalize_observation(dim, result)
+
+    def get_scoring_observation(self, dimension: VisionDimension) -> Dict[str, str]:
+        """取评分用观测，排除声明正常占位，原始记录保持不变。"""
+        obs = self.get_observation(dimension)
+        return {k: v for k, v in obs.items() if not is_declared_normal_value(v)}
 
     def _warn_if_mixed_shape(self, dim: VisionDimension,
                              root: Dict[str, Any]) -> None:
@@ -391,10 +410,13 @@ class DailyRecord:
         容器类型不对时返回空 dict（结构错误由 validator 报告）；
         形状 A 找不到辨证键时返回 {}，不得回落为整个 diagnosis dict
         （否则"综合辨证结论"等无关字段会污染辨证结果）。
+        B02：键值为 null 时回退下一个别名/旧名，不吞成 {}。
         """
         for key in ("pattern_differentiation", "pattern_update"):
             if key in self.raw:
-                val = self.raw.get(key) or {}
+                val = self.raw.get(key)
+                if val is None:
+                    continue  # null 不截断别名回退
                 return val if isinstance(val, dict) else {}
         diag = _first_present(self.raw, _A_DIAGNOSIS_KEYS) or {}
         if not isinstance(diag, dict):
@@ -409,18 +431,73 @@ class DailyRecord:
         新名优先）。
         正常返回 dict；formula 字段为非 dict（如整段方剂文本）时**原样返回**，
         交 has_formula_content 判定——安全检查不能因结构异常而放行。
+        B02：键值为 null 时回退下一个别名/旧名，不吞成 {}。
         """
         for key in ("formula", "formula_adjust", "formula_with_dosage"):
             if key in self.raw:
-                return self.raw.get(key) or {}
+                val = self.raw.get(key)
+                if val is None:
+                    continue  # null 不截断别名回退
+                return val or {}
         diag = _first_present(self.raw, _A_DIAGNOSIS_KEYS) or {}
         if not isinstance(diag, dict):
             return {}
         return diag.get("方剂建议", {}) or {}
 
+    def get_formula_material(self) -> List[Any]:
+        """汇总所有方剂候选；报告只取方剂/剂量相关 Markdown 段落。"""
+        import unicodedata
+        material = []
+        for key in ("formula", "formula_adjust", "formula_with_dosage"):
+            value = self.raw.get(key)
+            if value:
+                material.append(value)
+        for key in _A_DIAGNOSIS_KEYS:
+            diag = self.raw.get(key)
+            if not isinstance(diag, dict):
+                continue
+            formula = diag.get("方剂建议")
+            if formula:
+                material.append(formula)
+            report = diag.get("report")
+            markdown = report.get("markdown") if isinstance(report, dict) else None
+            if not isinstance(markdown, str):
+                continue
+            lines = unicodedata.normalize("NFKC", markdown).splitlines()
+            starts = [index for index, line in enumerate(lines)
+                      if re.match(r"^\s{0,3}#{1,6}\s+\*{0,2}(?:方剂建议|剂量建议)"
+                                  r"\*{0,2}\s*[:：]?\s*$", line)
+                      or re.match(r"^\s*(?:[-*+]\s+)?\*\*(?:方剂建议|剂量建议)\*\*"
+                                  r"\s*[:：]?\s*$", line)]
+            for index in starts:
+                end = next((next_index for next_index in range(index + 1, len(lines))
+                            if re.match(r"^\s{0,3}#{1,6}\s+", lines[next_index])),
+                           len(lines))
+                material.append({"text": "\n".join(lines[index:end])})
+        return material
+
     def get_danger_flags(self) -> Any:
         """取安全红线（danger_flags）。两种形状键名一致，直接返回。"""
         return self.raw.get("danger_flags", {})
+
+    def get_declarations(self, dimension=None) -> List[dict]:
+        raw = self.raw.get("declarations")
+        items = [dict(item) for item in raw if isinstance(item, dict)] \
+            if isinstance(raw, list) else []
+        if not items:
+            skipped = self.raw.get("skipped_dimensions", {})
+            if isinstance(skipped, dict):
+                for kind, legacy in (("declared_normal", "declared_normal"),
+                                     ("skipped", "uncovered")):
+                    values = skipped.get(legacy, [])
+                    if isinstance(values, list):
+                        items.extend({"kind": kind, "dimension": dim,
+                                      "part": "", "reason": ""} for dim in values)
+        if dimension is not None:
+            dim = self._as_dimension(dimension)
+            items = [item for item in items
+                     if item.get("dimension") == dim.english_name]
+        return items
 
     def get_triggered_danger_flags(self) -> List[str]:
         """取已触发的红线列表。
@@ -432,11 +509,12 @@ class DailyRecord:
         df = self.get_danger_flags()
         if not isinstance(df, dict):
             return []
-        if "triggered" in df and isinstance(df["triggered"], list):
-            return list(df["triggered"])
         triggered = []
+        if isinstance(df.get("triggered"), list):
+            triggered.extend(item for item in df["triggered"] if isinstance(item, str))
         for name, flag in df.items():
-            if isinstance(flag, dict) and _is_triggered(flag.get("triggered")):
+            if isinstance(flag, dict) and _is_triggered(flag.get("triggered")) \
+                    and name not in triggered:
                 triggered.append(name)
         return triggered
 
@@ -445,41 +523,56 @@ class DailyRecord:
         """返回每个维度是否被覆盖（有非空观测）。
 
         「未拍摄（用户声明正常）」占位不算覆盖（v1.7.19 起，
-        DECLARED_NORMAL_MARK 约定：占位≠亲眼所见）。"""
+        DECLARED_NORMAL_MARK 约定：占位≠亲眼所见）。B02 细化：
+        占位是**逐指标**剔除而非整维否决——维度内只要存在至少一个
+        非空且非占位的真实观察值即算覆盖；占位与真实值混合的档案
+        不再被占位拖成未覆盖，占位-only 维度照旧未覆盖。"""
         def covered(dim):
-            obs = self.get_observation(dim)
-            return dim.is_covered(obs) and DECLARED_NORMAL_MARK not in obs.values()
+            obs = self.get_scoring_observation(dim)
+            return any(v and v != UNKNOWN_OBSERVATION_MARK for v in obs.values())
         return {dim: covered(dim) for dim in DIMENSIONS}
 
     def get_covered_dimension_count(self) -> int:
         """已覆盖的维度数（用于置信度判定）。"""
         return sum(1 for covered in self.get_dimension_coverage().values() if covered)
 
-    def get_inquiry_coverage(self) -> Tuple[int, int]:
-        """取问诊覆盖 (已采集, 总数)。
+    def get_inquiry_answers(self) -> Dict[str, str]:
+        """统一返回 A/B/C 的已答问诊；仅展示层做规范化与限长。"""
+        from .textnorm import display_text
+        inquiry = self.raw.get("inquiry")
+        if not isinstance(inquiry, dict):
+            return {}
+        answers = {}
+        for question, entry in inquiry.items():
+            if not isinstance(question, str):
+                self._warn_once("inquiry-key", "⚠️ 警告: 忽略非字符串问诊键")
+                continue
+            if isinstance(entry, dict):
+                if entry.get("asked") is not True:
+                    continue
+                answer = entry.get("answer")
+            else:
+                answer = entry
+            if not isinstance(answer, str) or not answer.strip():
+                continue
+            question = display_text(question, 64)
+            answer = display_text(answer, 64)
+            if question and answer:
+                answers[question] = answer
+        return answers
 
-        形状 B：inquiry_coverage.covered / total；形状 A：inquiry 中 asked=True 计数；
-        形状 C：inquiry 为 {问题: 回答字符串} 扁平字典，值为非空字符串则计 1。
-        """
+    def get_inquiry_coverage(self) -> Tuple[int, int]:
+        """取问诊覆盖 (已采集, 契约总数 17)。"""
         if "inquiry_coverage" in self.raw:
-            cov = self.raw.get("inquiry_coverage")
-            if not isinstance(cov, dict):
-                return 0, 0
-            return _safe_int(cov.get("covered")), _safe_int(cov.get("total"))
-        inquiry = self.raw.get("inquiry", {}) or {}
-        if isinstance(inquiry, dict):
-            if self._shape == "C":
-                answered = sum(
-                    1 for v in inquiry.values()
-                    if isinstance(v, str) and v.strip()
-                )
-                return answered, len(inquiry)
-            asked = sum(
-                1 for item in inquiry.values()
-                if isinstance(item, dict) and item.get("asked") is True
-            )
-            return asked, len(inquiry)
-        return 0, 0
+            coverage = self.raw.get("inquiry_coverage")
+            if not isinstance(coverage, dict):
+                return 0, INQUIRY_TOTAL
+            covered = _safe_int(coverage.get("covered"))
+            if coverage.get("total") not in (None, INQUIRY_TOTAL):
+                self._warn_once("inquiry-total",
+                                f"⚠️ 警告: 问诊总数 {coverage.get('total')!r} 与契约 {INQUIRY_TOTAL} 不一致")
+            return covered, INQUIRY_TOTAL
+        return len(self.get_inquiry_answers()), INQUIRY_TOTAL
 
     def get_confidence(self) -> Optional[str]:
         """取记录自报的置信度（如 'HIGH'）。形状 A 无此字段返回 None。"""

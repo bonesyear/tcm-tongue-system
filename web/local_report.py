@@ -3,16 +3,15 @@
 把当日记录做**确定性聚类**（无任何推理/LLM）：
 1. 体质格局倾向：阳性体征按 正虚/邪实、水停/津亏 两轴聚合出的倾向陈述；
 2. 四证倾向：阳性体征按 水/火/气/血 四证方向聚类；
-3. 饮食宜忌方向：按聚出的四证查 knowledge_base diet-therapy.md 的体质节；
+3. 饮食宜忌方向：按聚出的四证查项目内置 DIET_MAP；
 4. 明日问诊优先项：按前两名倾向推荐最具鉴别价值的未答问诊项。
 
-以上都是证据清单的聚合视图与库内查表，**不是辨证结论**——六病归属、
-病机合成、方药建议必须走辨证 LLM（见 adaptive_analysis_prompt.md）。
+以上都是证据清单与**项目内置规则**的聚合视图，不读取当前知识库，
+**不是辨证结论**——六病归属、病机合成、方药建议必须走辨证 LLM。
 
-指标映射只收有出处支撑者（宁缺毋滥），逐条标注：
-【KB L##】= knowledge_base/diagnostics/smartphone-visual-diagnostics.md 行号；
-【食疗 L##】= knowledge_base/diet-lifestyle/diet-therapy.md 行号；
-【台账】= docs/VOCAB_PROVENANCE_2026-10-16.md；【验】= 经验映射，无书籍直接出处。
+代码中的出处注记是规则维护元数据，不是当前知识库检索结果：
+【KB L##】= 历史知识库行号；【食疗 L##】= 历史饮食资料行号；
+【台账】= docs/VOCAB_PROVENANCE_2026-10-16.md；【验】= 经验映射。
 """
 
 # PATTERN_MAP[dim_english][indicator] = [(match_values|None, 四证, 正邪, 出处注记), …]
@@ -137,6 +136,12 @@ INQUIRY_FOR = {
 PATTERNS = ("水证", "火证", "气证", "血证")
 
 
+def _display_note(note):
+    text = note.split("【", 1)[0]
+    suffix = "内置经验规则" if "【验】" in note else "内置规则"
+    return f"{text}【{suffix}】"
+
+
 def _bucket(rec, rules_map, key_index):
     """通用聚合：按 rules_map 把阳性体征归入桶。
     key_index：规则元组里目标键的位置（PATTERN_MAP=1 四证，FLUID_MAP=1 轴名）。"""
@@ -159,7 +164,7 @@ def _bucket(rec, rules_map, key_index):
                     sign = {"dim": dim.chinese_name,
                             "label": records_store.INDICATOR_LABELS.get(ind, ind),
                             "v": str(obs.get(ind, "")), "s": s,
-                            "note": rule[-1], "rule": rule}
+                            "note": _display_note(rule[-1]), "rule": rule}
                     out.setdefault(target, []).append(sign)
                     break
     return out
@@ -197,6 +202,23 @@ def _fluid_statement(water, depletion):
     return {"text": text, "detail": detail}
 
 
+def _unknowns(rec):
+    from src.dimensions import DIMENSIONS
+    from src.scoring import assess_indicators
+    import records_store
+    out = []
+    for dim in DIMENSIONS:
+        if records_store._is_declared_normal(rec.get_observation(dim)):
+            continue
+        obs = records_store._scoring_observation(rec, dim)
+        for ind, assessment in assess_indicators(dim, obs).items():
+            if assessment.state == "unknown":
+                out.append({"dim": dim.chinese_name,
+                            "label": records_store.INDICATOR_LABELS.get(ind, ind),
+                            "v": obs.get(ind, "")})
+    return out
+
+
 def build_pattern_overview(rec) -> dict:
     """当日记录的本地规则速览（四段：体质格局/四证聚类/饮食宜忌/问诊优先）。"""
     # ---- 四证聚类（兼产正邪轴）----
@@ -226,14 +248,7 @@ def build_pattern_overview(rec) -> dict:
     diet = [{"name": d["name"], **DIET_MAP[d["name"]]} for d in directions]
 
     # ---- 明日问诊优先项（前两名倾向 × 未答 × 去重 ≤3）----
-    inquiry_raw = rec.raw.get("inquiry")
-    answered = set()
-    if isinstance(inquiry_raw, dict):
-        for q, v in inquiry_raw.items():
-            if isinstance(v, dict) and v.get("asked") and v.get("answer"):
-                answered.add(q)
-            elif isinstance(v, str) and v.strip():  # 形状 C 扁平问答（{问: "答"}）
-                answered.add(q)
+    answered = set(rec.get_inquiry_answers())
     inquiry = []
     for d in directions[:2]:
         for q, why in INQUIRY_FOR[d["name"]]:
@@ -246,6 +261,8 @@ def build_pattern_overview(rec) -> dict:
 
     return {"directions": directions,
             "positive_n": sum(len(v) for v in pat.values()),
+            "covered_dimensions": rec.get_covered_dimension_count(),
             "constitution": constitution,
             "diet": diet,
-            "inquiry": inquiry}
+            "inquiry": inquiry,
+            "unknowns": _unknowns(rec)}

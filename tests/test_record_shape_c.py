@@ -89,8 +89,8 @@ def test_long_peeling_text_does_not_leak_into_other_indicators(shape_c_record):
 # ---- 问诊扁平字典 / pattern_update ----
 
 def test_inquiry_flat_dict_counts_nonempty_strings(shape_c_record):
-    # 4 个问题中 "小便" 为空串 → 3/4
-    assert shape_c_record.get_inquiry_coverage() == (3, 4)
+    # 4 个示例问题中 "小便" 为空串；完整契约固定为 17 题。
+    assert shape_c_record.get_inquiry_coverage() == (3, 17)
 
 
 def test_pattern_update_read(shape_c_record):

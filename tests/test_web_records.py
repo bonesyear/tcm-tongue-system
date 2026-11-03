@@ -33,7 +33,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")  # 完成启动声明确认
+    c.post("/welcome", headers={"Origin": "http://localhost"})  # 完成启动声明确认
     return c
 
 
@@ -117,3 +117,181 @@ def test_review_badges_shown(demo_client):
     assert 'class="field-row review"' in html
     assert html.count('class="field-row review"') >= 3  # fixture 中齿痕/厚薄/腻腐/面色/络脉迂曲均有值
     assert 'class="rv" title=' in html  # 圆点带复核原因 tooltip
+
+
+def test_demo_rejects_non_empty_library_without_overwrite(client, data_root):
+    daily = os.path.join(data_root, "records", "daily")
+    target = os.path.join(daily, "2026-06-25_analysis.json")
+    original = '{"date":"2026-06-25","note":"real-user-data","observations":{}}'
+    with open(target, "w", encoding="utf-8") as f:
+        f.write(original)
+
+    resp = client.post("/demo")
+
+    assert resp.status_code == 409
+    with open(target, encoding="utf-8") as f:
+        assert f.read() == original
+
+
+def test_validate_candidate_isolates_concurrent_payloads(data_root, monkeypatch):
+    import json
+    import threading
+    import records_store
+    import input_validator
+
+    entered = threading.Barrier(2)
+    read_done = threading.Barrier(2)
+    seen = {}
+
+    def fake_validate(path):
+        name = threading.current_thread().name
+        entered.wait(timeout=5)
+        with open(path, encoding="utf-8") as f:
+            seen[name] = json.load(f)["payload"]
+        read_done.wait(timeout=5)
+        return {}, [], []
+
+    monkeypatch.setattr(input_validator, "validate_record", fake_validate)
+    daily = os.path.join(data_root, "records", "daily")
+    threads = [
+        threading.Thread(target=records_store.validate_candidate,
+                         args=({"payload": value}, daily), name=name)
+        for name, value in (("A", "AAAA"), ("B", "BBBB"))
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert seen == {"A": "AAAA", "B": "BBBB"}
+
+
+def test_invalid_month_falls_back_to_current_month(client):
+    import datetime
+    resp = client.get("/?m=2026-13")
+
+    assert resp.status_code == 200
+    today = datetime.date.today()
+    assert f"{today.year} 年 {today.month} 月" in resp.get_data(as_text=True)
+
+
+def test_shape_a_detail_maps_chinese_diagnosis_fields():
+    import records_store
+    from src.record import DailyRecord
+    raw = {
+        "date": "2026-06-25",
+        "vision_analysis": {},
+        "diagnosis": {"经方六经辨证": {
+            "三观": {"表里观": "里证"},
+            "六病定位": "太阴病",
+            "核心病机": "太阴虚寒，水饮内停",
+        }},
+    }
+
+    diagnosis = records_store.record_detail(DailyRecord(raw))["diagnosis"]
+
+    assert diagnosis["six_diseases"] == "太阴病"
+    assert diagnosis["pathomechanism"] == "太阴虚寒，水饮内停"
+
+
+def test_mixed_declared_normal_does_not_hide_real_observation():
+    import records_store
+    from src.record import DailyRecord, DECLARED_NORMAL_MARK
+    raw = {"observations": {"tongue": {
+        "body": {"color": "淡红"}, "coating": {"color": DECLARED_NORMAL_MARK},
+    }}}
+
+    tongue = records_store.record_detail(DailyRecord(raw))["dims"][0]
+
+    assert tongue["covered"] is True
+    assert tongue["declared_normal"] is False
+
+    placeholder_only = {"observations": {"tongue": {
+        "body": {"color": DECLARED_NORMAL_MARK},
+    }}}
+    tongue = records_store.record_detail(DailyRecord(placeholder_only))["dims"][0]
+    assert tongue["covered"] is False
+    assert tongue["declared_normal"] is True
+
+
+def test_record_detail_marks_unmatched_as_unknown_not_zero():
+    import records_store
+    from src.record import DailyRecord
+    rec = DailyRecord({"date": "2026-06-25", "observations": {
+        "tongue": {"body": {"color": "无法判读的描述"}},
+    }})
+
+    detail = records_store.record_detail(rec)
+    tongue = detail["dims"][0]
+    field = next(f for g in tongue["groups"] for f in g["fields"]
+                 if f["ind"] == "body_color")
+
+    assert tongue["score"] is None
+    assert tongue["unknown_count"] == 1
+    assert detail["unknown_count"] == 1
+    assert field["s"] is None
+    assert field["unknown"] is True
+
+
+def test_record_summary_does_not_average_unknown_as_zero():
+    import records_store
+    from src.record import DailyRecord
+    rec = DailyRecord({"date": "2026-06-25", "observations": {
+        "tongue": {"body": {"color": "无法判读的描述"}},
+    }})
+
+    summary = records_store.record_summary(rec)
+
+    assert summary["coverage"] == 1
+    assert summary["total"] == 0
+    assert summary["total_sev"] == "sev-none"
+    assert summary["unknown_count"] == 1
+
+
+def test_explicit_normal_and_negation_are_not_unknown():
+    import records_store
+    from src.record import DailyRecord
+    smooth = DailyRecord({"observations": {"hand": {"nail_bed": {"shape": "光滑"}}}})
+    negated = DailyRecord({"observations": {"eye": {"scleral_jaundice": "无黄染"}}})
+
+    baseline = DailyRecord({"observations": {"tongue": {"sublingual": {
+        "vein_color": "隐约浅淡蓝紫色，大致正常", "vein_thickness": "不粗",
+    }}}})
+    assert records_store.record_summary(smooth)["unknown_count"] == 0
+    assert records_store.record_summary(negated)["unknown_count"] == 0
+    assert records_store.record_summary(baseline)["unknown_count"] == 0
+
+
+def test_no_abnormal_exit_requires_all_conditions():
+    import records_store
+    from src.record import DailyRecord
+    normal = DailyRecord({"observations": {"tongue": {"body": {"color": "淡红"}}},
+                          "inquiry": {}})
+    assert records_store.allows_no_abnormal_exit(normal) is True
+
+    unknown = DailyRecord({"observations": {"tongue": {"body": {"color": "无法判读"}}},
+                           "inquiry": {}})
+    assert records_store.allows_no_abnormal_exit(unknown) is False
+
+    positive = DailyRecord({"observations": {"tongue": {"body": {"color": "淡红"}}},
+                            "inquiry": {"恶寒or恶热？": {"asked": True, "answer": "恶寒"}}})
+    assert records_store.allows_no_abnormal_exit(positive) is False
+
+    empty = DailyRecord({"observations": {}, "inquiry": {}})
+    assert records_store.allows_no_abnormal_exit(empty) is False
+
+    danger = DailyRecord({"observations": {"tongue": {"body": {"color": "淡红"}}},
+                          "danger_flags": {"triggered": ["mirror_tongue"],
+                                           "not_triggered": []}, "inquiry": {}})
+    assert records_store.allows_no_abnormal_exit(danger) is False
+
+
+def test_total_sev_keeps_original_six_dimension_scale():
+    import records_store
+    from src.record import DailyRecord
+    rec = DailyRecord({"observations": {"eye": {"redness": "充血"}}})
+
+    summary = records_store.record_summary(rec)
+
+    assert summary["total"] == 6
+    assert summary["total_sev"] == "sev-1"

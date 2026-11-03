@@ -19,9 +19,7 @@ import envfile  # noqa: E402
 import wizard_store  # noqa: E402
 from app import create_app  # noqa: E402
 
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d494844520000000100000001080600000"
-    "01f15c4890000000d4944415478da63fc3f40401f0005fb018a845d3d")
+from test_web_wizard import PNG
 
 
 @pytest.fixture
@@ -39,7 +37,7 @@ def client(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     return c
 
 
@@ -192,7 +190,7 @@ def test_settings_disabled_key_env_locked(tmp_path, data_root, monkeypatch):
     app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
     app.config["TESTING"] = True
     c = app.test_client()
-    c.post("/welcome")
+    c.post("/welcome", headers={"Origin": "http://localhost"})
     html = c.get("/settings").get_data(as_text=True)
     import re
     m = re.search(r'<input[^>]*name="VISION_ENABLED"[^>]*>', html)

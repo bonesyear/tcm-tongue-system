@@ -198,17 +198,18 @@ class TestRetrieveAnd:
         # term 字段回标为原 term（独有词/阳明），不是 OR 模式串
         assert {h["term"] for h in r["results"]} <= {"独有词", "阳明"}
 
-    def test_and_missing_term_falls_back_to_rag(self, tmp_kb):
-        # test.md 无 "不存在XYZ" → AND 整文件不返回 → grep 0 → RAG 兜底
+    def test_and_missing_term_rejects_rag_noise(self, tmp_kb):
+        # 不存在的文件或不满足 AND 的文件，不能借 RAG 混入结果。
         rag_result = [{"file": "other.md", "line": 1, "content": "rag",
                        "context": [], "score": 0.9}]
         r = retrieve(["太阴", "不存在XYZ"], kb_root=tmp_kb,
                      rag=FakeRag(available=True, results=rag_result), syn_map={})
-        assert r["method"] == "rag"
+        assert r["method"] == "grep"
         assert r["grep_hits"] == 0
-        assert r["rag_hits"] == 1
+        assert r["rag_hits"] == 0
 
-    def test_and_invariant_results_equals_grep_plus_rag(self, tmp_kb):
+    def test_and_invariant_results_equals_grep_plus_rag(self, tmp_kb, tmp_path):
+        (tmp_path / "kb" / "other.md").write_text("独有词 阳明\n", encoding="utf-8")
         rag_result = [{"file": "other.md", "line": 1, "content": "rag",
                        "context": [], "score": 0.9}]
         r = retrieve(["独有词", "阳明"], kb_root=tmp_kb,
@@ -239,14 +240,13 @@ class TestRealKbIntegration:
         assert r["grep_hits"] >= GREP_MIN_HITS
         assert "下利" in r["synonyms_used"]
 
-    def test_conceptual_query_falls_back_to_rag(self):
-        # 地图舌：现代临床术语，经方原文中无逐字出现 → grep=0 → RAG 兜底
-        r = retrieve("地图舌 治疗")
+    def test_unrelated_query_returns_no_rag_noise(self):
+        # 共用一个无关汉字不等于知识库有相关证据。
+        r = retrieve("查无")
         assert r["grep_hits"] == 0
-        # RAG 可用（numpy 兜底）→ 有结果
-        assert r["rag_hits"] > 0
-        assert r["method"] in ("rag", "both")
-        assert r["synonyms_used"] == []  # 非别名词典键
+        assert r["rag_hits"] == 0
+        assert r["method"] == "grep"
+        assert r["results"] == []
 
     def test_and_query_uses_grep_on_real_kb(self):
         # 苓桂 AND 五苓：跨条文鉴别，两词在多个文件共现 → grep 充足

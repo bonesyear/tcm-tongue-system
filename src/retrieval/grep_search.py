@@ -34,58 +34,75 @@ from __future__ import annotations
 
 import os
 import re
-from glob import glob
+import sys
+import threading
+
+from .kb_paths import resolve_kb_root
 
 
 # ============================================================
 # 路径
 # ============================================================
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
-DEFAULT_KB_ROOT = os.path.join(_REPO_ROOT, "knowledge_base")
+DEFAULT_KB_ROOT = resolve_kb_root()
 DEFAULT_EXCLUDE = {"README.md"}
-
-# 环境变量覆盖（测试/部署时指向别处）
-_ENV_KB = os.environ.get("TCM_KB_ROOT")
-if _ENV_KB:
-    DEFAULT_KB_ROOT = _ENV_KB
 
 
 def _resolve_kb_root(kb_root: str | None) -> str:
-    return os.path.abspath(kb_root or DEFAULT_KB_ROOT)
+    return resolve_kb_root(kb_root)
 
 
 def list_kb_files(kb_root: str | None = None,
                   exclude: list[str] | None = None) -> list[str]:
-    """递归列出 kb_root 下所有 .md 文件（绝对路径），排除 exclude 中的文件名。"""
+    """用 scandir 列出真实 .md 文件；目录名以 .md 结尾不当文件读取。"""
     root = _resolve_kb_root(kb_root)
     excl = set(exclude) if exclude is not None else DEFAULT_EXCLUDE
-    files = glob(os.path.join(root, "**", "*.md"), recursive=True)
     out = []
-    for f in files:
-        if os.path.basename(f) in excl:
-            continue
-        out.append(os.path.abspath(f))
-    out.sort()
-    return out
+
+    def walk(directory):
+        try:
+            entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
+        except OSError:
+            return
+        for entry in entries:
+            if entry.name in excl:
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    walk(entry.path)
+                elif entry.is_file() and entry.name.lower().endswith(".md"):
+                    out.append(os.path.abspath(entry.path))
+            except OSError as error:
+                print(f"⚠️ 警告: 跳过无法访问的知识库文件 {entry.path}: {error}",
+                      file=sys.stderr)
+
+    walk(root)
+    return sorted(out)
 
 
 # ============================================================
 # 文件读取缓存（按 path+mtime 失效）
 # ============================================================
 _FILE_CACHE: dict[str, tuple[float, list[str]]] = {}
+_FILE_CACHE_LOCK = threading.RLock()
 
 
 def _read_lines(path: str) -> list[str]:
-    """读文件为行列表（保留行内容、去末尾换行）。带 mtime 缓存。"""
-    mtime = os.path.getmtime(path)
-    cached = _FILE_CACHE.get(path)
-    if cached and cached[0] == mtime:
-        return cached[1]
-    with open(path, encoding="utf-8") as f:
-        lines = f.read().splitlines()
-    _FILE_CACHE[path] = (mtime, lines)
-    return lines
+    """读文件为行列表；异常文件告警并跳过，不中断全库检索。"""
+    with _FILE_CACHE_LOCK:
+        mtime = 0
+        try:
+            mtime = os.path.getmtime(path)
+            cached = _FILE_CACHE.get(path)
+            if cached and cached[0] == mtime:
+                return cached[1]
+            with open(path, encoding="utf-8") as f:
+                lines = f.read().splitlines()
+        except (OSError, UnicodeError) as error:
+            print(f"⚠️ 警告: 跳过无法读取的知识库文件 {path}: {error}",
+                  file=sys.stderr)
+            lines = []
+        _FILE_CACHE[path] = (mtime, lines)
+        return lines
 
 
 def _relpath(path: str, kb_root: str) -> str:
@@ -145,7 +162,7 @@ def search(query: str,
                     "content": line,
                     "context": _context(lines, idx, context_lines),
                 })
-    # 已天然按 file→line 升序（glob 排序 + 行号递增），无需再排
+    # 已天然按 file→line 升序（scandir 排序 + 行号递增），无需再排
     return results
 
 

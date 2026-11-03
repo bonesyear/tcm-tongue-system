@@ -28,6 +28,7 @@
   python3 scripts/input_validator.py records/daily/2026-06-25_analysis.json
 """
 
+import datetime
 import json
 import os
 import re
@@ -39,7 +40,9 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from src.record import DailyRecord, SCHEMA, has_formula_content  # noqa: E402
+from src.record import (  # noqa: E402
+    DailyRecord, SCHEMA, has_dosage_content, has_formula_content,
+)
 from src.dimensions import DIMENSIONS, VisionDimension  # noqa: E402
 from src import confidence as confidence_mod  # noqa: E402
 from src.scoring import DIMENSION_RULES, match_keyword  # noqa: E402
@@ -54,7 +57,7 @@ _DICT_FIELDS = ("observations", "vision_analysis", "doubao_vision_analysis",
                 "pattern_differentiation", "danger_flags", "formula",
                 # 形状 C 顶层维度键与辨证键
                 "tongue", "head_face", "eye", "ear", "hand", "skin",
-                "pattern_update")
+                "pattern_update", "context")
 
 
 def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
@@ -92,6 +95,7 @@ def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
         for field in SCHEMA["top_required_any"]:
             if not record.raw.get(field):
                 errors.append(f"❌ 缺失必填字段: {field}")
+        errors.extend(_validate_date_identity(record.raw.get("date"), filepath))
 
         # ---- 2. 六维观测覆盖（从 Dimension 枚举取规范，不再手抄中文名） ----
         coverage = record.get_dimension_coverage()
@@ -102,8 +106,8 @@ def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
 
         # ---- 3. 问诊覆盖 ----
         asked, total = record.get_inquiry_coverage()
-        # total==0 视为问诊结构缺失（形状 A 的 inquiry 会被解析为 asked 计数）
-        if total == 0 and "inquiry" not in record.raw and "inquiry_coverage" not in record.raw:
+        # 总数恒为 17；是否提供问诊须按字段存在性判断。
+        if "inquiry" not in record.raw and "inquiry_coverage" not in record.raw:
             warnings.append("⚠️ 缺少问诊数据（inquiry / inquiry_coverage）")
 
         # ---- 4. 安全红线（danger_flags）完整性 ----
@@ -128,20 +132,82 @@ def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:
     return record, errors, warnings
 
 
+def _validate_date_identity(value, filepath):
+    if not value:
+        return []
+    if not isinstance(value, str):
+        return [f"❌ date 必须为 YYYY-MM-DD 字符串，实际为 {type(value).__name__}"]
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return [f"❌ date 不是合法的 YYYY-MM-DD 日期: {value!r}"]
+    name = os.path.basename(filepath)
+    if re.match(r"^\d{4}-\d{2}-\d{2}", name) and name[:10] != value:
+        return [f"❌ date 与文件名日期不一致: {value} != {name[:10]}"]
+    return []
+
+
 def _validate_structure(raw: Dict[str, Any]) -> List[str]:
-    """顶层容器字段的类型校验：键存在但不是对象 → error。"""
-    return [
+    """顶层结构、v2 元数据与声明校验；旧记录缺少这些字段不受影响。"""
+    from src.observations import (
+        SCHEMA_VERSION, validate_declarations, validate_observation_metadata,
+    )
+    errors = [
         f"❌ 字段 {field} 应为对象，实际为 {type(raw[field]).__name__}"
         for field in _DICT_FIELDS
         if field in raw and not isinstance(raw[field], dict)
     ]
+    observations = raw.get("observations")
+    if isinstance(observations, dict):
+        known = {dim.english_name for dim in DIMENSIONS}
+        for dim, node in observations.items():
+            if dim not in known:
+                continue
+            if not isinstance(node, dict):
+                errors.append(f"❌ observations.{dim} 应为对象，实际为 {type(node).__name__}")
+                continue
+            for group in ("body", "coating", "sublingual", "face", "lips", "nose"):
+                if group in node and not isinstance(node[group], dict):
+                    errors.append(f"❌ observations.{dim}.{group} 应为对象")
+    for container_key in ("vision_analysis", "doubao_vision_analysis"):
+        container = raw.get(container_key)
+        if not isinstance(container, dict):
+            continue
+        known = {dim.chinese_name for dim in DIMENSIONS}
+        for dim, node in container.items():
+            if dim not in known:
+                continue
+            if not isinstance(node, dict):
+                errors.append(f"❌ {container_key}.{dim} 应为对象，实际为 {type(node).__name__}")
+                continue
+            for group in ("面域", "唇域", "鼻域"):
+                if group in node and not isinstance(node[group], dict):
+                    errors.append(f"❌ {container_key}.{dim}.{group} 应为对象")
+    inquiry = raw.get("inquiry")
+    if isinstance(inquiry, dict):
+        for question, answer in inquiry.items():
+            if not isinstance(question, str):
+                errors.append("❌ inquiry 的问题键必须为字符串")
+            if not isinstance(answer, (dict, str)):
+                errors.append(f"❌ inquiry.{question} 应为对象或字符串")
+    if "schema_version" in raw and (
+            type(raw["schema_version"]) is not int
+            or raw["schema_version"] != SCHEMA_VERSION):
+        errors.append(f"❌ 不支持的 schema_version: {raw['schema_version']!r}")
+    errors.extend(validate_observation_metadata(
+        raw.get("observation_meta", {}), raw.get("observations")))
+    errors.extend(validate_declarations(raw.get("declarations", [])))
+    if "danger_review" in raw:
+        from src.danger_review import validate_history
+        errors.extend(f"❌ {error}" for error in validate_history(raw["danger_review"]))
+    return errors
 
 
 def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
     """校验安全红线对象存在且结构合法。返回 (errors, warnings)。
 
-    形状 B：danger_flags.triggered / not_triggered（列表）。
-    形状 A：danger_flags 为 {flag_name: {triggered, finding}}。
+    形状 B：triggered / not_triggered / unknown 列表及 evaluations。
+    形状 A：danger_flags 为 {flag_name: {triggered, finding, state?}}。
     严重度：对象/triggered 字段缺失=error；取值类型可疑、finding 为空=warning。
     """
     errors: List[str] = []
@@ -151,20 +217,41 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
         errors.append("❌ danger_flags 缺失或格式错误，应为对象")
         return errors, warnings
 
-    # 形状 B：triggered/not_triggered 必须是列表——类型错误会让红线状态
-    # 被静默"清零"（get_triggered_danger_flags 对非列表回落为 []），
-    # 报告显示"✅ 无触发"，这是安全数据，必须 error
-    for key in ("triggered", "not_triggered"):
+    # 形状 B：三态列表与评估元数据必须可辨，不能让非法类型静默清零。
+    for key in ("triggered", "not_triggered", "unknown"):
         if key in df and not isinstance(df[key], list):
             errors.append(
                 f"❌ danger_flags.{key} 应为列表，实际为 {type(df[key]).__name__}"
                 f"（红线状态不可信）"
             )
+        elif key in df and isinstance(df[key], list):
+            for index, value in enumerate(df[key]):
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"❌ danger_flags.{key}[{index}] 应为字符串（非空红线键名）")
+    evaluations = df.get("evaluations")
+    if evaluations is not None:
+        if not isinstance(evaluations, list):
+            errors.append("❌ danger_flags.evaluations 应为列表")
+        else:
+            for index, item in enumerate(evaluations):
+                if not isinstance(item, dict) or not item.get("rule_id"):
+                    errors.append(f"❌ danger_flags.evaluations[{index}] 缺 rule_id")
+                    continue
+                if item.get("state") not in ("triggered", "not_triggered", "unknown"):
+                    errors.append(f"❌ danger_flags.evaluations[{index}].state 非法")
+                if item.get("kind") not in ("screening", "critical_rule"):
+                    errors.append(f"❌ danger_flags.evaluations[{index}].kind 非法")
 
     # 形状 A：每个 flag 对象应有 triggered 布尔；触发时应有 finding
+    # 形状 B 判定：存在三态列表或 evaluations 即视为形状 B。
+    # B 的标量附加元数据容忍；A/B 旗形混用为结构错误。
+    shape_b = any(key in df for key in ("triggered", "not_triggered", "unknown", "dismissed", "evaluations"))
+    if shape_b and any(isinstance(flag, dict) for name, flag in df.items()
+                       if name not in ("triggered", "not_triggered", "unknown", "dismissed", "evaluations")):
+        errors.append("❌ danger_flags 混合了 B 式状态列表与 A 式旗对象，结构不可信")
     for name, flag in df.items():
-        if name in ("triggered", "not_triggered"):
-            continue  # 形状 B 的列表字段，上面已校验
+        if name in ("triggered", "not_triggered", "unknown", "dismissed", "evaluations"):
+            continue
         if isinstance(flag, dict):
             if "triggered" not in flag:
                 errors.append(f"❌ danger_flags.{name} 缺失 'triggered' 字段")
@@ -175,6 +262,10 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
                     f"❌ danger_flags.{name}.triggered 应为布尔值，"
                     f"实际为: {type(flag['triggered']).__name__}（红线状态不可信）"
                 )
+            if "state" in flag and flag["state"] not in ("triggered", "not_triggered", "unknown"):
+                errors.append(f"❌ danger_flags.{name}.state 非法")
+            if "kind" in flag and flag["kind"] not in ("screening", "critical_rule"):
+                errors.append(f"❌ danger_flags.{name}.kind 非法")
             if flag.get("triggered") is True:
                 finding = flag.get("finding", "")
                 if not finding or (isinstance(finding, str) and not finding.strip()):
@@ -182,6 +273,8 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
                         f"⚠️ danger_flags.{name}.triggered=true 但 finding 为空"
                     )
         else:
+            if shape_b:
+                continue  # 形状 B 的非 dict 附加键按元数据容忍
             errors.append(
                 f"❌ danger_flags.{name} 应为对象，实际为 {type(flag).__name__}"
             )
@@ -194,7 +287,8 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
         from src.dimensions import DIMENSIONS
         obs_text = {dim.english_name: record.get_observation(dim)
                     for dim in DIMENSIONS}
-        detected = set(detect_danger(obs_text))
+        detected = set(detect_danger({
+            "observations": obs_text, "inquiry": record.raw.get("inquiry", {})}))
         triggered = set(record.get_triggered_danger_flags())
         missing = detected - triggered
         if missing:
@@ -202,22 +296,17 @@ def _validate_danger_flags(record: DailyRecord) -> Tuple[List[str], List[str]]:
                 f"⚠️ 观察值中可探测到红线体征但未标记触发: "
                 f"{sorted(missing)} —— 请人工复核是漏标还是探测误报"
             )
-    except Exception:
-        pass  # 探测失败不影响校验主流程（探测是增强，不是门槛）
+    except Exception as error:
+        warnings.append(f"⚠️ 红线探测失败: {error}；请人工复核")
     return errors, warnings
 
 
 def _validate_confidence(record: DailyRecord,
                          covered_count: int) -> Tuple[List[str], List[str]]:
-    """校验置信度一致性与安全边界（LOW 禁方剂）。返回 (errors, warnings)。
+    """校验置信度一致性、LOW 禁方剂与非 HIGH 禁剂量。
 
-    安全边界违反是 error——"宁缺毋滥"铁律必须以退出码 1 强制执行，
-    否则违规记录照样通过校验（历史 Bug 7）。
-
-    检查以【自报等级】与【覆盖度推断等级】中更严格者执行：
-    不自报 confidence、或自报无法解析的值，都按推断等级照样查方剂——
-    否则"省略/乱填 confidence 字段"即可绕过铁律（fail-open，对抗验证发现）。
-    方剂内容判定用 has_formula_content：无方名但携带药材+剂量同样算方剂。
+    自报与覆盖推断取更严格者，所有安全错误均阻断 CLI 校验。
+    方剂材料由 DailyRecord 汇总，兼容结构化字段与报告相应段落。
     """
     errors: List[str] = []
     warnings: List[str] = []
@@ -237,19 +326,27 @@ def _validate_confidence(record: DailyRecord,
         )
     elif not confidence_mod.is_consistent(claimed, covered_count):
         warnings.append(
-            f"⚠️ 置信度不一致: 记录声称 {claimed}，但实际覆盖 {covered_count}/6 维 "
-            f"应为 {inferred.value}"
+            f"⚠️ 置信度不一致: 记录声称 {claimed}（解析为 {claimed_level.value}），"
+            f"但实际覆盖 {covered_count}/6 维，按覆盖推断应为 {inferred.value}；"
+            f"下方安全边界（LOW 禁方剂）按两者中较严格者执行"
         )
 
-    # 安全边界：自报与推断等级任一为 LOW 即禁方剂（取更严格者，error 级）
+    # 自报与覆盖推断取更严格者；汇总结构化方剂和报告相应段落。
     check_levels = [lvl for lvl in (claimed_level, inferred) if lvl is not None]
-    if any(not confidence_mod.allows_formula(lvl) for lvl in check_levels):
-        if has_formula_content(record.get_formula()):
-            shown = claimed if claimed is not None else f"推断 {inferred.value}"
-            errors.append(
-                f"🚨 安全边界违反: confidence={shown}（LOW）不应输出方剂，"
-                f"但记录包含方剂内容"
-            )
+    material = record.get_formula_material()
+    shown = claimed if claimed is not None else f"推断 {inferred.value}"
+    if any(not confidence_mod.allows_formula(lvl) for lvl in check_levels) \
+            and any(has_formula_content(item) for item in material):
+        errors.append(
+            f"🚨 安全边界违反: confidence={shown}（LOW）不应输出方剂，"
+            f"但记录包含方剂内容"
+        )
+    if any(not confidence_mod.allows_dosage(lvl) for lvl in check_levels) \
+            and any(has_dosage_content(item) for item in material):
+        errors.append(
+            f"🚨 安全边界违反: confidence={shown}；仅 HIGH 可输出具体剂量，"
+            f"但记录包含剂量内容"
+        )
 
     return errors, warnings
 
@@ -378,7 +475,8 @@ def _validate_scoring_vocab_coverage(record: DailyRecord) -> List[str]:
                 continue
             if match_keyword(rules, value) is not None:
                 continue
-            if _NORMAL_STATEMENT_RE.search(value):
+            from src.textnorm import mask_non_negations
+            if _NORMAL_STATEMENT_RE.search(mask_non_negations(value)):
                 continue
             # 判读注记检查已告警的值不重复告警（同一值两条 warning 是噪声）
             if any(_ANNOTATION_WORD_RE.search(b)
@@ -460,7 +558,25 @@ def print_report(filepath: str, record: DailyRecord,
         print("\n🎉 完美！记录完全合规。")
 
 
+def _tolerate_unencodable(stream) -> None:
+    """让 stream 遇到不可编码字符时降级替换而不是抛 UnicodeEncodeError。
+
+    Windows 中文控制台默认 GBK：报告里的 emoji（✅⚠️🚨 等）无法编码，
+    print 会抛 UnicodeEncodeError 留下 traceback、破坏退出码语义。
+    errors="replace" 只把不可编码字符换成 "?"，编码与其余输出保持不变。
+    非 TextIOWrapper（被重定向/已被替换）时静默跳过。
+    """
+    try:
+        stream.reconfigure(errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
+
+
 def main():
+    # GBK 控制台安全：先于任何打印执行（含用法提示）
+    _tolerate_unencodable(sys.stdout)
+    _tolerate_unencodable(sys.stderr)
+
     if len(sys.argv) < 2:
         print("用法: python input_validator.py <daily_analysis_json_path>")
         print("示例: python input_validator.py records/daily/2026-06-25_analysis.json")

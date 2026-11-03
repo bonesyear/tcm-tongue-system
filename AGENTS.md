@@ -15,13 +15,21 @@
   ```bash
   python3 -m pytest tests/ -q
   ```
+  `tests/conftest.py` 的共享 fixture 强制隔离 HOME、模型环境和数据目录；
+  新增测试必须使用临时数据与 mock，禁止依赖真实 `.env`、健康记录或外部模型。
 - 设计哲学（不可违背）：
   - **诊断体系以《经方探源》为主、《中医诊断学》为辅**（2026-10-21 主人拍板）：
     辨证框架（三观→四证→六病/方证对应/红线）以探源为准绳；中诊只做
     舌象体征的词汇与量化层。新增词条/判据先标出处再入库
     （台账：`docs/VOCAB_PROVENANCE_2026-10-16.md`），不得伪托。
-  - `src/` 核心模块（dimensions/record/scoring/confidence/retrieval）**仅用标准库**，
+  - `src/` 核心模块（dimensions/indicators/record/observations/scoring/alerts/text_analysis/confidence/governance/retrieval）**仅用标准库**，
     不 import 任何 LLM SDK、不发起 HTTP 请求、不绑任何框架。
+  - **未标定辅助模式（2026-10-27 主人定策）**：项目无法取得真实医学标定数据，
+    照片体征判读交由用户自配置的视觉模型，welcome 与手册披露非诊断、模型误差和
+    人工复核责任；不把医学数据集或医学人员签认作为当前辅助模式的交付前置。
+    现有权重/总分/剂量规则仍是未验证经验规则，不得让模型自评充当医学真值。
+    医学规则变更须由主人明确决定并写迁移；如未来具备独立标定材料，再按
+    `docs/GOVERNANCE_2026-10-27.md` 校验，不能用结构校验或 AI 输出冒充医学批准。
   - 失败要**可诊断**（stderr 告警），不静默吞错；同时正常路径**零告警**。
   - 无遥测、无统计上报。
 
@@ -61,10 +69,13 @@
    `compute_dimension_deviation()` 的 dict 输出（纯函数可 import），
    **不要**服务端生成 matplotlib PNG。
 4. **拍照向导**：分步向导（一步一个部位，承载拍摄纪律：舌底禁闪光灯等），
-   每步可「跳过（声明正常）」或「跳过（未覆盖）」；danger_flags 触发时**拦截式提示**。
+   每步可声明正常、跳过、拒绝或无法拍摄，均写入独立 `declarations`，不写假观察；
+   danger_flags 触发时**拦截式提示**。
 5. **设置页**：视觉 LLM（`VISION_*`）与辨证 LLM（新增 `LLM_*`）在线配置，
    写回 `.env`（唯一存储）；含连通性测试；首次启动未配置则跳转引导。
-   局域网开启需口令（`WEB_ADMIN_TOKEN`），未设则局域网对设置页只读。
+   非回环监听必须先设口令（`WEB_ADMIN_TOKEN`），否则拒绝启动。
+   局域网在设置页通过 POST 验证后取得会话；未认证时设置页只读，
+   记录、趋势和照片均不可读，口令不得放入 URL 或页面脚本。
 
 ### 关键语义
 - **双模型均可选**（2026-10-23 起，设置页开关写回 .env）：
@@ -72,7 +83,8 @@
     草稿状态 `manual`，记录打 `manual_entry` 审计；`photo_coverage` 只认
     真实识图）。skip 后改主意允许真实录入覆盖（真实值优先于声明）。
   - `LLM_DISABLED=1` → 详情页报告区改**本地规则速览**（`web/local_report.py`：
-    体质格局/四证聚类/饮食宜忌/问诊优先，确定性聚类+库内查表，非辨证结论）。
+    体质格局/四证聚类/饮食宜忌/问诊优先，确定性聚类+项目内置规则映射，
+    不读取当前知识库，不构成库内引用，非辨证结论）。
   - 模式语义：启用且配置齐全走模型；关闭走本地；未配置未关闭时，
     记录已有模型期内容照旧展示、全无则走本地。
   - 设置页表单用隐藏标记 `FORM_VISION/FORM_LLM` 识别来源（BASE_URL 被
@@ -81,8 +93,11 @@
   JSON 里打 `manually_corrected: true` + 时间戳。保存前必须复用
   `scripts/input_validator.py` 的 `validate_record()`。
 - 记录形状有三种（A 中文键 / B `observations` / C 顶层英文键），
-  `DailyRecord` 自动识别；**写回必须形状感知**（参考 `src/record.py` 的 `_DIMENSION_INDICATORS`）。
-- 新记录推荐形状 B；辨证报告存进记录 JSON（形状 A 的 `diagnosis` 约定）+
+  `DailyRecord` 自动识别；**写回必须形状感知**（路径以 `src/indicators.py` 注册表为准）。
+- 新记录推荐形状 B v2（`schema_version=2`）：`observation_meta` 保存采集来源/
+  方式/raw/certainty/evidence/value，`declarations` 与观察分离，`derived_meta`
+  随输入变化重算；无比例尺/未暴露只记 unknown，不计真实覆盖。
+- 辨证报告存进记录 JSON（形状 A 的 `diagnosis` 约定）+
   记 `prompt_template_version`。
 - 当日已有记录再走向导：给「补充未覆盖维度 / 重新分析（旧版自动备份）/ 取消」三选。
 - 照片存 `records/photos/<日期>/<部位>.jpg`（不入 git），详情页展示原图供肉眼复核。
@@ -111,11 +126,79 @@
 ## 3. 常见坑（前人以身试法）
 
 - v1.5.0 键名已换：按旧键名写代码会静默落空——先用 `DailyRecord` 的形状探测确认。
-- 评分词表外的措辞会被静默读作 0 分：接视觉模型的 prompt 必须用封闭词表
-  （与 `src/scoring.py` 逐键对齐），换模型必须重新标定。
-- `.env` 读取是「原始 bytes → 严格 UTF-8」，非 UTF-8 会打告警——别用平台默认编码重开文件。
+- 评分词表外的措辞在新 `assess*` 接口返回 `unknown`（旧 `score*` 为兼容仍返回 0）：
+  接视觉模型的 prompt 必须使用 `src/indicators.py` 注册表的封闭词表
+  （评分规则见 `src/scoring.py`），换模型必须重新标定。
+- 新预警用 `src.alerts.evaluate_alert(s)` / `danger_flags_for()`：`screening` 不等于确诊，
+  `unknown` 不等于 `not_triggered`；旧 `detect_danger()` 空列表不代表已排除。
+- `.env` 严格按 UTF-8 读取（允许起始 BOM），引号与转义需读写一致；非法换行拒绝。
+  Web 每请求只取一次配置快照，禁止用 `os.environ + importlib.reload` 传模型配置；
+  `VISION_BASE_URL` 必填，不再回退默认第三方端点。私有历史配置路径须显式 opt-in。
+- 模型出站统一走 `web.safe_fetch`：仅 HTTP(S)、同源重定向、响应限量和总时限；
+  已存 key 只在同源端点复用。测试 mock `web.safe_fetch.urlopen`，默认拒绝未 mock HTTP。
+- 记录/草稿写回必须携带同次读取的文件版本，经 `io_utils` 条件写入/删除；
+  多文件事务在同一 `write_lock` 中完成。版本冲突返回 409，不得裸 `os.replace`
+  覆盖目标；详见 `docs/MIGRATION_2026-10-27_KNOWN21.md`。
+- 问诊统一经 `DailyRecord.get_inquiry_answers()` 读取，契约总数为 17；观察写入复用
+  `records_store.validate_field_value()`，正式清空用 `action=clear` 并留修正审计。
+  识图异常类型/词表外值保留 `_raw` 并列 `_type_errors`，注记单独放 `_notes`；不得转成已确认观察。
+  文本规范化走 `src/textnorm.py`，不对整串盲目 NFKC。详见 `docs/MIGRATION_2026-10-27_B14.md`。
+- 医学安全校验必须覆盖 `DailyRecord.get_formula_material()` 的结构化方剂与报告段落；
+  LOW 禁具体方剂，非 HIGH 禁具体剂量。Web 写入口不得按 emoji 过滤 errors；
+  `records_store.validate_candidate()` 传入 `previous_raw`，只阻断本次新增错误，存量错误转 warning。
+  A/B 混合 `danger_flags` 读取取并集但写入校验拒绝。详见 `docs/MIGRATION_2026-10-28_B13.md`。
+- 红线裁决统一走 `src/danger_review.py`：`danger_token` 绑定当前触发与证据，
+  首次/过期确认返回 409；`dismiss` 不等于 `not_triggered`，`clear` 只在证据消失时追加。
+  merge 不允许 dismiss 未触及旧项；裁决历史纳入报告指纹。详见 `docs/MIGRATION_2026-10-28_B15.md`。
+- 恢复只走当前代 pristine 与 restore 安全备份，不按本地时间选最早备份；报告保留。
+  上传必须经 `photo_store` 清洗并暂存，提交成功才转正并备份旧图，禁止直接 `file.save` 覆盖。
+  普通备份按每日 20 份保留，删除必须管理员 POST `confirm=DELETE`，同时清理关联数据。
+  锁按目录生效，不能嵌套不同目录写锁；跨目录提交要可回滚。详见 `docs/MIGRATION_2026-10-28_B16.md`。
 - 知识库检索用户输入必须走 `retrieve()`（内部 re.escape）；`search()` 吃原始正则。
+  KB_ROOT/词典与索引缓存共用归一化路径；RAG 低分噪声不返回，AND 按真实文件复核。
+  选档统一走 `src/daily_files.py`，副本与特殊路径共用 scandir；首页限量摘要、月历
+  复用按文件签名失效的缓存。week_id 用滚动窗口起止日期，正常 0 不等于无观测。
+  详见 `docs/MIGRATION_2026-10-28_B17.md`。
+- 前端请求须检查 HTTP/JSON/重定向并显示失败；设置开关走 `/settings/toggle`，不携带
+  整张表单。上传回调固定发起部位，识图与提交有在途锁；warnings 用 sessionStorage
+  一次性传入详情页。问诊再次点击已选项只撤销该题。窄屏轨道保持 minmax(0,1fr)，
+  ECharts 随窗口 resize；原生 dialog 不加冗余角色/手工焦点陷阱。
+- `TCM_TIMEZONE` 由 `web/time_utils.py` 用 ZoneInfo 解析；Web 从当前配置快照传入写入口，
+  新时间戳带偏移。向导 POST 固定草稿日期，仅恢复已存在且不超过一天的草稿；提交按
+  草稿日期。连续记录从今天/昨天起算并排除未来日期。详见 `docs/MIGRATION_2026-11-03_B18.md`。
+- Web 模块统一使用顶层导入（`import records_store` / `from safe_fetch import …`），
+  禁止混用 `web.records_store` / `from web import …`，避免双模块实例导致 mock、缓存和配置分叉。
+  `lifecycle_store.py` 仅属于 Web 层，路径为 `web/lifecycle_store.py`。
+- Web 所有请求先校验 Host；写请求要求与当前请求同源，或凭有效会话兼容传统浏览器；
+  `/welcome` POST 测试需加 `Origin: http://localhost`。局域网口令只走
+  `/settings/login` POST，勿放入 URL/JS；非回环无口令配置必须拒绝。
 - 视觉端点 temperature 有服务端下限（如 DashScope 钳到 0.6），传 0 ≠ 确定性输出。
+- 部署使用 `web/server.py` 的 Waitress（8 线程、64 连接、通道超时 300 秒、backlog 32）；
+  依赖只在 `web/requirements.txt` 声明，不污染核心库。同日报告经 `trends_store` 非阻塞锁
+  去重，生成中返回 409，异常释放锁。通道超时不替代模型总时限。
+- 知识库已公私分离：原内容完整保留在仓库外的私有目录，公开仓仅保留配置说明。
+  通过 `TCM_KB_ROOT` 指向有权使用的目录；测试只用 `tests/fixtures/knowledge_base/` 合成资料，
+  不依赖私有副本。公开历史按 F90 接受并登记，不重写、不 force push；远端可见性另行处理。
+  图片按主人决定保留现版，不强制 AI 标识/C2PA。分离迁移见
+  `docs/MIGRATION_2026-11-03_KB_SPLIT.md`，逐项闭环见 `docs/REVIEW_CLOSURE_2026-11-03.md`。
+- 知识库分 `constitution`（中医体质辨证）、`diet`（食疗）、`formula`（方剂）三类。
+  专用变量分别为 `TCM_KB_CONSTITUTION_ROOT`、`TCM_KB_DIET_ROOT`、`TCM_KB_FORMULA_ROOT`，
+  新 clone 默认不读取外部旧库，程序管理的 `private_kb/` 副本自动启用；
+  `TCM_KB_STRICT_CATEGORIES=1` 禁止综合回退，默认关闭。分类 ZIP 必须含 `kb.yaml`（`schema_version: 1`、匹配 `category`），
+  导入只覆盖 `<TCM_DATA_ROOT>/private_kb/<类别>/`，**严禁移动、覆盖或删除其他类别或外部原库**。
+  旧 `composite` 导入仍写 `TCM_KB_ROOT`，替换综合副本时保留分类子目录，拒绝保留目录名。
+  配置写回失败须同时回滚 `.env` 和目录。自建格式见 `docs/KB_AUTHORING.md`；自定义内容只影响
+  检索与候选参考，不改医学规则、不是训练。
+- 分类重置只处理 `<TCM_DATA_ROOT>/private_kb/<类别>/`，禁止按当前配置根删除外部目录。
+  `TCM_KB_<类别>_DISABLED=1` 优先于综合回退，重置后对应信息不可显示。每次新 ZIP 完整校验后
+  重置本类旧副本并清除停用；配置失败按事务前字节恢复配置与目录。重置备份只放
+  `.kb-reset-backup-*`，不得提交。
+- Web 报告必须从同次 `cfg` 快照显式传递各类根，统一经 `inspect_kb_categories()` 获取状态；
+  报告保存 `kb_categories` 及兼容字段，任一类根/版本变化触发过期。`kb_refs` 只是候选参考，
+  不等于模型实际引用。缺体质库隐藏体质/辨证内容，缺食疗库隐藏饮食，缺方剂库隐藏方药及
+  完整方药报告；即使旧记录已有内容也不得绕过。缺方剂时的方名/剂量、缺食疗的结构化饮食、
+  缺体质的结构化辨证输出还须写入前拒绝，不能只靠 prompt。本地速览使用内置规则计算，但只有
+  对应类别 `ready` 才展示。无库/无命中/失败必须在模型输入和页面披露。
 
 ## 4. 与「另一个 Agent」的交接方式
 

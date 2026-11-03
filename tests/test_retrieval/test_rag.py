@@ -163,7 +163,7 @@ class TestTfidfBackend:
 
     def test_result_shape(self, rag_on_tmp_kb):
         res = rag_on_tmp_kb.search("太阴", k=5)
-        if res:
-            r = res[0]
-            assert {"file", "line", "content", "context", "score",
-                    "title", "source"} <= set(r.keys())
+        assert res
+        r = res[0]
+        assert {"file", "line", "content", "context", "score",
+                "title", "source"} <= set(r.keys())
