@@ -49,7 +49,7 @@ def test_settings_and_local_report_explicitly_handle_no_kb(tmp_path, monkeypatch
     client = app.test_client()
     client.post('/welcome', headers={'Origin': 'http://localhost'})
     settings = client.get('/settings').get_data(as_text=True)
-    assert settings.count('未配置知识库') == 3
+    assert settings.count('未配置知识库') == 4
     for category in ('constitution', 'diet', 'formula'):
         assert f'可检索 Markdown <span id="kb-count-{category}">0</span>' in settings
     assert '其他本地功能仍可使用' in settings

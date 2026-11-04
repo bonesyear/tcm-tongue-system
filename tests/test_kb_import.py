@@ -378,6 +378,27 @@ def test_settings_import_route_and_retrieval(client, tmp_path):
     assert (tmp_path / 'data' / 'private_kb' / 'diet' / 'new.md').is_file()
 
 
+def test_settings_composite_import_card_and_route(client, tmp_path):
+    html = client.get('/settings').get_data(as_text=True)
+    assert '此功能用于调试及保证兼容性。' in html
+    assert 'data-category="composite"' in html
+    assert html.index('id="kb-card-formula"') < html.index('id="kb-card-composite"')
+    assert 'category === "composite" && data.configured' in html
+
+    response = client.post('/settings/kb/import', data={
+        'category': 'composite', 'kb_file': (_valid_zip(), 'composite.zip'),
+    }, content_type='multipart/form-data')
+    assert response.status_code == 200, response.get_json()
+    payload = response.get_json()
+    assert payload['ok'] is True and payload['configured'] is True
+    root = payload['root']
+    assert root == str(tmp_path / 'data' / 'private_kb')
+    assert retrieve('便软', kb_root=root)['grep_hits'] == 1
+    html = client.get('/settings').get_data(as_text=True)
+    assert 'id="kb-current-root-composite"' in html and root in html
+    assert 'id="kb-import-status-composite"' in html
+
+
 def test_settings_import_rejects_bad_zip_without_config_change(client, tmp_path):
     response = client.post('/settings/kb/import', data={
         'kb_file': (io.BytesIO(b'bad'), 'bad.zip'),

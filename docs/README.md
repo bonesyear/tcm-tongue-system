@@ -42,6 +42,7 @@
 - [B21–B22 路由与报告结构优化](MIGRATION_2026-11-03_B21-B22.md)
 - [B23 部署与复原验收](MIGRATION_2026-11-03_B23.md)
 - [B25 工作区治理与部署边界验收](MIGRATION_2026-11-04_B25.md)
+- [综合知识库导入入口](MIGRATION_2026-11-04_COMPOSITE_IMPORT.md)
 
 ## 新增文档约定
 

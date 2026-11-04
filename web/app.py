@@ -1070,16 +1070,21 @@ def create_app(env_file: str | None = None,
         host_is_lan = is_lan_host(bound_host)
         extra = {"welcome": False, "saved": False, "host_changed": False,
                  "env_error": "", "locked": "", "kb_reset": "", **extra}
-        from src.retrieval import KB_CATEGORY_DEFS, inspect_kb_categories
+        from src.retrieval import KB_CATEGORY_DEFS, inspect_kb, inspect_kb_categories, \
+            kb_legacy_root
         allowed = admin_allowed()
         categories = inspect_kb_categories(kb_cfg) if allowed else {}
+        composite_root = kb_legacy_root(kb_cfg)
+        composite = inspect_kb(composite_root) if allowed else None
+        if allowed and not composite_root:
+            composite["root"] = ""
         import_roots = {category: os.path.join(os.path.abspath(data_root),
                                                "private_kb", category)
                         for category in KB_CATEGORY_DEFS}
         return render_template(
             "settings.html", page="settings", values=settings_values(),
             kb_categories=categories, kb_category_defs=KB_CATEGORY_DEFS,
-            kb_import_roots=import_roots,
+            kb_composite=composite, kb_import_roots=import_roots,
             kb_strict=cfg("TCM_KB_STRICT_CATEGORIES") == "1",
             env_locked=_env_locked(), read_only=not admin_allowed(),
             llm_disabled=llm_disabled(), vision_disabled=vision_disabled(),
