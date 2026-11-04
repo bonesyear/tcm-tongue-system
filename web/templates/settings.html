@@ -288,12 +288,6 @@
   {% if read_only %}
   <p class="muted">验证管理口令后可导入知识库。</p>
   {% else %}
-  <p class="muted">三类知识库独立导入、独立显示。缺少某类时，对应前端信息不可显示；未设置专用根的旧综合库可作为各类别回退，不会被修改。</p>
-  <form method="post" action="/settings/kb/mode" style="margin:10px 0 14px;">
-    <label><input type="checkbox" name="enabled" value="1" {% if kb_strict %}checked{% endif %} {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}> 严格分类模式（只使用各类专用根，不回退综合库）</label>
-    <button class="btn btn-ghost btn-sm" type="submit" {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}>保存分类模式</button>
-    <p class="form-hint">默认关闭以兼容旧综合库。开启前请确认三类专用库均已验证；开启后，未配置的类别会立即隐藏对应信息。</p>
-  </form>
   {% if kb_reset in kb_category_defs %}
   <div class="alert-note">已重置{{ kb_category_defs[kb_reset].label }}：本类导入副本已删除并停用，对应信息不可显示；外部原库和其他类别未修改。上传新 ZIP 可重新启用。</div>
   {% endif %}
@@ -305,7 +299,7 @@
       <strong id="kb-status-label-{{ category }}">{% if kb.disabled %}已重置/已停用{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
       <span id="kb-status-detail-{{ category }}">{% if kb.disabled %}本类信息不可显示；上传新 ZIP 可重新启用{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
     </p>
-    <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code> · 可检索 Markdown <span id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（旧综合库回退）{% endif %}</p>
+    <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code> · 可检索 Markdown <span id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（源综合库回退）{% endif %}</p>
     <p class="muted">本类导入副本：<code>{{ kb_import_roots[category] }}</code></p>
     <form class="kb-import-form" data-category="{{ category }}" method="post" action="/settings/kb/import" enctype="multipart/form-data">
       <input type="hidden" name="category" value="{{ category }}">
@@ -331,6 +325,12 @@
   <section id="kb-card-composite" style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
     <h3>综合知识库</h3>
     <p class="muted">此功能用于调试及保证兼容性。</p>
+    <p class="muted">三类知识库独立导入、独立显示。缺少某类时，对应前端信息不可显示；未设置专用根的源综合库可作为各类别回退，不会被修改。</p>
+    <form method="post" action="/settings/kb/mode" style="margin:10px 0 14px;">
+      <label><input type="checkbox" name="enabled" value="1" {% if kb_strict %}checked{% endif %} {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}> 严格分类模式（只使用各类专用根，不回退综合库）</label>
+      <button class="btn btn-ghost btn-sm" type="submit" {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}>保存分类模式</button>
+      <p class="form-hint">默认关闭以兼容源综合库。开启前请确认三类专用库均已验证；开启后，未配置的类别会立即隐藏对应信息。</p>
+    </form>
     <p class="muted">
       <strong id="kb-status-label-composite">{% if kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
       <span id="kb-status-detail-composite">{% if kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
