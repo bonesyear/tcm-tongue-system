@@ -289,6 +289,9 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         raw_max_tokens = raw_timeout = None
         kb_root = None
         kb_roots = None
+    # 旧三元组及未提供知识库键的调用保留默认行为；显式类别空值不得回退。
+    use_default_kb = not isinstance(config, dict) or (
+        "kb_root" not in config and "kb_roots" not in config)
     from src.retrieval import KB_CATEGORY_DEFS, inspect_kb
     if not isinstance(kb_roots, dict):
         kb_roots = {category: kb_root for category in KB_CATEGORY_DEFS}
@@ -297,7 +300,8 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         "diet": ["忌口", "适宜", "食疗"],
         "formula": ["煎服", "温覆", "方证", "方剂"],
     }
-    kb_infos = {category: inspect_kb(kb_roots.get(category))
+    kb_infos = {category: (inspect_kb() if use_default_kb else
+                           inspect_kb(kb_roots.get(category)))
                 for category in KB_CATEGORY_DEFS}
     kb_categories = {}
     kb_statuses = {}
@@ -325,7 +329,7 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         kb_statuses[category] = status
         kb_refs.extend(refs)
     for category, info in kb_infos.items():
-        latest = inspect_kb(kb_roots.get(category))
+        latest = inspect_kb() if use_default_kb else inspect_kb(kb_roots.get(category))
         if (latest["root"], latest["revision"]) != (info["root"], info["revision"]):
             return {"ok": False,
                     "error": f"{KB_CATEGORY_DEFS[category]['label']}在报告准备期间已变化，请重试"}

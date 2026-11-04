@@ -1,3 +1,5 @@
 # Web 层依赖（独立于根 requirements.txt，不污染核心库）
 Flask>=3.0
 waitress==3.0.2
+Pillow>=10.0
+tzdata>=2025.2

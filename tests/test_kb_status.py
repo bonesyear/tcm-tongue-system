@@ -178,3 +178,35 @@ def test_external_roots_ignored_by_default_and_managed_copies_auto_enable(tmp_pa
     config['TCM_KB_ALLOW_EXTERNAL_KB'] = '1'
     states = inspect_kb_categories(config)
     assert states['constitution']['status'] == 'ready'
+
+
+def test_explicit_none_inspect_does_not_fallback_to_environment(tmp_path, monkeypatch):
+    external = tmp_path / 'external'
+    external.mkdir()
+    (external / 'old.md').write_text('不应读取的合成旧库\n', encoding='utf-8')
+    monkeypatch.setenv('TCM_KB_ROOT', str(external))
+    monkeypatch.delenv('TCM_KB_ALLOW_EXTERNAL_KB', raising=False)
+
+    # 无参数调用保留旧的默认检索行为；显式空值表示上游已判定未配置。
+    assert inspect_kb()['status'] == 'ready'
+    for empty in (None, ''):
+        assert inspect_kb(empty) == {
+            'root': '', 'status': 'unconfigured', 'file_count': 0,
+            'revision': '', 'error': ''}
+
+
+def test_settings_does_not_inspect_ignored_external_composite(tmp_path, monkeypatch):
+    external = tmp_path / 'external'
+    external.mkdir()
+    (external / 'old.md').write_text('不应读取的合成旧库\n', encoding='utf-8')
+    monkeypatch.setenv('TCM_KB_ROOT', str(external))
+    monkeypatch.delenv('TCM_KB_ALLOW_EXTERNAL_KB', raising=False)
+    app = create_app(env_file=str(tmp_path / '.env'),
+                     data_root=str(tmp_path / 'data'))
+    app.config['TESTING'] = True
+
+    settings = app.test_client().get('/settings').get_data(as_text=True)
+
+    assert 'id="kb-status-label-composite">未配置知识库<' in settings
+    assert 'id="kb-count-composite">0</span>' in settings
+    assert 'id="kb-current-root-composite"></code>' in settings

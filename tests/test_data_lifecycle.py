@@ -125,6 +125,38 @@ def test_submit_binds_photo_and_backs_up_old_file(client, data_root, monkeypatch
     assert records_store.list_photos(str(photo.parent.parent), _today(), DailyRecord(raw)) == ["舌面.jpg"]
 
 
+def test_photo_commit_restores_current_part_when_promotion_fails(data_root, monkeypatch):
+    """暂存图转正失败时，当前部位已备份的旧图也必须回滚。"""
+    import photo_store
+    today = _today()
+    day_dir = data_root / "records" / "photos" / today
+    staging_dir = day_dir / ".staging"
+    staging_dir.mkdir(parents=True)
+    photo = day_dir / "舌面.jpg"
+    legacy_png = day_dir / "舌面.png"
+    staging = staging_dir / "舌面-staged.jpg"
+    photo.write_bytes(b"old-committed")
+    legacy_png.write_bytes(b"old-png")
+    staging.write_bytes(b"new-staged")
+    draft = {"parts": {"舌面": {"photo_staging": staging.name}}}
+    original_replace = photo_store.os.replace
+
+    def fail_promotion(source, destination):
+        if source == str(staging) and destination == str(photo):
+            raise OSError("synthetic promotion failure")
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(photo_store.os, "replace", fail_promotion)
+    with pytest.raises(OSError, match="synthetic promotion failure"):
+        photo_store.commit_photos(
+            draft, str(day_dir.parent), today, ["舌面"],
+            str(data_root / "records" / "_backup"))
+
+    assert photo.read_bytes() == b"old-committed"
+    assert legacy_png.read_bytes() == b"old-png"
+    assert staging.read_bytes() == b"new-staged"
+
+
 def test_merge_does_not_replace_covered_photo(client, data_root, monkeypatch):
     today = _today()
     photo = data_root / "records" / "photos" / today / "舌面.jpg"

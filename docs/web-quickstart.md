@@ -7,7 +7,7 @@
 
 ## 一、安装与启动
 
-核心库零依赖（纯标准库），Web 层只需要 Flask：
+核心库零依赖（纯标准库）；Web 层独立依赖为 Flask、Waitress、Pillow（照片清洗）和 tzdata（跨平台 IANA 时区数据）：
 
 ```bash
 pip install -r web/requirements.txt

@@ -8,12 +8,22 @@ from .grep_search import list_kb_files
 from .kb_paths import kb_map_path, resolve_kb_root
 
 
-def inspect_kb(kb_root=None):
-    """返回未配置、空库、可用或错误状态，以及当前内容版本签名。"""
-    configured = bool(kb_root or os.environ.get("TCM_KB_ROOT"))
-    root = resolve_kb_root(kb_root)
-    info = {"root": root, "status": "unconfigured", "file_count": 0,
+_UNSET = object()
+
+
+def inspect_kb(kb_root=_UNSET):
+    """返回知识库状态；无参数可读环境默认，显式空值表示未配置。"""
+    info = {"root": "", "status": "unconfigured", "file_count": 0,
             "revision": "", "error": ""}
+    if kb_root is _UNSET:
+        configured = bool(os.environ.get("TCM_KB_ROOT"))
+        root = resolve_kb_root()
+    else:
+        if not kb_root:
+            return info
+        configured = True
+        root = resolve_kb_root(kb_root)
+    info["root"] = root
     if not os.path.isdir(root):
         if configured:
             info.update(status="error", error="知识库目录不存在或不是目录")

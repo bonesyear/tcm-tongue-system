@@ -66,7 +66,8 @@ def daily_files(daily_dir: str) -> dict[str, list[tuple]]:
 def select_daily_file(daily_dir: str, date_str: str) -> str | None:
     """规范名优先；否则取 mtime 最新的非副本文件并明确告警。"""
     candidates = daily_files(daily_dir).get(date_str, [])
-    exact = os.path.join(daily_dir, f"{date_str}_analysis.json")
+    # 扫描结果统一为绝对路径；相对目录调用也必须识别规范正档。
+    exact = os.path.join(os.path.abspath(daily_dir), f"{date_str}_analysis.json")
     for candidate in candidates:
         if candidate[0] == exact:
             return exact

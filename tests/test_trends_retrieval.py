@@ -169,6 +169,22 @@ def test_special_paths_and_archive_names(tmp_path):
     assert records_store.list_dates(str(daily)) == ["2026-06-25"]
 
 
+def test_relative_daily_dir_still_prefers_canonical_record(tmp_path, monkeypatch):
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    canonical = daily / "2026-06-25_analysis.json"
+    alternate = daily / "2026-06-25_alternate_analysis.json"
+    canonical.write_text('{"date":"2026-06-25","tag":"canonical"}', encoding="utf-8")
+    alternate.write_text('{"date":"2026-06-25","tag":"alternate"}', encoding="utf-8")
+    os.utime(canonical, (1_000_000_000, 1_000_000_000))
+    os.utime(alternate, (1_000_000_100, 1_000_000_100))
+    monkeypatch.chdir(tmp_path)
+
+    selected = records_store.select_daily_file("daily", "2026-06-25")
+
+    assert os.path.basename(selected) == canonical.name
+
+
 def test_latest_record_skips_unreadable_candidate(tmp_path):
     daily = tmp_path / "daily"
     daily.mkdir()

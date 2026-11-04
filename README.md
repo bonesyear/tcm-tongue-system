@@ -77,7 +77,7 @@ pip install -r requirements.txt   # matplotlib numpy（周报画图）+ Pillow�
 ### Web 界面（推荐）
 
 ```bash
-pip install -r web/requirements.txt   # Flask + Waitress（独立声明，不污染核心依赖）
+pip install -r web/requirements.txt   # Flask + Waitress + Pillow + tzdata（独立声明，不污染核心依赖）
 python web/app.py                     # Waitress → http://127.0.0.1:8600
 ```
 

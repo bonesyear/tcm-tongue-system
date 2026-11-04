@@ -853,3 +853,41 @@ def test_report_invalid_llm_limit_returns_400_without_call(client, tmp_path, dat
     assert "LLM_MAX_TOKENS" in resp.get_json()["error"]
     with open(path, "rb") as file:
         assert file.read() == before
+
+
+def test_report_does_not_fallback_to_ignored_external_env(
+        tmp_path, data_root, monkeypatch):
+    external = tmp_path / "external"
+    external.mkdir()
+    marker = "DISABLED_EXTERNAL_MARKER"
+    (external / "old.md").write_text(
+        f"{marker} 舌 食疗 忌口 煎服 方证\n", encoding="utf-8")
+    monkeypatch.setenv("TCM_KB_ROOT", str(external))
+    monkeypatch.delenv("TCM_KB_ALLOW_EXTERNAL_KB", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "sk-x")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("LLM_BASE_URL", "https://x.com/v1/chat/completions")
+    captured = {}
+
+    def fake_chat(user_input, *args, **kwargs):
+        captured["input"] = user_input
+        return _contract("# ok")
+
+    monkeypatch.setattr(llm_client, "chat", fake_chat)
+    app = create_app(env_file=str(tmp_path / ".env"), data_root=data_root)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+
+    response = client.post("/record/2026-06-25/report")
+
+    assert response.status_code == 200, response.get_json()
+    with open(os.path.join(data_root, "records", "daily",
+                           "2026-06-25_analysis.json"), encoding="utf-8") as file:
+        report = json.load(file)["diagnosis"]["report"]
+    assert report["kb_status"] == "unconfigured"
+    assert all(info["status"] == "unconfigured"
+               for info in report["kb_categories"].values())
+    assert "kb_refs" not in report
+    assert marker not in captured["input"]
+    assert captured["input"].count("状态：未配置") == 3

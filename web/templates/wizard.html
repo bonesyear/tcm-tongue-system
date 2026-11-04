@@ -836,9 +836,15 @@ document.getElementById("btn-next").addEventListener("click", function () { if (
 
 function showError(error) {
   var box = document.getElementById("wizard-alert");
+  var payload = error && error.payload;
+  var message = error && error.message ? error.message : String(error);
+  if (payload && payload.photo_saved === true && payload.staged === true &&
+      message.indexOf("未替换已提交原图") < 0) {
+    message += " 图片已清洗并暂存，未替换已提交原图；可重试识图或改用手动录入。";
+  }
   box.className = "alert-danger";
   box.setAttribute("role", "alert");
-  box.textContent = error && error.message ? error.message : String(error);
+  box.textContent = message;
   box.style.display = "";
 }
 
@@ -851,8 +857,10 @@ function responseJSON(response) {
   }
   return response.json().then(function (data) {
     if (!response.ok && !data.need_danger_ack) {
-      throw new Error(data.error || (data.errors || []).join("；") ||
-                    "请求失败（HTTP " + response.status + "）");
+      var error = new Error(data.error || (data.errors || []).join("；") ||
+                            "请求失败（HTTP " + response.status + "）");
+      error.payload = data;
+      throw error;
     }
     return data;
   });

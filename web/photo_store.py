@@ -84,6 +84,8 @@ def commit_photos(draft: dict, photos_dir: str, date_str: str,
                 backup = os.path.join(backup_dir, "photos", date_str, uuid.uuid4().hex)
                 os.makedirs(backup, exist_ok=True)
                 backups = []
+                # 先登记当前部位，备份或转正任一步失败都能恢复本轮已移动文件。
+                moves.append((target, staging, backups))
                 for extension in IMAGE_EXTENSIONS:
                     original = os.path.join(day_dir, part + extension)
                     if os.path.isfile(original):
@@ -91,7 +93,6 @@ def commit_photos(draft: dict, photos_dir: str, date_str: str,
                         os.replace(original, destination)
                         backups.append((original, destination))
                 os.replace(staging, target)
-                moves.append((target, staging, backups))
     except Exception:
         _rollback(moves)
         raise
