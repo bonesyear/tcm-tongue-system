@@ -97,7 +97,7 @@ def test_default_report_flattens_unified_anchor_terms(tmp_path, monkeypatch):
     _, roots = _corpus(tmp_path)
     seen = {}
 
-    def capture(rec, kb_roots, anchor_terms):
+    def capture(rec, kb_roots, anchor_terms, cache_root=None):
         seen['roots'] = kb_roots
         seen['anchors'] = anchor_terms
         return []
@@ -274,7 +274,7 @@ def test_unified_rejects_file_directory_conflicts(tmp_path, directory_first):
         _kb_references_unified(_record(), roots, _ALL_ANCHORS)
 
 
-def test_unified_temporary_view_invalidates_caches(tmp_path, monkeypatch):
+def test_unified_view_reuses_caches(tmp_path, monkeypatch):
     import kb_evidence
     from src.retrieval import dispatcher, grep_search, synonym_loader
     _, roots = _corpus(tmp_path)
@@ -283,10 +283,11 @@ def test_unified_temporary_view_invalidates_caches(tmp_path, monkeypatch):
         return (len(dispatcher._RAG_CACHE), len(grep_search._FILE_CACHE),
                 len(synonym_loader._CACHE))
 
-    before = counts()
-    for _ in range(2):
-        assert _kb_references_unified(_record(), roots, _ALL_ANCHORS)
-    assert counts() == before
+    assert _kb_references_unified(_record(), roots, _ALL_ANCHORS)
+    after_first = counts()
+    assert after_first[0] > 0
+    assert _kb_references_unified(_record(), roots, _ALL_ANCHORS)
+    assert counts() == after_first
 
     original = kb_evidence._kb_references
 
@@ -297,4 +298,4 @@ def test_unified_temporary_view_invalidates_caches(tmp_path, monkeypatch):
     monkeypatch.setattr(kb_evidence, '_kb_references', fail_after_retrieval)
     with pytest.raises(RuntimeError, match='合成检索后故障'):
         _kb_references_unified(_record(), roots, _ALL_ANCHORS)
-    assert counts() == before
+    assert counts() == after_first

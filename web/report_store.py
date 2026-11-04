@@ -292,11 +292,13 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         raw_timeout = config.get("timeout")
         kb_root = config.get("kb_root")
         kb_roots = config.get("kb_roots")
+        kb_cache_root = config.get("kb_cache_root")
     else:
         model, base_url, api_key = config
         raw_max_tokens = raw_timeout = None
         kb_root = None
         kb_roots = None
+        kb_cache_root = None
     # 旧三元组及未提供知识库键的调用保留默认行为；显式类别空值不得回退。
     use_default_kb = not isinstance(config, dict) or (
         "kb_root" not in config and "kb_roots" not in config)
@@ -325,7 +327,8 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
                       if kb_infos[category]["status"] == "ready"},
                 anchor_terms=[term for category in KB_CATEGORY_DEFS
                               if kb_infos[category]["status"] == "ready"
-                              for term in anchors[category]])
+                              for term in anchors[category]],
+                cache_root=kb_cache_root)
         except Exception as error:
             unified_error = error
             import sys

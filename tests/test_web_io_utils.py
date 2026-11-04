@@ -125,3 +125,37 @@ def test_write_temp_json_uses_unique_paths(tmp_path):
     finally:
         os.unlink(first)
         os.unlink(second)
+
+
+def _process_acquire_fresh_lock(directory, start, results):
+    start.wait(10)
+    try:
+        with io_utils.write_lock(directory):
+            pass
+        results.put('locked')
+    except Exception as error:
+        results.put(type(error).__name__)
+
+
+def test_processes_can_acquire_fresh_lock(tmp_path):
+    ctx = multiprocessing.get_context('spawn')
+    start = ctx.Event()
+    results = ctx.Queue()
+    directory = tmp_path / 'fresh-lock'
+    directory.mkdir()
+    (directory / '.write.lock').write_bytes(b'')
+    processes = [ctx.Process(target=_process_acquire_fresh_lock,
+                            args=(str(directory), start, results)) for _ in range(2)]
+    for process in processes:
+        process.start()
+    start.set()
+    for process in processes:
+        process.join(15)
+        if process.is_alive():
+            process.terminate()
+            process.join()
+    assert all(process.exitcode == 0 for process in processes)
+    outcomes = sorted(results.get(timeout=2) for _ in processes)
+    results.close()
+    results.join_thread()
+    assert outcomes == ['locked', 'locked']

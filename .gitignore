@@ -60,6 +60,7 @@ private/
 
 # 导入的私有知识库与暂存区（仅本机，永不入库）
 private_kb/
+cache/kb-unified/
 .kb-staging/
 .kb-backup-*/
 .kb-failed-*/

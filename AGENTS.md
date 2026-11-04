@@ -133,6 +133,7 @@
   `unknown` 不等于 `not_triggered`；旧 `detect_danger()` 空列表不代表已排除。
 - `.env` 严格按 UTF-8 读取（允许起始 BOM），引号与转义需读写一致；非法换行拒绝。
   完整读—改—写—回读使用线程/进程锁，知识库导入、重置与模式切换共用同一配置锁；锁文件 `.write.lock` 不入库。
+  Windows 直接锁定空文件第 0 字节，不在加锁前写入初始化字节，避免多进程新鲜锁竞态。
   Web 每请求只取一次配置快照，禁止用 `os.environ + importlib.reload` 传模型配置；
   `VISION_BASE_URL` 必填，不再回退默认第三方端点。私有历史配置路径须显式 opt-in。
 - 模型出站统一走 `web.safe_fetch`：仅 HTTP(S)、同源重定向、响应限量和总时限；
@@ -170,8 +171,8 @@
 - Web 模块统一使用顶层导入（`import records_store` / `from safe_fetch import …`），
   禁止混用 `web.records_store` / `from web import …`，避免双模块实例导致 mock、缓存和配置分叉。
   `lifecycle_store.py` 仅属于 Web 层，路径为 `web/lifecycle_store.py`。
-  知识库路由在 `web/kb_routes.py`；候选检索在 `web/kb_evidence.py`；报告生成在
-  `web/report_store.py`；`web/trends_store.py` 只保留周报实现和兼容转发。
+  知识库路由在 `web/kb_routes.py`；候选检索在 `web/kb_evidence.py`；统一视图生命周期在
+  `web/kb_view.py`；报告生成在 `web/report_store.py`；`web/trends_store.py` 只保留周报实现和兼容转发。
 - Web 所有请求先校验 Host；写请求要求与当前请求同源，或凭有效会话兼容传统浏览器；
   `/welcome` POST 测试需加 `Origin: http://localhost`。局域网口令只走
   `/settings/login` POST，勿放入 URL/JS；非回环无口令配置必须拒绝。
@@ -203,12 +204,13 @@
   缺体质的结构化辨证输出还须写入前拒绝，不能只靠 prompt。本地速览使用内置规则计算，但只有
   对应类别 `ready` 才展示。无库/无命中/失败必须在模型输入和页面披露。
   类别未配置或停用时状态根为空，不得把被忽略的外部旧根显示为当前目录。
-  默认报告经 `kb_references_unified()` 按可用类别构造临时统一视图，保留全局预算、类别溯源和锚词顺序；`trends_store` 默认不得强制注入旧分类函数，显式自定义 `kb_references` 必须原样保留并走原分类路径。
+  默认报告经 `kb_references_unified()` 按可用类别构造统一视图，保留全局预算、类别溯源和锚词顺序；`trends_store` 默认不得强制注入旧分类函数，显式自定义 `kb_references` 必须原样保留并走原分类路径。
   共享综合根须在检索前剔除未启用类别。三类齐全时，未按专类目录组织的综合资料标为 `composite` 通用候选，不冒称体质；缺类时无法确定归属的资料明确报错。专用根任意目录按声明类别处理。
   标准三类目录下，三类齐全须与综合库结果一致，双模块须与源库对应子集一致；缺类不得把该类证据送入模型。统一视图不得静默覆盖同路径冲突文件。每类保存的 `refs` 只含本类候选，通用候选单独进入模型输入。
-  统一视图只排除精确 `README.md`，与检索层一致；合并别名通过 `syn_map` 直接传给 `retrieve()`，不得重写临时 YAML。文件内容或路径类型冲突必须明确报错。临时视图无论成功或异常都须在 `finally` 调用 `invalidate_kb_caches()` 清理本临时根缓存。
+  统一视图只排除精确 `README.md`，与检索层一致；合并别名通过 `syn_map` 直接传给 `retrieve()`，不得重写临时 YAML。文件内容或路径类型冲突必须明确报错。
+  受管视图在 `web/kb_view.py`，缓存位于 `<TCM_DATA_ROOT>/cache/kb-unified/`，是可删除重建的派生数据，不得提交。键包含类别、规范根、路径及内容哈希；构建与原子发布在缓存根写锁内，检索在锁外。默认保留 8 个近期视图，超出先失效本进程缓存，目录经过 1 小时保护期才删除。启动及后续缓存操作只清理系统标记内可识别暂存，不得触碰源库、ZIP 或无关文件。缓存与源根重叠时回退一次性视图，退出必须清理本临时根缓存。视图语义变化须提升 `_VIEW_SCHEMA`。
   各类完整路径统一放入“技术详情”折叠区，默认只展示状态与可检索 Markdown 数。
-  B25 部署验收与配置并发修复见 `docs/MIGRATION_2026-11-04_B25.md`；B26 正式链路与缺类隔离见 `docs/MIGRATION_2026-11-04_B26.md`；B27 一致性与缓存清理见 `docs/MIGRATION_2026-11-04_B27.md`。
+  B25 部署验收与配置并发修复见 `docs/MIGRATION_2026-11-04_B25.md`；B26–B28 检索与缓存修复见 `docs/MIGRATION_2026-11-04_B26.md`、`docs/MIGRATION_2026-11-04_B27.md`、`docs/MIGRATION_2026-11-04_B28.md`。
 
 ## 4. 与「另一个 Agent」的交接方式
 

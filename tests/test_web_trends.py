@@ -337,9 +337,10 @@ def test_report_http_uses_unified_and_scopes_category_refs(client, data_root, mo
     seen = {}
     original = kb_evidence._kb_references_unified
 
-    def capture(rec, kb_roots, anchor_terms=None):
+    def capture(rec, kb_roots, anchor_terms=None, cache_root=None):
         seen['roots'] = kb_roots
-        return original(rec, kb_roots, anchor_terms=anchor_terms)
+        seen['cache_root'] = cache_root
+        return original(rec, kb_roots, anchor_terms=anchor_terms, cache_root=cache_root)
 
     monkeypatch.setattr(kb_evidence, '_kb_references_unified', capture)
     monkeypatch.setattr(llm_client, 'chat', lambda *args, **kwargs: _contract('# 合成报告'))

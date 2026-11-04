@@ -76,6 +76,7 @@ def create_app(env_file: str | None = None,
     # 启动时环境变量优先；每个请求只读取一次 .env，不把配置写回进程环境。
     boot_env = dict(os.environ)
     data_root = data_root or paths.DATA_ROOT
+    kb_cache_root = os.path.join(data_root, "cache", "kb-unified")
     daily_dir = os.path.join(data_root, "records", "daily")
     photos_dir = os.path.join(data_root, "records", "photos")
     backup_dir = os.path.join(data_root, "records", "_backup")
@@ -446,6 +447,7 @@ def create_app(env_file: str | None = None,
                      "max_tokens": cfg("LLM_MAX_TOKENS"),
                      "timeout": cfg("LLM_TIMEOUT"),
                      "kb_root": cfg("TCM_KB_ROOT") or None,
+                     "kb_cache_root": kb_cache_root,
                      "kb_roots": {category: kb_category_root(category, kb_cfg)
                                   for category in KB_CATEGORY_DEFS}},
             timezone_name=cfg("TCM_TIMEZONE") or None)
@@ -1280,6 +1282,11 @@ def create_app(env_file: str | None = None,
         except Exception as e:  # 连通性测试的失败必须可见，不静默
             return jsonify({"ok": False, "detail": f"{type(e).__name__}: {e}"})
 
+    import kb_view
+    try:
+        kb_view.cleanup_unified_view_cache(kb_cache_root)
+    except OSError as error:
+        print(f"[web][kb][warn] 统一视图缓存清理失败: {error}", file=sys.stderr)
     return app
 
 
