@@ -322,8 +322,8 @@
   </section>
   {% endfor %}
   {% set kb = kb_composite %}
-  <section id="kb-card-composite" style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
-    <h3>综合知识库</h3>
+  <details id="kb-card-composite" style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
+    <summary><h3>综合知识库</h3></summary>
     <p class="muted">此功能用于调试及保证兼容性。</p>
     <p class="muted">三类知识库独立导入、独立显示。缺少某类时，对应前端信息不可显示；未设置专用根的源综合库可作为各类别回退，不会被修改。</p>
     <form method="post" action="/settings/kb/mode" style="margin:10px 0 14px;">
@@ -345,7 +345,7 @@
       <button class="btn btn-primary" id="kb-import-submit-composite" type="submit">导入综合知识库</button>
       <p id="kb-import-status-composite" role="status" aria-live="polite"></p>
     </form>
-  </section>
+  </details>
   {% endif %}
 </div>
 

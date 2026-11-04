@@ -385,6 +385,8 @@ def test_settings_composite_import_card_and_route(client, tmp_path):
     assert '默认关闭以兼容源综合库' in html
     assert '旧综合库' not in html
     assert 'data-category="composite"' in html
+    assert '<details id="kb-card-composite"' in html
+    assert '<details id="kb-card-composite" open' not in html
     assert html.index('id="kb-card-formula"') < html.index('id="kb-card-composite"')
     assert html.index('此功能用于调试及保证兼容性。') < html.index('默认关闭以兼容源综合库')
     assert 'category === "composite" && data.configured' in html
