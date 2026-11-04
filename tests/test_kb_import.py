@@ -407,6 +407,16 @@ def test_settings_composite_import_card_and_route(client, tmp_path):
     assert 'id="kb-import-status-composite"' in html
 
 
+def test_kb_paths_are_collapsed_technical_details(client):
+    html = client.get('/settings').get_data(as_text=True)
+    assert html.count('<summary>技术详情</summary>') == 4
+    for category in ('constitution', 'diet', 'formula', 'composite'):
+        count_index = html.index(f'id="kb-count-{category}"')
+        path_index = html.index(f'id="kb-current-root-{category}"')
+        details_index = html.rfind('<summary>技术详情</summary>', 0, path_index)
+        assert details_index > count_index
+
+
 def test_settings_import_rejects_bad_zip_without_config_change(client, tmp_path):
     response = client.post('/settings/kb/import', data={
         'kb_file': (io.BytesIO(b'bad'), 'bad.zip'),

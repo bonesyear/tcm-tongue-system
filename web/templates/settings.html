@@ -301,8 +301,12 @@
       <strong id="kb-status-label-{{ category }}">{% if kb.disabled %}已重置/已停用{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
       <span id="kb-status-detail-{{ category }}">{% if kb.disabled %}本类信息不可显示；上传新 ZIP 可重新启用{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
     </p>
-    <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code> · 可检索 Markdown <span id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（源综合库回退）{% endif %}</p>
-    <p class="muted">本类导入副本：<code>{{ kb_import_roots[category] }}</code></p>
+    <p class="muted">可检索 Markdown <span id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（源综合库回退）{% endif %}</p>
+    <details style="margin-top:10px;">
+      <summary>技术详情</summary>
+      <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code></p>
+      <p class="muted">本类导入副本：<code>{{ kb_import_roots[category] }}</code></p>
+    </details>
     <form class="kb-import-form" data-category="{{ category }}" method="post" action="/settings/kb/import" enctype="multipart/form-data">
       <input type="hidden" name="category" value="{{ category }}">
       <label for="kb-file-{{ category }}">导入{{ definition.label }} ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
@@ -342,7 +346,11 @@
       <strong id="kb-status-label-composite">{% if kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
       <span id="kb-status-detail-composite">{% if kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
     </p>
-    <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code> · 可检索 Markdown <span id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
+    <p class="muted">可检索 Markdown <span id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
+    <details style="margin-top:10px;">
+      <summary>技术详情</summary>
+      <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code></p>
+    </details>
     <form class="kb-import-form" data-category="composite" method="post" action="/settings/kb/import" enctype="multipart/form-data">
       <input type="hidden" name="category" value="composite">
       <label for="kb-file-composite">导入综合知识库 ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>

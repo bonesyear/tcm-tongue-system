@@ -43,6 +43,7 @@
 - [B23 部署与复原验收](MIGRATION_2026-11-03_B23.md)
 - [B25 工作区治理与部署边界验收](MIGRATION_2026-11-04_B25.md)
 - [综合知识库导入入口](MIGRATION_2026-11-04_COMPOSITE_IMPORT.md)
+- [知识库路径收进技术详情](MIGRATION_2026-11-04_KB_PATH_DETAILS.md)
 
 ## 新增文档约定
 
