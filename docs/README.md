@@ -46,6 +46,7 @@
 - [知识库路径收进技术详情](MIGRATION_2026-11-04_KB_PATH_DETAILS.md)
 - [系统审查：知识库隔离、照片回滚与选档修复](MIGRATION_2026-11-04_REVIEW_HARDENING.md)
 - [统一知识库检索视图](MIGRATION_2026-11-04_KB_UNIFIED.md)
+- [B26 正式报告链路与缺类隔离](MIGRATION_2026-11-04_B26.md)
 
 ## 新增文档约定
 

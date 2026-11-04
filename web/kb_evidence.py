@@ -61,13 +61,12 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
 
 
 def _category_for_file(filename):
-    from src.retrieval import KB_CATEGORY_DEFS
     first = filename.replace("\\", "/").split("/", 1)[0]
     for category, directory in (("constitution", "diagnostics"),
                                 ("diet", "diet-lifestyle"), ("formula", "formulas")):
         if first == directory:
             return category
-    return next(iter(KB_CATEGORY_DEFS))
+    return None
 
 
 def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None) -> list:
@@ -85,19 +84,30 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None) -> list:
     if not active:
         return []
     distinct_roots = list(dict.fromkeys(active.values()))
+    shared = {root for root in distinct_roots
+              if list(active.values()).count(root) > 1}
+
+    def shared_category(relative):
+        category = _category_for_file(relative)
+        if category is None:
+            if len(active) < len(KB_CATEGORY_DEFS):
+                raise ValueError(f"共享综合知识库文件无法确定类别: {relative}；"
+                                 "缺类时请按 diagnostics/、diet-lifestyle/、formulas/ 分类"
+                                 "或改用分类专用根")
+            return "composite"
+        return category
+
     if len(active) == len(KB_CATEGORY_DEFS) and len(distinct_roots) == 1:
-        refs = _kb_references(rec, kb_root=distinct_roots[0],
-                              anchor_terms=anchor_terms)
+        root = distinct_roots[0]
+        refs = _kb_references(rec, kb_root=root, anchor_terms=anchor_terms)
         for ref in refs:
-            ref["category"] = _category_for_file(ref["file"])
+            ref["category"] = shared_category(ref["file"])
         return refs
 
     with tempfile.TemporaryDirectory(prefix="kb-unified-") as view:
         view = Path(view)
         owners = {}
         merged_map = {}
-        shared = {root for root in distinct_roots
-                  if list(active.values()).count(root) > 1}
         ordered_roots = sorted(distinct_roots,
                                key=lambda root: (root not in shared,
                                                  distinct_roots.index(root)))
@@ -108,14 +118,20 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None) -> list:
                         or source.name.lower() == "readme.md":
                     continue
                 relative = source.relative_to(root_path).as_posix()
+                if root in shared:
+                    owner = shared_category(relative)
+                    if owner != "composite" and active.get(owner) != root:
+                        continue
+                else:
+                    owner = next(category for category, value in active.items()
+                                 if value == root)
                 target = view / relative
                 if target.exists() and target.read_bytes() != source.read_bytes():
                     raise ValueError(f"重复且内容冲突的知识库文件: {relative}")
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
-                owners[relative] = _category_for_file(relative) if root in shared \
-                    else next(category for category, value in active.items() if value == root)
+                owners[relative] = owner
             map_path = root_path / "synonym_map.yaml"
             if map_path.is_file():
                 for key, values in load_map(str(map_path)).items():
@@ -134,5 +150,8 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None) -> list:
                         handle.write(f"  - {value}\n")
         refs = _kb_references(rec, kb_root=str(view), anchor_terms=anchor_terms)
         for ref in refs:
-            ref["category"] = owners.get(ref["file"], _category_for_file(ref["file"]))
+            category = owners.get(ref["file"])
+            if category is None:
+                raise ValueError(f"统一知识库候选缺少类别溯源: {ref['file']}")
+            ref["category"] = category
         return refs

@@ -145,7 +145,7 @@ def _report_lock(daily_dir, date_str):
 
 
 def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
-                              llm_cfg, timezone_name=None) -> dict:
+                              llm_cfg, timezone_name=None, kb_references=None) -> dict:
     return report_store.generate_and_store_report(
         daily_dir, backup_dir, date_str, llm_cfg, timezone_name,
-        kb_references=_kb_references)
+        kb_references=kb_references)

@@ -332,6 +332,32 @@ def test_report_includes_kb_refs(client, data_root, monkeypatch):
     assert "不等同实际引用" in html
 
 
+def test_report_http_uses_unified_and_scopes_category_refs(client, data_root, monkeypatch):
+    import kb_evidence
+    seen = {}
+    original = kb_evidence._kb_references_unified
+
+    def capture(rec, kb_roots, anchor_terms=None):
+        seen['roots'] = kb_roots
+        return original(rec, kb_roots, anchor_terms=anchor_terms)
+
+    monkeypatch.setattr(kb_evidence, '_kb_references_unified', capture)
+    monkeypatch.setattr(llm_client, 'chat', lambda *args, **kwargs: _contract('# 合成报告'))
+    monkeypatch.setenv('LLM_API_KEY', 'sk-x')
+    monkeypatch.setenv('LLM_MODEL', 'm')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://x.com/v1/chat/completions')
+    resp = client.post('/record/2026-06-25/report')
+    assert resp.status_code == 200, resp.get_json()
+    assert set(seen['roots']) == {'constitution', 'diet', 'formula'}
+    with open(os.path.join(data_root, 'records', 'daily',
+                           '2026-06-25_analysis.json'), encoding='utf-8') as f:
+        report = json.load(f)['diagnosis']['report']
+    for category, info in report['kb_categories'].items():
+        expected = [ref for ref in report['kb_refs'] if ref['category'] == category]
+        assert info['refs'] == expected
+        assert info['status'] == ('retrieved' if expected else 'no_hits')
+
+
 def test_kb_references_fail_safe(client, data_root, monkeypatch):
     """检索失败不阻断报告，但明确保存并展示 error 状态。"""
     import trends_store

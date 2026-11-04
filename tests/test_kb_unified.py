@@ -120,3 +120,111 @@ def test_default_report_flattens_unified_anchor_terms(tmp_path, monkeypatch):
     assert result['ok'], result
     assert seen['roots'] == roots
     assert seen['anchors'] == _ALL_ANCHORS
+
+
+def _generate_report(tmp_path, monkeypatch, roots, injection=None):
+    import llm_client
+    from report_store import generate_and_store_report
+
+    monkeypatch.setattr(llm_client, 'chat', lambda *args, **kwargs: json.dumps({
+        'structured': {'three_views': {}, 'four_patterns': {}, 'six_diseases': '',
+                       'core_pathomechanism': '', 'diet_advice': {}, 'lifestyle': {}},
+        'markdown': '# 合成报告\n仅用于统一检索回归。',
+    }, ensure_ascii=False))
+    daily = tmp_path / 'records' / 'daily'
+    backup = tmp_path / 'records' / '_backup'
+    daily.mkdir(parents=True)
+    shutil.copyfile(_FIXTURE.parent / '2026-06-25_analysis.json',
+                    daily / '2026-06-25_analysis.json')
+    kwargs = {'kb_references': injection} if injection is not None else {}
+    result = generate_and_store_report(
+        str(daily), str(backup), '2026-06-25',
+        lambda: {'model': 'synthetic', 'base_url': 'http://127.0.0.1/unused',
+                 'api_key': 'synthetic', 'kb_roots': roots}, **kwargs)
+    assert result['ok'], result
+    return json.loads((daily / '2026-06-25_analysis.json').read_text(
+        encoding='utf-8'))['diagnosis']['report']
+
+
+def test_unified_shared_root_excludes_unavailable_category(tmp_path, monkeypatch):
+    composite, _ = _corpus(tmp_path)
+    formula = composite / 'formulas' / 'formula-system.md'
+    formula.write_text(formula.read_text(encoding='utf-8') +
+                       '\n食疗也可能出现在综合库的其他分类文件中。\n', encoding='utf-8')
+    roots = {'constitution': str(composite), 'diet': str(composite), 'formula': None}
+    expected = _kb_references(_record(), kb_root=_without(composite, 'formulas'),
+                              anchor_terms=_ANCHORS['diet'])
+    actual = _kb_references_unified(_record(), roots, _ANCHORS['diet'])
+    assert _signature(actual) == _signature(expected)
+    assert {ref['category'] for ref in actual} <= {'constitution', 'diet'}
+
+    report = _generate_report(tmp_path, monkeypatch, roots)
+    assert not [ref for ref in report['kb_refs'] if ref['category'] == 'formula']
+    assert report['kb_categories']['formula']['status'] == 'unconfigured'
+
+
+def test_unified_partial_shared_root_rejects_unknown_layout(tmp_path):
+    composite, _ = _corpus(tmp_path)
+    (composite / 'notes').mkdir()
+    (composite / 'notes' / 'custom.md').write_text('自定义主题', encoding='utf-8')
+    roots = {'constitution': str(composite), 'diet': str(composite)}
+    with pytest.raises(ValueError, match='无法确定类别'):
+        _kb_references_unified(_record(), roots, ['自定义主题'])
+
+
+def test_unified_full_shared_root_keeps_generic_candidates(tmp_path):
+    composite, _ = _corpus(tmp_path)
+    (composite / 'notes').mkdir()
+    (composite / 'notes' / 'custom.md').write_text('自定义主题', encoding='utf-8')
+    refs = _kb_references_unified(
+        _record(), {category: str(composite) for category in _DIRECTORIES}, ['自定义主题'])
+    generic = [ref for ref in refs if ref['file'] == 'notes/custom.md']
+    assert [ref['category'] for ref in generic] == ['composite']
+    text = build_report_input(_record(), refs, kb_status={
+        category: 'retrieved' for category in _DIRECTORIES})
+    assert '综合知识库通用候选参考' in text
+    assert '自定义主题' in text
+
+
+def test_unified_dedicated_root_keeps_custom_layout(tmp_path):
+    root = tmp_path / 'custom-diet'
+    (root / 'notes').mkdir(parents=True)
+    (root / 'notes' / 'custom.md').write_text('专用食疗主题', encoding='utf-8')
+    refs = _kb_references_unified(_record(), {'diet': str(root)}, ['专用食疗主题'])
+    assert [ref['category'] for ref in refs] == ['diet']
+
+
+def test_report_preserves_custom_kb_references(tmp_path, monkeypatch):
+    _, roots = _corpus(tmp_path)
+    called = []
+
+    def injection(rec, kb_root=None, anchor_terms=None, category=None):
+        called.append(category)
+        return [{'file': f'{category}.md', 'line': 1, 'excerpt': '合成自定义参考',
+                 'term': 'custom', 'category': category}]
+
+    report = _generate_report(tmp_path, monkeypatch, roots, injection)
+    assert called == list(_DIRECTORIES)
+    assert [(ref['file'], ref['category']) for ref in report['kb_refs']] == [
+        (f'{category}.md', category) for category in _DIRECTORIES]
+
+
+def test_unified_mixed_roots_prefer_dedicated_category(tmp_path):
+    composite, roots = _corpus(tmp_path)
+    shared_formula = composite / 'formulas' / 'formula-system.md'
+    shared_formula.write_text('共享综合根中的方剂文件不应进入。\n食疗交叉主题。',
+                              encoding='utf-8')
+    (composite / 'notes').mkdir()
+    (composite / 'notes' / 'custom.md').write_text('通用综合主题', encoding='utf-8')
+    expected_root = tmp_path / 'expected'
+    shutil.copytree(composite, expected_root)
+    shutil.rmtree(expected_root / 'formulas')
+    shutil.copytree(tmp_path / 'formula' / 'formulas', expected_root / 'formulas')
+    active = {'constitution': str(composite), 'diet': str(composite),
+              'formula': roots['formula']}
+    anchors = _ALL_ANCHORS + ['通用综合主题']
+    expected = _kb_references(_record(), kb_root=str(expected_root), anchor_terms=anchors)
+    actual = _kb_references_unified(_record(), active, anchors)
+    assert _signature(actual) == _signature(expected)
+    generic = [ref for ref in actual if ref['file'] == 'notes/custom.md']
+    assert [ref['category'] for ref in generic] == ['composite']
