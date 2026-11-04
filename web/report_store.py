@@ -261,7 +261,8 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     """
     import llm_client
 
-    if kb_references is None:
+    use_unified = kb_references is None
+    if not use_unified:
         kb_references = kb_evidence._kb_references
     filepath = records_store.select_daily_file(daily_dir, date_str)
     if not filepath:
@@ -307,27 +308,54 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     kb_statuses = {}
     kb_refs = []
     kb_errors = []
+    unified_refs = None
+    unified_error = None
+    if use_unified:
+        try:
+            unified_refs = kb_evidence._kb_references_unified(
+                rec, {category: kb_roots.get(category)
+                      for category in KB_CATEGORY_DEFS
+                      if kb_infos[category]["status"] == "ready"},
+                anchor_terms=[term for category in KB_CATEGORY_DEFS
+                              if kb_infos[category]["status"] == "ready"
+                              for term in anchors[category]])
+        except Exception as error:
+            unified_error = error
+            import sys
+            print(f"[web][trends][warn] 统一知识库检索失败（{error!r}），"
+                  "本次报告不含候选参考", file=sys.stderr)
     for category, definition in KB_CATEGORY_DEFS.items():
         info = dict(kb_infos[category])
         status = info["status"]
         refs = []
-        if status == "ready":
-            try:
-                refs = kb_references(rec, kb_root=kb_roots.get(category),
-                                     anchor_terms=anchors[category], category=category)
-                status = "retrieved" if refs else "no_hits"
-            except Exception as error:
+        if unified_error is not None:
+            if status == "ready":
                 status = "error"
-                info["error"] = str(error)
-                import sys
-                print(f"[web][trends][warn] {definition['label']}检索失败"
-                      f"（{error!r}），本次报告不含该类候选参考", file=sys.stderr)
+                info["error"] = str(unified_error)
+        elif status == "ready":
+            if use_unified:
+                refs = unified_refs or []
+                status = "retrieved" if refs else "no_hits"
+            else:
+                try:
+                    refs = kb_references(rec, kb_root=kb_roots.get(category),
+                                         anchor_terms=anchors[category], category=category)
+                    status = "retrieved" if refs else "no_hits"
+                except Exception as error:
+                    status = "error"
+                    info["error"] = str(error)
+                    import sys
+                    print(f"[web][trends][warn] {definition['label']}检索失败"
+                          f"（{error!r}），本次报告不含该类候选参考", file=sys.stderr)
         if info["error"]:
             kb_errors.append(info["error"])
         info.update(status=status, refs=refs)
         kb_categories[category] = info
         kb_statuses[category] = status
-        kb_refs.extend(refs)
+        if not use_unified:
+            kb_refs.extend(refs)
+    if use_unified:
+        kb_refs = unified_refs or []
     for category, info in kb_infos.items():
         latest = inspect_kb() if use_default_kb else inspect_kb(kb_roots.get(category))
         if (latest["root"], latest["revision"]) != (info["root"], info["revision"]):
