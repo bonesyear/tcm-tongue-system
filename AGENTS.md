@@ -132,7 +132,7 @@
 - 新预警用 `src.alerts.evaluate_alert(s)` / `danger_flags_for()`：`screening` 不等于确诊，
   `unknown` 不等于 `not_triggered`；旧 `detect_danger()` 空列表不代表已排除。
 - `.env` 严格按 UTF-8 读取（允许起始 BOM），引号与转义需读写一致；非法换行拒绝。
-  完整读—改—写—回读使用线程/进程锁，知识库导入、重置与模式切换共用同一配置锁。
+  完整读—改—写—回读使用线程/进程锁，知识库导入、重置与模式切换共用同一配置锁；锁文件 `.write.lock` 不入库。
   Web 每请求只取一次配置快照，禁止用 `os.environ + importlib.reload` 传模型配置；
   `VISION_BASE_URL` 必填，不再回退默认第三方端点。私有历史配置路径须显式 opt-in。
 - 模型出站统一走 `web.safe_fetch`：仅 HTTP(S)、同源重定向、响应限量和总时限；

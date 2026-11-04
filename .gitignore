@@ -12,6 +12,7 @@ dist/
 .env
 .privacy-words
 .backup_manifest
+.write.lock
 
 # 本地工具配置(Claude Code 会话本地设置,不入库)
 .claude/
