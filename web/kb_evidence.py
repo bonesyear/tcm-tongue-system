@@ -9,7 +9,7 @@ MAX_KB_TOTAL_CHARS = 12000
 
 
 def _kb_references(rec, kb_root=None, max_hits: int = 10,
-                   anchor_terms=None, category=None) -> list:
+                   anchor_terms=None, category=None, syn_map=None) -> list:
     """按当日证候和类别锚词检索候选条文。"""
     from src.scoring import score_indicators
     from src.textnorm import display_text
@@ -35,7 +35,7 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
         for term in terms:
             if len(hits) >= limit or total_chars >= MAX_KB_TOTAL_CHARS:
                 return
-            r = retrieve(term, context_lines=1, kb_root=kb_root)
+            r = retrieve(term, context_lines=1, kb_root=kb_root, syn_map=syn_map)
             added = 0
             for h in r.get("results", []):
                 if len(hits) >= limit or added >= 2 \
@@ -106,52 +106,57 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None) -> list:
 
     with tempfile.TemporaryDirectory(prefix="kb-unified-") as view:
         view = Path(view)
-        owners = {}
-        merged_map = {}
-        ordered_roots = sorted(distinct_roots,
-                               key=lambda root: (root not in shared,
-                                                 distinct_roots.index(root)))
-        for root in ordered_roots:
-            root_path = Path(root)
-            for source in root_path.rglob("*"):
-                if not source.is_file() or source.suffix.lower() != ".md" \
-                        or source.name.lower() == "readme.md":
-                    continue
-                relative = source.relative_to(root_path).as_posix()
-                if root in shared:
-                    owner = shared_category(relative)
-                    if owner != "composite" and active.get(owner) != root:
+        try:
+            owners = {}
+            merged_map = {}
+            ordered_roots = sorted(distinct_roots,
+                                   key=lambda root: (root not in shared,
+                                                     distinct_roots.index(root)))
+            for root in ordered_roots:
+                root_path = Path(root)
+                for source in root_path.rglob("*"):
+                    if not source.is_file() or source.suffix.lower() != ".md" \
+                            or source.name == "README.md":
                         continue
-                else:
-                    owner = next(category for category, value in active.items()
-                                 if value == root)
-                target = view / relative
-                if target.exists() and target.read_bytes() != source.read_bytes():
-                    raise ValueError(f"重复且内容冲突的知识库文件: {relative}")
-                if not target.exists():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(source, target)
-                owners[relative] = owner
-            map_path = root_path / "synonym_map.yaml"
-            if map_path.is_file():
-                for key, values in load_map(str(map_path)).items():
-                    aliases = merged_map.setdefault(key, [])
-                    for value in values:
-                        if value not in aliases:
-                            aliases.append(value)
-        if len(merged_map) > MAX_SYNONYM_KEYS or any(
-                len(values) > MAX_SYNONYMS_PER_KEY for values in merged_map.values()):
-            raise ValueError("统一别名词典超过现有键或别名数量上限")
-        if merged_map:
-            with (view / "synonym_map.yaml").open("w", encoding="utf-8") as handle:
-                for key, values in merged_map.items():
-                    handle.write(f"{key}:\n")
-                    for value in values:
-                        handle.write(f"  - {value}\n")
-        refs = _kb_references(rec, kb_root=str(view), anchor_terms=anchor_terms)
-        for ref in refs:
-            category = owners.get(ref["file"])
-            if category is None:
-                raise ValueError(f"统一知识库候选缺少类别溯源: {ref['file']}")
-            ref["category"] = category
-        return refs
+                    relative = source.relative_to(root_path).as_posix()
+                    if root in shared:
+                        owner = shared_category(relative)
+                        if owner != "composite" and active.get(owner) != root:
+                            continue
+                    else:
+                        owner = next(category for category, value in active.items()
+                                     if value == root)
+                    target = view / relative
+                    try:
+                        if target.exists():
+                            if not target.is_file():
+                                raise ValueError(f"知识库路径类型冲突: {relative}")
+                            if target.read_bytes() != source.read_bytes():
+                                raise ValueError(f"重复且内容冲突的知识库文件: {relative}")
+                        else:
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copyfile(source, target)
+                    except (FileExistsError, NotADirectoryError, IsADirectoryError) as error:
+                        raise ValueError(f"知识库路径类型冲突: {relative}") from error
+                    owners[relative] = owner
+                map_path = root_path / "synonym_map.yaml"
+                if map_path.is_file():
+                    for key, values in load_map(str(map_path)).items():
+                        aliases = merged_map.setdefault(key, [])
+                        for value in values:
+                            if value not in aliases:
+                                aliases.append(value)
+            if len(merged_map) > MAX_SYNONYM_KEYS or any(
+                    len(values) > MAX_SYNONYMS_PER_KEY for values in merged_map.values()):
+                raise ValueError("统一别名词典超过现有键或别名数量上限")
+            refs = _kb_references(rec, kb_root=str(view), anchor_terms=anchor_terms,
+                                  syn_map=merged_map)
+            for ref in refs:
+                category = owners.get(ref["file"])
+                if category is None:
+                    raise ValueError(f"统一知识库候选缺少类别溯源: {ref['file']}")
+                ref["category"] = category
+            return refs
+        finally:
+            from src.retrieval import invalidate_kb_caches
+            invalidate_kb_caches(str(view))

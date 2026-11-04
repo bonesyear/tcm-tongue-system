@@ -228,3 +228,73 @@ def test_unified_mixed_roots_prefer_dedicated_category(tmp_path):
     assert _signature(actual) == _signature(expected)
     generic = [ref for ref in actual if ref['file'] == 'notes/custom.md']
     assert [ref['category'] for ref in generic] == ['composite']
+
+
+def test_unified_lowercase_readme_matches_original(tmp_path):
+    composite, roots = _corpus(tmp_path)
+    (composite / 'readme.md').write_text('小写说明文件标记', encoding='utf-8')
+    (tmp_path / 'diet' / 'readme.md').write_text('小写说明文件标记', encoding='utf-8')
+    expected = _kb_references(_record(), kb_root=str(composite),
+                              anchor_terms=['小写说明文件标记'])
+    actual = _kb_references_unified(_record(), roots, ['小写说明文件标记'])
+    assert _signature(actual) == _signature(expected)
+    assert [ref['category'] for ref in actual if ref['file'] == 'readme.md'] == ['diet']
+
+
+def test_unified_aliases_preserve_loader_values(tmp_path, monkeypatch):
+    from src.retrieval import synonym_loader
+    _, roots = _corpus(tmp_path)
+    (tmp_path / 'diet' / 'diet-lifestyle' / 'hash.md').write_text(
+        '#特殊词', encoding='utf-8')
+    original_load_map = synonym_loader.load_map
+
+    def source_mapping_only(path):
+        if 'kb-unified-' in str(path):
+            return original_load_map(path)
+        return {'口语': ['#特殊词']}
+
+    monkeypatch.setattr(synonym_loader, 'load_map', source_mapping_only)
+    refs = _kb_references_unified(_record(), roots, ['口语'])
+    hits = [ref for ref in refs if ref['term'] == '口语' and ref['excerpt'] == '#特殊词']
+    assert len(hits) == 1
+    assert hits[0]['category'] == 'diet'
+
+
+@pytest.mark.parametrize('directory_first', [True, False])
+def test_unified_rejects_file_directory_conflicts(tmp_path, directory_first):
+    _, roots = _corpus(tmp_path)
+    first = tmp_path / 'constitution' / 'diagnostics' / 'conflict.md'
+    second = tmp_path / 'diet' / 'diagnostics' / 'conflict.md'
+    directory, file = (first, second) if directory_first else (second, first)
+    directory.mkdir(parents=True)
+    (directory / 'nested.md').write_text('目录内容', encoding='utf-8')
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text('文件内容', encoding='utf-8')
+    with pytest.raises(ValueError, match='路径类型冲突'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS)
+
+
+def test_unified_temporary_view_invalidates_caches(tmp_path, monkeypatch):
+    import kb_evidence
+    from src.retrieval import dispatcher, grep_search, synonym_loader
+    _, roots = _corpus(tmp_path)
+
+    def counts():
+        return (len(dispatcher._RAG_CACHE), len(grep_search._FILE_CACHE),
+                len(synonym_loader._CACHE))
+
+    before = counts()
+    for _ in range(2):
+        assert _kb_references_unified(_record(), roots, _ALL_ANCHORS)
+    assert counts() == before
+
+    original = kb_evidence._kb_references
+
+    def fail_after_retrieval(rec, kb_root=None, anchor_terms=None, syn_map=None):
+        original(rec, kb_root=kb_root, anchor_terms=anchor_terms, syn_map=syn_map)
+        raise RuntimeError('合成检索后故障')
+
+    monkeypatch.setattr(kb_evidence, '_kb_references', fail_after_retrieval)
+    with pytest.raises(RuntimeError, match='合成检索后故障'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS)
+    assert counts() == before
