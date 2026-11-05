@@ -284,17 +284,19 @@ def create_app(env_file: str | None = None,
     @app.before_request
     def require_boot_ack():
         # guide 是只读公开文档且被 welcome 页引用，必须在门禁之外；
-        # settings 另由 admin_allowed 保护，可提供口令登录。
-        if request.endpoint in ("welcome", "welcome_ack", "license_text", "settings",
-                                "settings_save", "settings_toggle", "settings_kb_import", "settings_kb_mode", "settings_kb_reset", "settings_login", "guide", "guide_doc",
-                                "guide_images", "static"):
+        # settings_login 保留口令登录入口，其余设置页及配置操作都先确认 welcome。
+        settings_endpoints = {"settings", "settings_save", "settings_toggle",
+                              "settings_kb_import", "settings_kb_mode", "settings_kb_reset"}
+        if request.endpoint in ("welcome", "welcome_ack", "license_text", "settings_login",
+                                "guide", "guide_doc", "guide_images", "static"):
             return None
-        if not is_local() and not admin_allowed():
+        if request.cookies.get("boot_ack") != boot_token:
+            return redirect("/welcome")
+        if not is_local() and not admin_allowed() \
+                and request.endpoint not in settings_endpoints:
             if request.is_json:
                 return jsonify({"ok": False, "error": "无权限：需管理口令或有效会话"}), 403
             return redirect(url_for("settings", welcome=1))
-        if request.cookies.get("boot_ack") != boot_token:
-            return redirect("/welcome")
         return None
 
     @app.after_request
@@ -302,7 +304,9 @@ def create_app(env_file: str | None = None,
         resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
         resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["Referrer-Policy"] = "no-referrer"
+        # Chrome 在 no-referrer 下会把局域网原生表单 POST 的 Origin 序列化为 null；
+        # same-origin 保留同源表单校验信息，同时禁止跨站请求携带 Referer。
+        resp.headers["Referrer-Policy"] = "same-origin"
         resp.headers["Vary"] = "Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site"
         if not is_local() and not has_admin_session() \
                 and not g.get("config_error", False) and admin_token():
@@ -348,11 +352,13 @@ def create_app(env_file: str | None = None,
         return redirect("/guide/")
 
     @app.get("/guide/")
+    @app.get("/kb-guide/")
     def guide_doc():
-        """使用手册（独立静态页，自包含暖纸主题；新标签打开，不包外壳）。"""
-        path = os.path.join(_REPO_ROOT, "docs", "user-guide.html")
+        """静态使用手册；两个固定入口均不读取用户路径或私有资料。"""
+        filename = "kb-guide.html" if request.path == "/kb-guide/" else "user-guide.html"
+        path = os.path.join(_REPO_ROOT, "docs", filename)
         if not os.path.exists(path):
-            return "使用手册缺失：docs/user-guide.html 不存在", 404
+            return f"使用手册缺失：docs/{filename} 不存在", 404
         return send_file(path, mimetype="text/html")
 
     @app.get("/guide/images/<path:filename>")
@@ -404,8 +410,10 @@ def create_app(env_file: str | None = None,
         from src.retrieval import KB_CATEGORY_DEFS, inspect_kb, inspect_kb_categories, \
             kb_legacy_root
         current_categories = inspect_kb_categories(kb_cfg)
+        effective_legacy_root = None if kb_cfg("TCM_KB_STRICT_CATEGORIES") == "1" \
+            else kb_legacy_root(kb_cfg)
         state = trends_store.report_state(
-            rec, kb_info=inspect_kb(kb_legacy_root(kb_cfg)),
+            rec, kb_info=inspect_kb(effective_legacy_root),
             kb_categories=current_categories)
         has_llm_content = (isinstance(diag, dict)
                            and isinstance(diag.get("report"), dict)) \
@@ -417,9 +425,24 @@ def create_app(env_file: str | None = None,
         view["stale_reasons"] = state["reasons"]
         if state["stale"]:
             view["diagnosis"] = None
+        display_report = None if local_mode or state["stale"] else view["report"]
+        if display_report and isinstance(display_report.get("kb_refs"), list):
+            all_ready = all(info["status"] == "ready"
+                            for info in current_categories.values())
+            visible_refs = []
+            for ref in display_report["kb_refs"]:
+                if not isinstance(ref, dict):
+                    continue
+                category = ref.get("category")
+                if category in current_categories:
+                    if current_categories[category]["status"] == "ready":
+                        visible_refs.append(ref)
+                elif category in (None, "", "composite") and all_ready:
+                    visible_refs.append(ref)
+            display_report["kb_refs"] = visible_refs
         return render_template(
             "record.html", page="index", r=view,
-            report=None if local_mode or state["stale"] else view["report"],
+            report=display_report,
             llm_configured=llm_ready(),
             local_mode=local_mode,
             kb_categories=current_categories, kb_category_defs=KB_CATEGORY_DEFS,
@@ -1064,6 +1087,7 @@ def create_app(env_file: str | None = None,
                 ["WEB_ADMIN_TOKEN", "WEB_HOST", "VISION_DISABLED", "LLM_DISABLED",
                  "TCM_KB_ROOT", "TCM_KB_CONSTITUTION_ROOT", "TCM_KB_DIET_ROOT",
                  "TCM_KB_FORMULA_ROOT", "TCM_KB_STRICT_CATEGORIES",
+                 "TCM_KB_CATEGORIES_DISABLED", "TCM_KB_COMPOSITE_DISABLED",
                  "TCM_KB_CONSTITUTION_DISABLED", "TCM_KB_DIET_DISABLED",
                  "TCM_KB_FORMULA_DISABLED"] if is_env_locked(k)]
 
@@ -1088,6 +1112,8 @@ def create_app(env_file: str | None = None,
             kb_categories=categories, kb_category_defs=KB_CATEGORY_DEFS,
             kb_composite=composite, kb_import_roots=import_roots,
             kb_strict=cfg("TCM_KB_STRICT_CATEGORIES") == "1",
+            kb_categories_disabled=cfg("TCM_KB_CATEGORIES_DISABLED") == "1",
+            kb_composite_disabled=cfg("TCM_KB_COMPOSITE_DISABLED") == "1",
             env_locked=_env_locked(), read_only=not admin_allowed(),
             llm_disabled=llm_disabled(), vision_disabled=vision_disabled(),
             lan_ip=_lan_ip() if host_is_lan else "",
@@ -1193,10 +1219,18 @@ def create_app(env_file: str | None = None,
         body = json_object()
         target = body.get("target")
         enabled = body.get("enabled")
-        if target not in ("vision", "llm") or not isinstance(enabled, bool):
-            return jsonify({"ok": False, "error": "开关参数必须为模型类别和布尔值"}), 400
-        prefix = target.upper()
-        key = prefix + "_DISABLED"
+        toggle_keys = {
+            "vision": "VISION_DISABLED", "llm": "LLM_DISABLED",
+            "kb_categories": "TCM_KB_CATEGORIES_DISABLED",
+            "kb_composite": "TCM_KB_COMPOSITE_DISABLED",
+            "kb_constitution": "TCM_KB_CONSTITUTION_DISABLED",
+            "kb_diet": "TCM_KB_DIET_DISABLED",
+            "kb_formula": "TCM_KB_FORMULA_DISABLED",
+        }
+        key = toggle_keys.get(target)
+        if key is None or not isinstance(enabled, bool):
+            return jsonify({"ok": False,
+                            "error": "开关目标必须为已知类别，enabled 必须为布尔值"}), 400
         if is_env_locked(key):
             return jsonify({"ok": False, "error": f"{key} 已被环境变量锁定"}), 409
         try:

@@ -5,6 +5,11 @@
   /* ---- 详情页私有 ---- */
   #dims { display: block; }
   #dims .dim-card { margin-bottom: var(--gap); }
+  @media (max-width: 760px) {
+    .total-scoreline { flex-wrap: wrap; }
+    .total-scoreline > .muted { white-space: nowrap; }
+    .total-scoreline > .faint { flex-basis: 100%; }
+  }
   /* 窄屏：带/堆叠包装器透明，六卡单列直下 */
   .dims-band, .dims-stack { display: contents; }
   /* 宽屏两带两列：带1 = 舌诊 | [目/耳/手] 堆叠，带2 = 头面诊 | 皮肤诊；
@@ -220,7 +225,7 @@
       </div>
     </div>
     <span class="spacer"></span>
-    <div class="scoreline" style="min-width: 260px;">
+    <div class="scoreline total-scoreline" style="min-width: 260px;">
       <span class="muted" style="font-size:13px;">总偏离度</span>
       <span class="badge lg {{ r.total_sev }} num">{{ "%.1f"|format(r.total) }} / 60</span>
       <div class="scorebar"><i class="{{ r.total_sev }}" style="width:{{ (r.total / 60 * 100) | round(1) }}%"></i></div>
@@ -512,6 +517,20 @@
     {% if r.diagnosis.pathomechanism %}<div class="field-row"><span class="k">核心病机</span><span class="v">{{ r.diagnosis.pathomechanism }}</span></div>{% endif %}
   </div>
 
+  {% if report and report.lifestyle %}
+  <hr class="divider">
+  <h3 class="sect-h">起居情志</h3>
+  <div class="fields">
+    {% for k in ["作息", "情志", "预期改善"] %}
+    {% if report.lifestyle.get(k) %}<div class="field-row"><span class="k">{{ k }}</span><span class="v">{{ report.lifestyle.get(k) }}</span></div>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% elif r.report_stale %}
+  <p class="faint">历史报告已过期，请重新生成。</p>
+  {% elif not report %}
+  <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
+  {% endif %}
   {% if report and report.diet_advice and diet_ready %}
   <hr class="divider">
   <h3 class="sect-h">饮食建议</h3>
@@ -540,20 +559,6 @@
   </table>
   </div>
   {% endif %}
-  {% endif %}
-  {% if report and report.lifestyle %}
-  <hr class="divider">
-  <h3 class="sect-h">起居情志</h3>
-  <div class="fields">
-    {% for k in ["作息", "情志", "预期改善"] %}
-    {% if report.lifestyle.get(k) %}<div class="field-row"><span class="k">{{ k }}</span><span class="v">{{ report.lifestyle.get(k) }}</span></div>{% endif %}
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% elif r.report_stale %}
-  <p class="faint">历史报告已过期，请重新生成。</p>
-  {% elif not report %}
-  <p class="faint">该记录无辨证报告（由拍照向导流程生成）。</p>
   {% endif %}
   {% if not constitution_ready %}
   <div class="alert-note">缺少中医体质辨证知识库，辨证提要、全案和该类候选参考不可显示。</div>

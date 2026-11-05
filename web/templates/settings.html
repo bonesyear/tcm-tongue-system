@@ -42,8 +42,93 @@
     color: var(--ink-3); font-size: 13px;
   }
   .collapse-head .chev.open, details[open] .collapse-head .chev { transform: rotate(90deg); }
-  #kb-card-composite > summary { list-style: none; }
-  #kb-card-composite > summary::-webkit-details-marker { display: none; }
+  /* 知识库：状态与导入分栏，技术操作留在次级折叠区 */
+  #kb-import-card > .card-head { margin-bottom: 8px; }
+  #kb-import-card > .card-head a { font-size: 13px; white-space: nowrap; }
+  .kb-module {
+    display: grid;
+    grid-template-columns: minmax(190px, .8fr) minmax(0, 2fr);
+    gap: 0 30px;
+    padding: 20px 0;
+    border-top: 1px solid var(--line);
+  }
+  .kb-group-shell { position: relative; margin-top: 18px; }
+  .kb-group { border-block: 1px solid var(--line); }
+  .kb-group-head {
+    display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 66px;
+    padding: 12px 64px 12px 0; cursor: pointer; user-select: none; list-style: none;
+  }
+  .kb-group-head::-webkit-details-marker { display: none; }
+  .kb-group-head .chev { flex: none; transition: transform .2s ease; color: var(--ink-3); }
+  .kb-group[open] > .kb-group-head .chev { transform: rotate(90deg); }
+  .kb-group-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
+  .kb-group-title strong { font-family: var(--font-serif); font-size: 18px; }
+  .kb-group-title small { color: var(--ink-3); font-size: 12.5px; line-height: 1.6; }
+  .kb-group-toggle { position: absolute; top: 21px; right: 0; z-index: 1; }
+  .kb-group-body .kb-module:first-child { border-top: 1px solid var(--line); }
+  .kb-module-summary { min-width: 0; }
+  .kb-module-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 12px; }
+  .kb-module-heading .switch { margin-left: auto; align-self: flex-start; }
+  .kb-module-heading h3 { font-size: 17px; letter-spacing: .04em; }
+  .kb-status-badge {
+    display: inline-flex; align-items: center; padding: 3px 9px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-pill);
+    background: var(--card-sunken); color: var(--ink-2);
+    font-family: var(--font-sans); font-size: 12px; line-height: 1.4;
+    font-weight: 600; white-space: nowrap;
+  }
+  .kb-status-badge.is-ready { color: var(--sev-0); background: var(--sev-0-bg); border-color: transparent; }
+  .kb-status-badge.is-empty { color: var(--sev-1); background: var(--sev-1-bg); border-color: transparent; }
+  .kb-status-badge.is-error { color: var(--sev-7); background: var(--sev-7-bg); border-color: transparent; }
+  .kb-status-detail { margin: 10px 0 0 !important; font-size: 13px; }
+  .kb-file-count { margin: 12px 0 0 !important; font-size: 12.5px; }
+  .kb-file-count .num { padding: 0 2px; color: var(--ink); font-size: 18px; font-weight: 600; }
+  .kb-module-import { min-width: 0; margin: 0; }
+  .kb-module-import > label { display: block; margin-bottom: 8px; color: var(--ink-2); font-size: 13.5px; font-weight: 600; }
+  .kb-upload-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+  .kb-file-input {
+    width: 100%; min-width: 0; padding: 4px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-inner);
+    background: #fff; color: var(--ink-2); font-family: var(--font-sans); font-size: 13px;
+  }
+  .kb-file-input::file-selector-button {
+    margin-right: 12px; padding: 7px 12px; border: 0; border-right: 1px solid var(--line);
+    border-radius: 7px; background: var(--card-sunken); color: var(--ink);
+    font-family: var(--font-sans); font-size: 13px; cursor: pointer;
+  }
+  .kb-file-input:focus { outline: 2px solid var(--cinnabar-tint); border-color: var(--cinnabar); }
+  .kb-upload-controls .btn { justify-content: center; border-radius: var(--radius-inner); white-space: nowrap; }
+  .kb-import-form .form-hint { grid-column: auto; margin: 8px 0 0; line-height: 1.7; }
+  [id^="kb-import-status-"] { margin: 10px 0 0; }
+  [id^="kb-import-status-"]:empty { display: none; }
+  .kb-module-tools {
+    grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 12px 28px;
+    margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line);
+  }
+  .kb-module-tools details { flex: 1 1 0; min-width: 0; }
+  .kb-module-tools summary { color: var(--ink-3); font-size: 12.5px; cursor: pointer; }
+  .kb-module-tools details[open] summary { color: var(--ink-2); }
+  .kb-module-tools p { font-size: 12.5px; }
+  .kb-module-tools code { overflow-wrap: anywhere; word-break: break-all; }
+  .kb-module-tools form { margin-top: 10px; }
+  #kb-category-mode {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 18px;
+    align-items: center; padding: 16px 0; border-top: 1px solid var(--line);
+  }
+  #kb-category-mode > label { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; font-weight: 600; }
+  #kb-category-mode > label input { margin-top: 5px; accent-color: var(--cinnabar); }
+  #kb-category-mode > .btn { grid-column: 2; grid-row: 1 / span 2; }
+  #kb-category-mode > .form-hint { grid-column: 1; margin: 0; }
+  @media (max-width: 760px) {
+    .kb-module { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 18px 0; }
+    .kb-upload-controls { grid-template-columns: minmax(0, 1fr); }
+    .kb-upload-controls .btn { width: 100%; }
+    .kb-module-tools { flex-direction: column; margin-top: 0; }
+    .kb-module-tools details { width: 100%; }
+    #kb-category-mode { grid-template-columns: minmax(0, 1fr); }
+    #kb-category-mode > .btn, #kb-category-mode > .form-hint { grid-column: 1; grid-row: auto; }
+    #kb-category-mode > .btn { width: 100%; }
+  }
   /* 顶部保存横幅：滑下→停驻→滑回 */
   .top-toast {
     position: fixed; top: 14px; left: 50%; z-index: 110;
@@ -286,81 +371,120 @@
 </div>
 
 <div class="card" id="kb-import-card">
-  <div class="card-head"><h2>知识库</h2></div>
+  <div class="card-head">
+    <h2>知识库</h2>
+    <span class="spacer"></span>
+    <a href="/kb-guide/" target="_blank" rel="noopener">自建知识库指南 ↗</a>
+  </div>
+  <p class="muted">导入你有权使用的资料；开关只控制对应内容是否参与检索和报告，不删除文件。子知识库用于按类别配置，普通自建库可直接使用综合知识库。</p>
   {% if read_only %}
   <p class="muted">验证管理口令后可导入知识库。</p>
   {% else %}
   {% if kb_reset in kb_category_defs %}
   <div class="alert-note">已重置{{ kb_category_defs[kb_reset].label }}：本类导入副本已删除并停用，对应信息不可显示；外部原库和其他类别未修改。上传新 ZIP 可重新启用。</div>
   {% endif %}
-  {% for category, definition in kb_category_defs.items() %}
-  {% set kb = kb_categories[category] %}
-  <section id="kb-card-{{ category }}" style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
-    <h3>{{ definition.label }}</h3>
-    <p class="muted">
-      <strong id="kb-status-label-{{ category }}">{% if kb.disabled %}已重置/已停用{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
-      <span id="kb-status-detail-{{ category }}">{% if kb.disabled %}本类信息不可显示；上传新 ZIP 可重新启用{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
-    </p>
-    <p class="muted">可检索 Markdown <span id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（源综合库回退）{% endif %}</p>
-    <details style="margin-top:10px;">
-      <summary>技术详情</summary>
-      <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code></p>
-      <p class="muted">本类导入副本：<code>{{ kb_import_roots[category] }}</code></p>
-    </details>
-    <form class="kb-import-form" data-category="{{ category }}" method="post" action="/settings/kb/import" enctype="multipart/form-data">
-      <input type="hidden" name="category" value="{{ category }}">
-      <label for="kb-file-{{ category }}">导入{{ definition.label }} ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
-      <input id="kb-file-{{ category }}" name="kb_file" type="file" accept=".zip,application/zip" required
-             aria-describedby="kb-import-help-{{ category }} kb-import-status-{{ category }}">
-      <p class="form-hint" id="kb-import-help-{{ category }}">完整校验后先重置本类旧副本，再激活新内容并解除停用；失败恢复旧副本，不影响其他类别或外部原库。分类 ZIP 必须含匹配的 <code>kb.yaml</code>；格式见 <code>docs/KB_AUTHORING.md</code>。仅本地校验，不调用模型。{% if definition.env_key in env_locked %}<strong>{{ definition.env_key }} 被环境变量锁定，导入后当前类别不变。</strong>{% endif %}</p>
-      <button class="btn btn-primary" id="kb-import-submit-{{ category }}" type="submit">导入{{ definition.label }}</button>
-      <p id="kb-import-status-{{ category }}" role="status" aria-live="polite"></p>
-    </form>
-    <details style="margin-top:10px;">
-      <summary>重置本类知识库</summary>
-      <p class="form-hint">只删除本类导入副本并停用本类功能，外部原库和其他类别不会删除或修改。重置后对应信息不可显示，上传新 ZIP 可重新启用。</p>
-      <form method="post" action="/settings/kb/reset">
-        <input type="hidden" name="category" value="{{ category }}">
-        <button class="btn btn-ghost btn-sm" type="submit" {% if definition.env_key in env_locked or definition.disabled_key in env_locked %}disabled{% endif %}>确认重置{{ definition.label }}</button>
+  <div class="kb-group-shell">
+    <details class="kb-group" id="kb-categories-card">
+      <summary class="kb-group-head">
+        <span class="chev" aria-hidden="true">▶</span>
+        <span class="kb-group-title"><strong>子知识库</strong><small>{% if kb_categories_disabled %}整组已停用；各子库选择已保留{% else %}体质、食疗、方剂 · 分类专用包{% endif %}</small></span>
+      </summary>
+      <div class="kb-group-body">
+      {% for category, definition in kb_category_defs.items() %}
+      {% set kb = kb_categories[category] %}
+      {% set status_class = 'is-disabled' if kb.disabled else ('is-ready' if kb.status == 'ready' else ('is-empty' if kb.status == 'empty' else ('is-error' if kb.status == 'error' else 'is-unconfigured'))) %}
+      <section id="kb-card-{{ category }}" class="kb-module">
+        <div class="kb-module-summary">
+          <div class="kb-module-heading">
+            <h3>{{ definition.label }}</h3>
+            <strong class="kb-status-badge {{ status_class }}" id="kb-status-label-{{ category }}">{% if kb.group_disabled %}整组已停用{% elif kb.self_disabled %}已停用{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
+            <label class="switch" title="关闭后本类不参与检索和报告；整组开关不会改变此项选择">
+              <input type="checkbox" data-kb-toggle="kb_{{ category }}" aria-label="启用{{ definition.label }}"
+                     {% if not kb.self_disabled %}checked{% endif %} {% if definition.disabled_key in env_locked %}disabled{% endif %}>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p class="muted kb-status-detail"><span id="kb-status-detail-{{ category }}">{% if kb.group_disabled %}整组已停用；本类选择已保留，重新开启整组后恢复{% elif kb.self_disabled %}本类信息不可显示；开启本类开关或上传新 ZIP 可重新启用{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span></p>
+          <p class="muted kb-file-count">可检索 Markdown <span class="num" id="kb-count-{{ category }}">{{ kb.file_count }}</span> 个{% if kb.legacy and kb.status == "ready" %}（综合库回退）{% endif %}</p>
+        </div>
+        <form class="kb-import-form kb-module-import" data-category="{{ category }}" method="post" action="/settings/kb/import" enctype="multipart/form-data">
+          <input type="hidden" name="category" value="{{ category }}">
+          <label for="kb-file-{{ category }}">导入{{ definition.label }} ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
+          <div class="kb-upload-controls">
+            <input class="kb-file-input" id="kb-file-{{ category }}" name="kb_file" type="file" accept=".zip,application/zip" required
+                   aria-describedby="kb-import-help-{{ category }} kb-import-status-{{ category }}">
+            <button class="btn btn-primary" id="kb-import-submit-{{ category }}" type="submit">导入{{ definition.label }}</button>
+          </div>
+          <p class="form-hint" id="kb-import-help-{{ category }}">完整校验后先重置本类旧副本，再激活新内容并解除本类自身停用；整组和其他子库状态不变。失败恢复旧副本，不影响其他类别或外部原库。分类 ZIP 必须含匹配的 <code>kb.yaml</code>；格式见 <code>docs/KB_AUTHORING.md</code>。仅本地校验，不调用模型。{% if definition.env_key in env_locked %}<strong>{{ definition.env_key }} 被环境变量锁定，导入后当前类别不变。</strong>{% endif %}</p>
+          <p id="kb-import-status-{{ category }}" role="status" aria-live="polite"></p>
+        </form>
+        <div class="kb-module-tools">
+          <details>
+            <summary>技术详情</summary>
+            <p class="muted">当前目录：<code id="kb-current-root-{{ category }}">{{ kb.root }}</code></p>
+            <p class="muted">本类导入副本：<code>{{ kb_import_roots[category] }}</code></p>
+          </details>
+          <details>
+            <summary>重置本类知识库</summary>
+            <p class="form-hint">只删除本类导入副本并停用本类功能，外部原库和其他类别不会删除或修改。重置后对应信息不可显示，上传新 ZIP 可重新启用。</p>
+            <form method="post" action="/settings/kb/reset">
+              <input type="hidden" name="category" value="{{ category }}">
+              <button class="btn btn-ghost btn-sm" type="submit" {% if definition.env_key in env_locked or definition.disabled_key in env_locked %}disabled{% endif %}>确认重置{{ definition.label }}</button>
+            </form>
+            {% if definition.env_key in env_locked or definition.disabled_key in env_locked %}<p class="form-hint">本类配置被环境变量锁定，不能重置。</p>{% endif %}
+          </details>
+        </div>
+      </section>
+      {% endfor %}
+      <form method="post" action="/settings/kb/mode" id="kb-category-mode">
+        <label><input type="checkbox" name="enabled" value="1" {% if kb_strict %}checked{% endif %} {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}> 严格分类模式（只使用各类专用根，不回退综合库）</label>
+        <button class="btn btn-ghost btn-sm" type="submit" {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}>保存分类模式</button>
+        <p class="form-hint">仅在需要完全停用综合回退时开启。开启后，未配置的类别会立即隐藏对应信息。此设置与子知识库整组启停相互独立。</p>
       </form>
-      {% if definition.env_key in env_locked or definition.disabled_key in env_locked %}<p class="form-hint">本类配置被环境变量锁定，不能重置。</p>{% endif %}
+      </div>
     </details>
-  </section>
-  {% endfor %}
+    <label class="switch kb-group-toggle" title="关闭整组后三个子库及综合回退均不参与检索；各子库自身选择保持不变">
+      <input type="checkbox" data-kb-toggle="kb_categories" aria-label="启用子知识库整组"
+             {% if not kb_categories_disabled %}checked{% endif %} {% if 'TCM_KB_CATEGORIES_DISABLED' in env_locked %}disabled{% endif %}>
+      <span class="slider"></span>
+    </label>
+  </div>
   {% set kb = kb_composite %}
-  <details id="kb-card-composite" style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
-    <summary class="card-head collapse-head">
-      <h3>综合知识库</h3>
-      <span class="sec-tag">调试 · 兼容性</span>
-      <span class="spacer"></span>
-      <span class="chev" aria-hidden="true">▶</span>
-    </summary>
-    <p class="muted">此功能用于调试及保证兼容性。</p>
-    <p class="muted">三类知识库独立导入、独立显示。缺少某类时，对应前端信息不可显示；未设置专用根的源综合库可作为各类别回退，不会被修改。</p>
-    <form method="post" action="/settings/kb/mode" style="margin:10px 0 14px;">
-      <label><input type="checkbox" name="enabled" value="1" {% if kb_strict %}checked{% endif %} {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}> 严格分类模式（只使用各类专用根，不回退综合库）</label>
-      <button class="btn btn-ghost btn-sm" type="submit" {% if 'TCM_KB_STRICT_CATEGORIES' in env_locked %}disabled{% endif %}>保存分类模式</button>
-      <p class="form-hint">默认关闭以兼容源综合库。开启前请确认三类专用库均已验证；开启后，未配置的类别会立即隐藏对应信息。</p>
-    </form>
-    <p class="muted">
-      <strong id="kb-status-label-composite">{% if kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
-      <span id="kb-status-detail-composite">{% if kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span>
-    </p>
-    <p class="muted">可检索 Markdown <span id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
-    <details style="margin-top:10px;">
-      <summary>技术详情</summary>
-      <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code></p>
-    </details>
-    <form class="kb-import-form" data-category="composite" method="post" action="/settings/kb/import" enctype="multipart/form-data">
+  {% set status_class = 'is-disabled' if kb_composite_disabled or kb_strict else ('is-ready' if kb.status == 'ready' else ('is-empty' if kb.status == 'empty' else ('is-error' if kb.status == 'error' else 'is-unconfigured'))) %}
+  <section id="kb-card-composite" class="kb-module">
+    <div class="kb-module-summary">
+      <div class="kb-module-heading">
+        <h3>综合知识库</h3>
+        <span class="sec-tag">整包导入</span>
+        <strong class="kb-status-badge {{ status_class }}" id="kb-status-label-composite">{% if kb_composite_disabled %}已停用{% elif kb_strict %}综合库未参与检索{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
+        <label class="switch" title="关闭后综合根及其分类回退均不参与检索；独立专用根不受影响">
+          <input type="checkbox" data-kb-toggle="kb_composite" aria-label="启用综合知识库"
+                 {% if not kb_composite_disabled %}checked{% endif %} {% if 'TCM_KB_COMPOSITE_DISABLED' in env_locked %}disabled{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <p class="muted kb-status-detail"><span id="kb-status-detail-composite">{% if kb_composite_disabled %}综合库及分类回退已停用；独立专用根不受影响{% elif kb_strict %}当前只使用分类专用根{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span></p>
+      <p class="muted kb-file-count">可检索 Markdown <span class="num" id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
+      {% if kb_strict %}<div class="alert-note">严格分类模式已开启，综合库未参与检索。可在上方子知识库中关闭该模式。</div>{% endif %}
+    </div>
+    <form class="kb-import-form kb-module-import" data-category="composite" method="post" action="/settings/kb/import" enctype="multipart/form-data">
       <input type="hidden" name="category" value="composite">
       <label for="kb-file-composite">导入综合知识库 ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
-      <input id="kb-file-composite" name="kb_file" type="file" accept=".zip,application/zip" required
-             aria-describedby="kb-import-help-composite kb-import-status-composite">
-      <p class="form-hint" id="kb-import-help-composite">完整校验后替换综合副本，保留三类专用副本；综合包不能包含 <code>constitution/</code>、<code>diet/</code>、<code>formula/</code> 目录；失败恢复旧副本，不修改外部原库。严格分类模式开启时不参与回退。{% if 'TCM_KB_ROOT' in env_locked %}<strong>TCM_KB_ROOT 被环境变量锁定，导入后当前配置不变。</strong>{% endif %}</p>
-      <button class="btn btn-primary" id="kb-import-submit-composite" type="submit">导入综合知识库</button>
+      <div class="kb-upload-controls">
+        <input class="kb-file-input" id="kb-file-composite" name="kb_file" type="file" accept=".zip,application/zip" required
+               aria-describedby="kb-import-help-composite kb-import-status-composite">
+        <button class="btn btn-primary" id="kb-import-submit-composite" type="submit">导入综合知识库</button>
+      </div>
+      <p class="form-hint" id="kb-import-help-composite">完整校验后替换综合导入副本并解除综合自身停用，保留三类专用副本及其状态，不修改外部原库。目录结构与建库步骤见右上角指南。{% if 'TCM_KB_ROOT' in env_locked %}<strong>TCM_KB_ROOT 被环境变量锁定，导入后当前配置不变。</strong>{% endif %}</p>
       <p id="kb-import-status-composite" role="status" aria-live="polite"></p>
     </form>
-  </details>
+    <div class="kb-module-tools">
+      <details>
+        <summary>技术详情</summary>
+        <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code></p>
+      </details>
+    </div>
+  </section>
   {% endif %}
 </div>
 
@@ -448,6 +572,38 @@ function topToast(text, isErr) {
       topToast(error.message || String(error), true);
     } finally {
       sw.disabled = false;
+    }
+  });
+});
+
+/* 五个知识库开关分别保存；整组只控制有效来源，不覆盖子库偏好 */
+document.querySelectorAll("[data-kb-toggle]").forEach(function (sw) {
+  sw.addEventListener("click", function (event) { event.stopPropagation(); });
+  sw.addEventListener("change", async function () {
+    var desired = sw.checked;
+    var previous = !desired;
+    sw.disabled = true;
+    try {
+      var response = await fetch("/settings/toggle", {
+        method: "POST", redirect: "manual",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({target: sw.dataset.kbToggle, enabled: desired})
+      });
+      if (response.type === "opaqueredirect" || response.redirected) {
+        throw new Error("会话已失效，请刷新页面");
+      }
+      if (!(response.headers.get("content-type") || "").includes("application/json")) {
+        throw new Error("保存失败：服务未返回 JSON（HTTP " + response.status + "）");
+      }
+      var data = await response.json();
+      if (!response.ok || !data.ok || data.enabled !== desired) {
+        throw new Error(data.error || "保存失败（HTTP " + response.status + "）");
+      }
+      location.reload();
+    } catch (error) {
+      sw.checked = previous;
+      sw.disabled = false;
+      topToast(error.message || String(error), true);
     }
   });
 });
@@ -587,13 +743,8 @@ document.querySelectorAll(".kb-import-form").forEach(function (form) {
       status.textContent = data.configured
         ? "已导入 " + data.count + " 个文件并覆盖本类副本；其他类别和外部原库未修改。"
         : "已覆盖本类副本；配置被环境变量锁定，当前类别未切换，其他类别和外部原库未修改。";
-      if (category === "composite" && data.configured) {
+      if (data.configured) {
         location.reload();
-      } else if (data.configured) {
-        document.getElementById("kb-count-" + category).textContent = data.markdown_count;
-        document.getElementById("kb-current-root-" + category).textContent = data.root;
-        document.getElementById("kb-status-label-" + category).textContent = "知识库可用";
-        document.getElementById("kb-status-detail-" + category).textContent = "对应信息与候选参考可显示";
       }
       form.reset();
     } catch (error) {

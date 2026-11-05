@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 .pytest_cache/
+.browser-tmp/
 .venv/
 *.pyc
 *.pyo

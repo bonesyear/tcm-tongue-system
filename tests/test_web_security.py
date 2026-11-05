@@ -88,6 +88,26 @@ def test_origin_must_match_host_scheme_and_port(client):
     assert resp.status_code == 302
 
 
+def test_settings_requires_welcome_for_local_and_remote(client):
+    for remote in ({}, REMOTE):
+        resp = client.get("/settings", environ_overrides=remote)
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/welcome"
+
+    _ack(client)
+    assert client.get("/settings").status_code == 200
+    remote_settings = client.get("/settings", environ_overrides=REMOTE)
+    assert remote_settings.status_code == 200
+    assert "只读" in remote_settings.get_data(as_text=True)
+
+
+def test_settings_write_requires_welcome_without_mutation(client, env_path):
+    resp = client.post("/settings", data={"VISION_MODEL": "blocked"}, headers=ORIGIN)
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/welcome"
+    assert "VISION_MODEL" not in envfile.read_env(env_path)
+
+
 @pytest.mark.parametrize("host", ["evil.example", "localhost:bad", "localhost@evil.example"])
 def test_untrusted_host_rejected_before_route(client, host):
     resp = client.get("/settings", headers={"Host": host})
@@ -121,9 +141,15 @@ def test_cross_site_write_is_rejected_without_mutation(client, env_path):
 def test_lan_login_uses_post_session_not_url(client, env_path):
     envfile.write_env(env_path, {"WEB_ADMIN_TOKEN": TOKEN, "VISION_API_KEY": "sk-test"})
     resp = client.get("/settings?token=" + TOKEN, environ_overrides=REMOTE)
-    assert "只读" in resp.get_data(as_text=True)
+    assert resp.status_code == 302 and resp.headers["Location"] == "/welcome"
     assert TOKEN not in resp.get_data(as_text=True)
     assert "admin_session" not in resp.headers.get("Set-Cookie", "")
+    assert client.get("/", environ_overrides=REMOTE).status_code == 302
+
+    _ack(client)
+    resp = client.get("/settings?token=" + TOKEN, environ_overrides=REMOTE)
+    assert "只读" in resp.get_data(as_text=True)
+    assert TOKEN not in resp.get_data(as_text=True)
     assert client.get("/", environ_overrides=REMOTE).status_code == 302
 
     resp = client.post("/settings/login", data={"admin_token": TOKEN},
@@ -134,8 +160,6 @@ def test_lan_login_uses_post_session_not_url(client, env_path):
     assert cookie["httponly"] and cookie["samesite"] == "Strict"
     assert cookie["path"] == "/" and not cookie["secure"]
 
-    assert client.get("/", environ_overrides=REMOTE).headers["Location"] == "/welcome"
-    _ack(client)
     assert client.get("/", environ_overrides=REMOTE).status_code == 200
     resp = client.post("/settings", data={"VISION_MODEL": "after-login"},
                        headers=ORIGIN, environ_overrides=REMOTE)
@@ -155,7 +179,7 @@ def test_lan_wrong_password_and_forged_session_rejected(client, env_path):
 
     client.set_cookie("admin_session", "forged")
     resp = client.get("/record/2026-06-25", environ_overrides=REMOTE)
-    assert resp.status_code == 302 and "/settings" in resp.headers["Location"]
+    assert resp.status_code == 302 and resp.headers["Location"] == "/welcome"
 
 
 def test_lan_reads_and_photo_bytes_require_login(client, env_path, tmp_path):
@@ -206,6 +230,7 @@ def test_null_non_object_and_malformed_json_return_400(client, body):
 
 def test_forwarded_header_does_not_elevate_remote_client(client, env_path):
     envfile.write_env(env_path, {"WEB_ADMIN_TOKEN": TOKEN})
+    _ack(client)
     html = client.get("/settings", environ_overrides={
         "REMOTE_ADDR": "::ffff:127.0.0.1"}).get_data(as_text=True)
     assert "只读" not in html
@@ -215,6 +240,11 @@ def test_forwarded_header_does_not_elevate_remote_client(client, env_path):
         assert "只读" in html
 
 
+def test_referrer_policy_preserves_same_origin_native_forms(client):
+    """局域网 Chrome 原生表单需保留同源 Origin；跨站仍不得发送 Referer。"""
+    assert client.get("/welcome").headers["Referrer-Policy"] == "same-origin"
+
+
 def test_security_headers_on_public_and_private_pages(client):
     _ack(client)
     for path in ("/license", "/settings"):
@@ -222,7 +252,7 @@ def test_security_headers_on_public_and_private_pages(client):
         assert resp.headers["X-Frame-Options"] == "DENY"
         assert resp.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
-        assert resp.headers["Referrer-Policy"] == "no-referrer"
+        assert resp.headers["Referrer-Policy"] == "same-origin"
         assert "Sec-Fetch-Site" in resp.headers["Vary"]
 
 
@@ -247,6 +277,7 @@ def test_listen_host_and_password_can_be_saved_together(client, env_path):
 def test_settings_uses_actual_bound_host_and_port(app, client, monkeypatch):
     app.config.update(BOUND_HOST="0.0.0.0", BOUND_PORT=8610)
     monkeypatch.setattr(web_app, "_lan_ip", lambda: "192.168.1.8")
+    _ack(client)
     html = client.get("/settings").get_data(as_text=True)
     assert "0.0.0.0:8610" in html
     assert "127.0.0.1:8610" in html

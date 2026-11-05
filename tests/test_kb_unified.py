@@ -163,6 +163,25 @@ def test_unified_shared_root_excludes_unavailable_category(tmp_path, monkeypatch
     assert report['kb_categories']['formula']['status'] == 'unconfigured'
 
 
+@pytest.mark.parametrize('category', list(_DIRECTORIES))
+def test_unified_single_shared_root_excludes_inactive_categories(tmp_path, category):
+    composite, _ = _corpus(tmp_path)
+    scoped = tmp_path / f'single-{category}'
+    shutil.copytree(composite, scoped)
+    for other, directory in _DIRECTORIES.items():
+        if other != category:
+            shutil.rmtree(scoped / directory)
+    active = {category: str(composite)}
+    expected = _kb_references(_record(), kb_root=str(scoped),
+                              anchor_terms=_ALL_ANCHORS)
+    for ref in expected:
+        ref['category'] = category
+    actual = _kb_references_unified(_record(), active, _ALL_ANCHORS,
+                                    cache_root=str(tmp_path / 'cache'))
+    assert _signature(actual) == _signature(expected)
+    assert {ref['category'] for ref in actual} <= {category}
+
+
 def test_unified_partial_shared_root_rejects_unknown_layout(tmp_path):
     composite, _ = _corpus(tmp_path)
     (composite / 'notes').mkdir()
@@ -241,6 +260,23 @@ def test_unified_lowercase_readme_matches_original(tmp_path):
     assert [ref['category'] for ref in actual if ref['file'] == 'readme.md'] == ['diet']
 
 
+def test_unified_identical_duplicate_preserves_composite_category(tmp_path):
+    composite, roots = _corpus(tmp_path)
+    for root in (composite, tmp_path / 'constitution', tmp_path / 'diet'):
+        target = root / 'diagnostics' / 'duplicate.md'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('同路径重复类别标记', encoding='utf-8')
+    anchors = ['同路径重复类别标记']
+    expected = _kb_references_unified(
+        _record(), {category: str(composite) for category in _DIRECTORIES}, anchors)
+    actual = _kb_references_unified(_record(), roots, anchors)
+    assert _signature(actual) == _signature(expected)
+    assert [ref['category'] for ref in actual] == [ref['category'] for ref in expected]
+    statuses = {category: 'retrieved' for category in _DIRECTORIES}
+    assert build_report_input(_record(), actual, kb_status=statuses) == \
+        build_report_input(_record(), expected, kb_status=statuses)
+
+
 def test_unified_aliases_preserve_loader_values(tmp_path, monkeypatch):
     from src.retrieval import synonym_loader
     _, roots = _corpus(tmp_path)
@@ -299,3 +335,61 @@ def test_unified_view_reuses_caches(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='合成检索后故障'):
         _kb_references_unified(_record(), roots, _ALL_ANCHORS)
     assert counts() == after_first
+
+
+def test_switches_remove_and_restore_effective_candidates_and_report_input(tmp_path):
+    from src.retrieval import inspect_kb_categories, kb_category_root
+
+    composite, roots = _corpus(tmp_path)
+    rec = _record()
+    config = {'TCM_KB_ALLOW_EXTERNAL_KB': '1', 'TCM_KB_ROOT': str(composite),
+              'TCM_KB_DIET_ROOT': roots['diet']}
+
+    def active_and_states():
+        states = inspect_kb_categories(config)
+        return {category: kb_category_root(category, config)
+                for category in roots}, states
+
+    baseline_states = inspect_kb_categories(config)
+    baseline_roots, _ = active_and_states()
+    baseline = _kb_references_unified(rec, baseline_roots, _ALL_ANCHORS,
+                                      cache_root=str(tmp_path / 'cache'))
+    expected = _kb_references(rec, kb_root=str(composite), anchor_terms=_ALL_ANCHORS)
+    assert _signature(baseline) == _signature(expected)
+    assert build_report_input(rec, baseline) == build_report_input(rec, expected)
+
+    config['TCM_KB_COMPOSITE_DISABLED'] = '1'
+    without_composite, states = active_and_states()
+    assert without_composite == {
+        'constitution': None, 'diet': roots['diet'], 'formula': None}
+    refs = _kb_references_unified(rec, without_composite, _ALL_ANCHORS,
+                                  cache_root=str(tmp_path / 'cache'))
+    assert refs and {ref['category'] for ref in refs} == {'diet'}
+    assert states['diet']['status'] == 'ready'
+    assert states['constitution']['status'] == states['formula']['status'] == 'unconfigured'
+    prompt = build_report_input(rec, refs, kb_status={
+        category: info['status'] for category, info in states.items()})
+    assert '不得输出体质、四证、六经等辨证内容' in prompt
+    assert '不得输出具体方剂、方义或剂量' in prompt
+
+    config['TCM_KB_CATEGORIES_DISABLED'] = '1'
+    disabled_roots, states = active_and_states()
+    assert set(disabled_roots.values()) == {None}
+    assert _kb_references_unified(rec, disabled_roots, _ALL_ANCHORS) == []
+    prompt = build_report_input(rec, [], kb_status={
+        category: info['status'] for category, info in states.items()})
+    assert prompt.count('状态：未配置') == 3
+    assert '不得输出饮食宜忌或食疗建议' in prompt
+
+    config['TCM_KB_COMPOSITE_DISABLED'] = ''
+    config['TCM_KB_CATEGORIES_DISABLED'] = ''
+    restored_roots, restored_states = active_and_states()
+    assert restored_roots == baseline_roots
+    assert [(key, restored_states[key]['root'], restored_states[key]['revision'])
+            for key in roots] == [
+                (key, baseline_states[key]['root'], baseline_states[key]['revision'])
+                for key in roots]
+    restored = _kb_references_unified(rec, restored_roots, _ALL_ANCHORS,
+                                      cache_root=str(tmp_path / 'cache'))
+    assert _signature(restored) == _signature(baseline)
+    assert build_report_input(rec, restored) == build_report_input(rec, baseline)

@@ -54,6 +54,14 @@ def _import(client, category):
     }, content_type='multipart/form-data')
 
 
+def test_composite_reset_is_not_supported(tmp_path):
+    with pytest.raises(ValueError, match='未知知识库类别'):
+        kb_reset.reset_kb(str(tmp_path), str(tmp_path / '.env'), 'composite',
+                          write_env=envfile.write_env)
+    assert not (tmp_path / '.env').exists()
+    assert not (tmp_path / 'private_kb').exists()
+
+
 def test_reset_disables_category_and_reupload_reactivates(tmp_path, monkeypatch):
     original = _original(tmp_path)
     original_before = _snapshot(original)
@@ -138,7 +146,9 @@ def test_locked_reset_is_refused_without_deleting_copy(tmp_path, monkeypatch):
     managed = tmp_path / 'data' / 'private_kb' / 'diet'
     managed.mkdir(parents=True)
     (managed / 'a.md').write_text('导入副本', encoding='utf-8')
-    response = app.test_client().post('/settings/kb/reset', data={'category': 'diet'},
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/settings/kb/reset', data={'category': 'diet'},
                                       headers={'Origin': 'http://localhost'})
     assert response.status_code == 409
     assert (managed / 'a.md').is_file()

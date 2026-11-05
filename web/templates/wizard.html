@@ -848,6 +848,13 @@ function showError(error) {
   box.style.display = "";
 }
 
+function clearError() {
+  var box = document.getElementById("wizard-alert");
+  box.style.display = "none";
+  box.textContent = "";
+  box.removeAttribute("role");
+}
+
 function responseJSON(response) {
   if (response.type === "opaqueredirect" || response.redirected) {
     throw new Error("会话已失效，请刷新页面");
@@ -888,6 +895,7 @@ function skip(m) {
       PARTS[idx].status = m === "normal" || m === "uncovered" ? "skip_" + m : m;
       PARTS[idx].observation = null;
       PARTS[idx].observation_meta = {};
+      clearError();
       render();
     } else {
       showError(d.error || "保存失败");

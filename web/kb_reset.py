@@ -5,11 +5,14 @@ import os
 import shutil
 import uuid
 
-from src.retrieval import invalidate_kb_caches, kb_disabled_key, kb_env_key
+from src.retrieval import (
+    KB_CATEGORY_DEFS, invalidate_kb_caches, kb_disabled_key, kb_env_key)
 
 
 def reset_kb(data_root, env_path, category, write_env=None):
-    """停用指定类别并删除其导入副本，失败时恢复配置和目录。"""
+    """停用指定子库并删除其导入副本，失败时恢复配置和目录。"""
+    if category not in KB_CATEGORY_DEFS:
+        raise ValueError("未知知识库类别")
     env_key = kb_env_key(category)
     disabled_key = kb_disabled_key(category)
     data_root = os.path.abspath(data_root)

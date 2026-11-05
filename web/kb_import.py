@@ -199,9 +199,7 @@ def import_kb(upload, data_root, env_path, env_locked=False, write_env=None,
         from kb_config_tx import read_config_bytes, restore_config_bytes
         from src.retrieval.kb_status import kb_disabled_key
         previous_config = read_config_bytes(env_path)
-        updates = {env_key: final}
-        if category != "composite":
-            updates[kb_disabled_key(category)] = ""
+        updates = {env_key: final, kb_disabled_key(category): ""}
         try:
             write_env(env_path, updates)
         except Exception as error:

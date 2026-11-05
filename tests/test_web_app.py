@@ -374,6 +374,100 @@ def test_guide_images_served(client):
     assert img404.status_code == 404
 
 
+def test_welcome_discloses_custom_kb_responsibilities(client):
+    html = client.get("/welcome").get_data(as_text=True)
+    assert "使用自建知识库时" in html
+    assert "有权复制、整理和使用" in html
+    assert "候选条文不等于模型实际引用" in html
+    assert "不表示系统或作者认可其内容" in html
+    assert "记录、照片与知识库文件保存在你的本机" in html
+    assert "主动配置云端模型" in html
+    assert "不要将私人资料" not in html
+    assert "ZIP 提交到公开仓库" not in html
+    assert html.count('class="ack-row"') == 3
+
+
+def test_settings_links_custom_kb_guide(client):
+    html = client.get("/settings").get_data(as_text=True)
+    assert 'href="/kb-guide/"' in html
+    assert "自建知识库指南 ↗" in html
+    assert 'target="_blank" rel="noopener"' in html
+    heading_index = html.index("<h2>知识库</h2>")
+    link_index = html.index('href="/kb-guide/"', heading_index)
+    assert heading_index < link_index < html.index('id="kb-card-constitution"')
+
+
+def test_kb_guide_public_but_settings_requires_boot_ack(env_path, monkeypatch):
+    """自建手册保持公开；远程设置页只读状态也必须先确认 welcome。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    app = create_app(env_file=env_path,
+                     data_root=os.path.join(os.path.dirname(env_path), "data"))
+    app.config["TESTING"] = True
+    c = app.test_client()
+    response = c.get("/kb-guide/", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    for text in ("从中医著作到知识库", "让 AI 分批整理资料",
+                 "第一步：核对资料", "第二步：收到", "第三步：收到",
+                 "清单已确认", "正文已核对", "正文格式与原文复核",
+                 "导入综合知识库", "导入后的验收"):
+        assert text in html
+    assert 'href="/settings"' in html
+    settings = c.get("/settings", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
+    assert settings.status_code == 302
+    assert settings.headers["Location"] == "/welcome"
+    c.post("/welcome", headers={"Origin": "http://localhost"},
+           environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
+    settings = c.get("/settings", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
+    assert settings.status_code == 200
+    assert "自建知识库指南" in settings.get_data(as_text=True)
+
+
+def test_kb_guide_markdown_source_is_indexed():
+    import io
+    guide = io.open(os.path.join(_ROOT, "docs", "kb-guide.md"),
+                    encoding="utf-8").read()
+    for text in ("从中医著作到知识库", "schema_version: 1",
+                 "category: composite", "category: constitution",
+                 "diagnostics/", "diet-lifestyle/", "formulas/",
+                 "候选参考不等于模型实际引用", "主题—出处",
+                 "第二步：收到“清单已确认”", "第三步：收到“正文已核对”",
+                 "普通聊天 AI", "AI 可以协助列出原文与摘要的差异"):
+        assert text in guide
+    assert "tcm-kb-packages" not in guide and "C:\\Users" not in guide
+    html = io.open(os.path.join(_ROOT, "docs", "kb-guide.html"),
+                   encoding="utf-8").read()
+    for text in ("从中医著作到知识库", "让 AI 分批整理资料",
+                 "category: composite", "第一步：核对资料",
+                 "第二步：收到", "第三步：收到", "清单已确认", "正文已核对"):
+        assert text in html
+    index = io.open(os.path.join(_ROOT, "docs", "README.md"),
+                    encoding="utf-8").read()
+    assert "[从中医著作到知识库](kb-guide.md)" in index
+
+
+def test_custom_kb_docs_recommend_single_composite_zip():
+    import io
+    expected = ("只需用 AI 制作一个综合知识库 ZIP，"
+                "不必再拆成体质、食疗、方剂三个子库或三个 ZIP")
+    for relative in ("docs/kb-guide.md", "docs/kb-guide.html",
+                     "docs/KB_AUTHORING.md"):
+        text = io.open(os.path.join(_ROOT, relative), encoding="utf-8").read()
+        assert expected in text, relative
+        assert "综合包内的标准目录只用于主题归类，不是三个子库" in text, relative
+
+
+def test_user_facing_docs_link_custom_kb_guide():
+    import io
+    for relative in ("README.md", "docs/web-quickstart.md", "docs/user-guide.md"):
+        text = io.open(os.path.join(_ROOT, relative), encoding="utf-8").read()
+        assert "kb-guide.md" in text, relative
+    html = io.open(os.path.join(_ROOT, "docs", "user-guide.html"),
+                   encoding="utf-8").read()
+    assert 'href="/kb-guide/"' in html
+    assert 'href="#sec-kb"' in html and 'id="sec-kb"' in html
+
+
 def test_wizard_tips_consistent_with_design_mock():
     """口径漂移守卫：wizard_store.PARTS 的 tips 与设计稿 mock-data.js
     WIZARD_STEPS 必须一致（四轮审查发现的双副本漂移风险）。"""

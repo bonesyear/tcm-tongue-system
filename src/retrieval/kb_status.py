@@ -56,6 +56,9 @@ def inspect_kb(kb_root=_UNSET):
     return info
 
 
+KB_CATEGORIES_DISABLED_KEY = "TCM_KB_CATEGORIES_DISABLED"
+KB_COMPOSITE_DISABLED_KEY = "TCM_KB_COMPOSITE_DISABLED"
+
 KB_CATEGORY_DEFS = {
     "constitution": {"label": "中医体质辨证知识库",
                      "env_key": "TCM_KB_CONSTITUTION_ROOT",
@@ -76,6 +79,8 @@ def kb_env_key(category):
 
 
 def kb_disabled_key(category):
+    if category == "composite":
+        return KB_COMPOSITE_DISABLED_KEY
     if category not in KB_CATEGORY_DEFS:
         raise ValueError("未知知识库类别")
     return KB_CATEGORY_DEFS[category]["disabled_key"]
@@ -108,7 +113,9 @@ def _is_managed_root(category, root, config):
 
 
 def kb_legacy_root(config=None):
-    """旧综合根仅在明确允许或为程序管理副本时可用。"""
+    """综合根须未停用，且明确允许外部根或为程序管理副本。"""
+    if _config_value(config, KB_COMPOSITE_DISABLED_KEY) == "1":
+        return None
     root = _config_value(config, "TCM_KB_ROOT")
     if root and (_external_allowed(config) or _is_managed_root("composite", root, config)):
         return root
@@ -116,10 +123,11 @@ def kb_legacy_root(config=None):
 
 
 def kb_category_root(category, config=None):
-    """外部旧根默认忽略，程序管理副本始终可启用。"""
+    """整组与自身停用优先；专用根优先于综合回退。"""
     if category == "composite":
         return kb_legacy_root(config)
-    if _config_value(config, kb_disabled_key(category)) == "1":
+    if _config_value(config, KB_CATEGORIES_DISABLED_KEY) == "1" \
+            or _config_value(config, kb_disabled_key(category)) == "1":
         return None
     specific = _config_value(config, kb_env_key(category))
     if specific:
@@ -130,12 +138,14 @@ def kb_category_root(category, config=None):
 
 
 def inspect_kb_categories(config=None):
-    """返回三个类别的独立状态；停用优先于综合库回退。"""
+    """区分整组与自身停用；有效停用优先于专用根和综合回退。"""
     strict = _config_value(config, "TCM_KB_STRICT_CATEGORIES") == "1"
+    group_disabled = _config_value(config, KB_CATEGORIES_DISABLED_KEY) == "1"
     result = {}
     for category, definition in KB_CATEGORY_DEFS.items():
         specific = _config_value(config, definition["env_key"])
-        disabled = _config_value(config, definition["disabled_key"]) == "1"
+        self_disabled = _config_value(config, definition["disabled_key"]) == "1"
+        disabled = group_disabled or self_disabled
         root = kb_category_root(category, config)
         if disabled or root is None:
             info = {"root": root or "", "status": "unconfigured",
@@ -144,6 +154,7 @@ def inspect_kb_categories(config=None):
             info = inspect_kb(root)
         info.update(category=category, label=definition["label"],
                     env_key=definition["env_key"], disabled=disabled,
+                    self_disabled=self_disabled, group_disabled=group_disabled,
                     legacy=not specific and not strict and not disabled and bool(root))
         result[category] = info
     return result

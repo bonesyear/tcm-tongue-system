@@ -101,6 +101,38 @@ def test_valid_zip_uses_managed_copy_and_preserves_original(tmp_path):
     assert retrieved['synonyms_used'] == ['下利']
 
 
+def test_composite_import_clears_only_composite_disabled(tmp_path):
+    envfile.write_env(str(tmp_path / '.env'), {
+        'TCM_KB_COMPOSITE_DISABLED': '1',
+        'TCM_KB_CATEGORIES_DISABLED': '1',
+        'TCM_KB_DIET_DISABLED': '1',
+    })
+
+    result, _ = _import(tmp_path, _valid_zip(), category='composite')
+
+    assert result['ok'] is True and result['configured'] is True
+    config = envfile.read_env(str(tmp_path / '.env'))
+    assert config['TCM_KB_COMPOSITE_DISABLED'] == ''
+    assert config['TCM_KB_CATEGORIES_DISABLED'] == '1'
+    assert config['TCM_KB_DIET_DISABLED'] == '1'
+
+
+def test_sub_library_import_preserves_group_and_other_switches(tmp_path):
+    envfile.write_env(str(tmp_path / '.env'), {
+        'TCM_KB_CATEGORIES_DISABLED': '1',
+        'TCM_KB_DIET_DISABLED': '1',
+        'TCM_KB_FORMULA_DISABLED': '1',
+    })
+
+    result, _ = _import(tmp_path, _valid_zip('diet'), category='diet')
+
+    assert result['ok'] is True and result['configured'] is True
+    config = envfile.read_env(str(tmp_path / '.env'))
+    assert config['TCM_KB_DIET_DISABLED'] == ''
+    assert config['TCM_KB_CATEGORIES_DISABLED'] == '1'
+    assert config['TCM_KB_FORMULA_DISABLED'] == '1'
+
+
 def test_public_template_can_be_packaged_imported_and_retrieved(tmp_path):
     template = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', 'templates', 'kb'))
@@ -380,18 +412,22 @@ def test_settings_import_route_and_retrieval(client, tmp_path):
 
 def test_settings_composite_import_card_and_route(client, tmp_path):
     html = client.get('/settings').get_data(as_text=True)
-    assert '此功能用于调试及保证兼容性。' in html
-    assert '未设置专用根的源综合库可作为各类别回退' in html
-    assert '默认关闭以兼容源综合库' in html
+    assert '默认 · 推荐' not in html
+    assert '分类知识库（进阶）' not in html
+    assert '默认关闭，普通自建直接使用综合包即可' not in html
+    assert '此功能用于调试及保证兼容性。' not in html
     assert '旧综合库' not in html
-    assert 'data-category="composite"' in html
-    assert '<details id="kb-card-composite"' in html
-    assert '<details id="kb-card-composite" open' not in html
-    assert '<summary class="card-head collapse-head">' in html
-    assert 'details[open] .collapse-head .chev' in html
-    assert html.index('id="kb-card-formula"') < html.index('id="kb-card-composite"')
-    assert html.index('此功能用于调试及保证兼容性。') < html.index('默认关闭以兼容源综合库')
-    assert 'category === "composite" && data.configured' in html
+    assert 'id="kb-card-categories"' not in html
+    for category in ('constitution', 'diet', 'formula', 'composite'):
+        assert f'<section id="kb-card-{category}"' in html
+        assert f'data-category="{category}"' in html
+    card_order = ('kb-card-constitution', 'kb-card-diet', 'kb-card-formula',
+                  'kb-category-mode', 'kb-card-composite')
+    assert [html.index(f'id="{card_id}"') for card_id in card_order] == sorted(
+        html.index(f'id="{card_id}"') for card_id in card_order)
+    assert '目录结构与建库步骤见右上角指南' in html
+    assert 'if (data.configured) {\n        location.reload();' in html
+    assert 'statusLabel.textContent = "知识库可用"' not in html
 
     response = client.post('/settings/kb/import', data={
         'category': 'composite', 'kb_file': (_valid_zip(), 'composite.zip'),
@@ -405,6 +441,71 @@ def test_settings_composite_import_card_and_route(client, tmp_path):
     html = client.get('/settings').get_data(as_text=True)
     assert 'id="kb-current-root-composite"' in html and root in html
     assert 'id="kb-import-status-composite"' in html
+
+    envfile.write_env(str(tmp_path / '.env'), {'TCM_KB_STRICT_CATEGORIES': '1'})
+    html = client.get('/settings').get_data(as_text=True)
+    assert '综合库未参与检索' in html
+    assert '当前只使用分类专用根' in html
+
+
+def test_kb_group_is_collapsed_and_has_five_independent_switches(client):
+    html = client.get('/settings').get_data(as_text=True)
+    opening = '<details class="kb-group" id="kb-categories-card"'
+    assert opening in html
+    assert ' open' not in html.split(opening, 1)[1].split('>', 1)[0]
+    labels = {
+        'kb_categories': '启用子知识库整组',
+        'kb_constitution': '启用中医体质辨证知识库',
+        'kb_diet': '启用食疗知识库',
+        'kb_formula': '启用方剂知识库',
+        'kb_composite': '启用综合知识库',
+    }
+    for target, label in labels.items():
+        assert html.count(f'data-kb-toggle="{target}"') == 1
+        assert f'aria-label="{label}"' in html
+    markup = html.split('<div class="card" id="kb-import-card">', 1)[1].split('<script>', 1)[0]
+    group_start = markup.index(opening)
+    group_label = markup.index('<label class="switch kb-group-toggle"')
+    group = markup[group_start:group_label]
+    # 整组开关紧跟在最外层 details 后，不能混入内部技术详情的折叠区。
+    assert group.rstrip().endswith('</details>')
+    for item in ('kb-card-constitution', 'kb-card-diet',
+                 'kb-card-formula', 'kb-category-mode'):
+        assert group_start < markup.index(item) < group_label
+    group_toggle = markup.index('data-kb-toggle="kb_categories"', group_label)
+    assert group_label < group_toggle < markup.index('kb-card-composite')
+
+
+def test_kb_group_override_is_visible_without_losing_sub_preferences(client, tmp_path):
+    envfile.write_env(str(tmp_path / '.env'), {
+        'TCM_KB_CATEGORIES_DISABLED': '1',
+        'TCM_KB_DIET_DISABLED': '1',
+    })
+    html = client.get('/settings').get_data(as_text=True)
+    assert '整组已停用' in html
+    expected = {
+        'kb_categories': False, 'kb_composite': True,
+        'kb_constitution': True, 'kb_diet': False, 'kb_formula': True,
+    }
+    for target, checked in expected.items():
+        marker = html.index(f'data-kb-toggle="{target}"')
+        tag = html[html.rfind('<input', 0, marker):html.index('>', marker) + 1]
+        assert ('checked' in tag) is checked, (target, tag)
+
+
+def test_settings_kb_modules_use_responsive_split_layout(client):
+    html = client.get('/settings').get_data(as_text=True)
+    for category in ('constitution', 'diet', 'formula', 'composite'):
+        start = html.index(f'<section id="kb-card-{category}"')
+        section = html[start:html.index('</section>', start)]
+        assert 'class="kb-module"' in section
+        summary_index = section.index('class="kb-module-summary"')
+        import_index = section.index('class="kb-import-form kb-module-import"')
+        tools_index = section.index('class="kb-module-tools"')
+        assert summary_index < import_index < tools_index
+    assert '.kb-module {' in html
+    assert '.kb-upload-controls {' in html
+    assert '@media (max-width: 760px)' in html
 
 
 def test_kb_paths_are_collapsed_technical_details(client):
@@ -432,7 +533,9 @@ def test_settings_locked_root_is_never_replaced(tmp_path, monkeypatch):
     monkeypatch.setenv('TCM_KB_ROOT', str(original))
     app = create_app(env_file=str(tmp_path / '.env'), data_root=str(tmp_path / 'data'))
     app.config['TESTING'] = True
-    response = app.test_client().post('/settings/kb/import', data={
+    client = app.test_client()
+    client.post('/welcome', headers={'Origin': 'http://localhost'})
+    response = client.post('/settings/kb/import', data={
         'kb_file': (_valid_zip(), 'knowledge.zip'),
     }, content_type='multipart/form-data', headers={'Origin': 'http://localhost'})
     assert response.status_code == 200, response.get_json()

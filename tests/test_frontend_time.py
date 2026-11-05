@@ -39,6 +39,39 @@ def test_settings_toggle_writes_only_its_own_field(client, tmp_path):
     assert "LLM_DISABLED" not in env
 
 
+@pytest.mark.parametrize("target,key", [
+    ("kb_categories", "TCM_KB_CATEGORIES_DISABLED"),
+    ("kb_composite", "TCM_KB_COMPOSITE_DISABLED"),
+    ("kb_constitution", "TCM_KB_CONSTITUTION_DISABLED"),
+    ("kb_diet", "TCM_KB_DIET_DISABLED"),
+    ("kb_formula", "TCM_KB_FORMULA_DISABLED"),
+])
+def test_kb_toggles_write_only_their_own_field(client, tmp_path, target, key):
+    response = client.post("/settings/toggle", json={"target": target, "enabled": False})
+    assert response.status_code == 200, response.get_json()
+    config = envfile.read_env(str(tmp_path / ".env"))
+    assert config[key] == "1"
+    assert len(config) == 1
+
+    response = client.post("/settings/toggle", json={"target": target, "enabled": True})
+    assert response.status_code == 200, response.get_json()
+    assert envfile.read_env(str(tmp_path / ".env"))[key] == ""
+
+
+def test_kb_toggle_honours_environment_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("TCM_KB_CATEGORIES_DISABLED", "1")
+    app = create_app(env_file=str(tmp_path / ".env"),
+                     data_root=str(tmp_path / "data"))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+
+    response = client.post("/settings/toggle",
+                           json={"target": "kb_categories", "enabled": True})
+    assert response.status_code == 409
+    assert not (tmp_path / ".env").exists()
+
+
 def test_settings_toggle_rejects_invalid_input_without_writes(client, tmp_path):
     response = client.post("/settings/toggle", json={"target": "vision", "enabled": "no"})
     assert response.status_code == 400
@@ -129,6 +162,15 @@ def test_wizard_keeps_session_date_across_midnight(client, tmp_path, monkeypatch
     assert not (daily / ".wizard-2026-10-26.json").exists()
 
 
+def test_record_mobile_total_score_layout_contract(client):
+    """窄屏总分标签不得被说明文字挤压成逐字竖排。"""
+    assert client.post("/demo").status_code == 302
+    html = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert 'class="scoreline total-scoreline"' in html
+    assert ".total-scoreline > .muted { white-space: nowrap; }" in html
+    assert ".total-scoreline > .faint { flex-basis: 100%; }" in html
+
+
 def test_frontend_accessibility_and_resize_contracts(client):
     wizard = client.get("/wizard").get_data(as_text=True)
     assert 'id="file-input" accept="image/*" capture="environment" style="display:none;"' not in wizard
@@ -144,6 +186,14 @@ def test_frontend_accessibility_and_resize_contracts(client):
     with open(os.path.join(os.path.dirname(records_store.__file__), "static", "css", "base.css"),
               encoding="utf-8") as handle:
         assert ".grid.cols-2, .grid.cols-3 { grid-template-columns: minmax(0, 1fr); }" in handle.read()
+
+
+def test_wizard_skip_success_clears_stale_error(client):
+    """断网恢复后，成功保存声明不得继续展示上一次的网络错误。"""
+    html = client.get("/wizard").get_data(as_text=True)
+    skip = html.split("function skip(m) {", 1)[1].split("\n}", 1)[0]
+    success = skip.split("if (d.ok) {", 1)[1].split("} else {", 1)[0]
+    assert "clearError();" in success
 
 
 def test_wizard_offers_recent_draft_continuation(client, tmp_path, monkeypatch):

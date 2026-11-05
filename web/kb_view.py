@@ -20,7 +20,7 @@ from src.retrieval.synonym_loader import (
     MAX_SYNONYM_KEYS, MAX_SYNONYM_TERM_CHARS, MAX_SYNONYMS_PER_KEY,
 )
 
-_VIEW_SCHEMA = 1
+_VIEW_SCHEMA = 3
 _CACHE_MARKER = ".kb-unified-cache-v1"
 _MAX_CACHED_VIEWS = 8
 _RETIRE_SECONDS = 3600
@@ -52,10 +52,9 @@ def _build_view(active, view):
     merged_map = {}
     for root in ordered_roots:
         root_path = Path(root)
-        for source in root_path.rglob("*"):
-            if not source.is_file() or source.suffix.lower() != ".md" \
-                    or source.name == "README.md":
-                continue
+        for filename in list_kb_files(root):
+            # 与检索层共用同一文件枚举，包含目录名排除和链接处理语义。
+            source = Path(filename)
             relative = source.relative_to(root_path).as_posix()
             if root in shared:
                 owner = category_for_shared_file(relative, active)
@@ -64,6 +63,15 @@ def _build_view(active, view):
             else:
                 owner = next(category for category, value in active.items()
                              if value == root)
+                # 单一类别也可能回退到完整综合根；其他类别的标准目录不能
+                # 因根只被引用一次就当作专用内容并入，自定义专用目录不受影响。
+                first = relative.split("/", 1)[0]
+                if len(active) == 1 and any(
+                        first == directory and category != owner
+                        for category, directory in (("constitution", "diagnostics"),
+                                                    ("diet", "diet-lifestyle"),
+                                                    ("formula", "formulas"))):
+                    continue
             target = view / relative
             try:
                 if target.exists():
@@ -76,7 +84,17 @@ def _build_view(active, view):
                     shutil.copyfile(source, target)
             except (FileExistsError, NotADirectoryError, IsADirectoryError) as error:
                 raise ValueError(f"知识库路径类型冲突: {relative}") from error
-            owners[relative] = owner
+            if relative in owners and owners[relative] != owner:
+                # 相同内容的重复文件不重复检索，但类别须与综合根的标准目录一致；
+                # 专用根的普通目录无法判类时保留确定性的首个归属。
+                try:
+                    preferred = category_for_shared_file(relative, active)
+                except ValueError:
+                    preferred = None
+                if preferred in (owners[relative], owner):
+                    owners[relative] = preferred
+            else:
+                owners[relative] = owner
         map_path = root_path / "synonym_map.yaml"
         if map_path.is_file():
             for key, values in synonym_loader.load_map(str(map_path)).items():
@@ -122,7 +140,7 @@ def _valid_relative(value):
     return not path.is_absolute() and ".." not in path.parts and path.as_posix() == value
 
 
-def _load_view(view, key):
+def _load_view(view, key, verify_content=True):
     try:
         manifest = json.loads((view / "view.json").read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError):
@@ -132,7 +150,9 @@ def _load_view(view, key):
         return None
     owners = manifest.get("owners")
     aliases = manifest.get("aliases")
-    if not isinstance(owners, dict) or not isinstance(aliases, dict):
+    digests = manifest.get("files")
+    if not isinstance(owners, dict) or not isinstance(aliases, dict) \
+            or not isinstance(digests, dict):
         return None
     allowed = set(KB_CATEGORY_DEFS) | {"composite"}
     if any(not _valid_relative(relative) or not isinstance(category, str)
@@ -140,7 +160,10 @@ def _load_view(view, key):
         return None
     files = {Path(filename).relative_to(view).as_posix()
              for filename in list_kb_files(str(view))}
-    if files != set(owners):
+    if files != set(owners) or set(digests) != files:
+        return None
+    if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+           for value in digests.values()):
         return None
     if len(aliases) > MAX_SYNONYM_KEYS:
         return None
@@ -150,6 +173,13 @@ def _load_view(view, key):
                 or len(values) > MAX_SYNONYMS_PER_KEY \
                 or any(not isinstance(value, str) or len(value) > MAX_SYNONYM_TERM_CHARS
                        for value in values):
+            return None
+    if verify_content:
+        try:
+            if any(_file_digest(view / relative) != digests[relative]
+                   for relative in files):
+                return None
+        except OSError:
             return None
     return owners, aliases
 
@@ -171,7 +201,8 @@ def _cleanup_staging(root):
 def _prune(root, current=None):
     views = [path for path in root.iterdir()
              if _VIEW_NAME.fullmatch(path.name) and path.is_dir()
-             and not path.is_symlink() and _load_view(path, path.name) is not None]
+             and not path.is_symlink()
+             and _load_view(path, path.name, verify_content=False) is not None]
     others = sorted((path for path in views if path != current),
                     key=lambda path: path.stat().st_mtime, reverse=True)
     keep = max(0, _MAX_CACHED_VIEWS - (1 if current is not None else 0))
@@ -221,6 +252,9 @@ def unified_view(active, cache_root=None):
         view = root / key
         loaded = _load_view(view, key)
         if loaded is None:
+            # 损坏视图可能已在先前读取中建立文件行或 RAG 缓存；
+            # 重建同路径前必须同时失效，不能仅恢复磁盘正文。
+            invalidate_kb_caches(str(view))
             if view.exists() or view.is_symlink():
                 _remove_path(view)
             staging = Path(tempfile.mkdtemp(prefix=f".{key}.staging-", dir=root))
@@ -229,7 +263,9 @@ def unified_view(active, cache_root=None):
                 if _view_key(active) != key:
                     raise ValueError("知识库在统一视图构建期间已变化，请重试")
                 manifest = {"schema": _VIEW_SCHEMA, "key": key,
-                            "owners": owners, "aliases": aliases}
+                            "owners": owners, "aliases": aliases,
+                            "files": {relative: _file_digest(staging / relative)
+                                      for relative in owners}}
                 (staging / "view.json").write_text(
                     json.dumps(manifest, ensure_ascii=False, sort_keys=True), encoding="utf-8")
                 os.replace(staging, view)

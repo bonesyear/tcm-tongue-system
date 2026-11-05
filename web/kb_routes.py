@@ -63,11 +63,10 @@ def register_kb_routes(app, *, admin_allowed, is_env_locked, env_lock,
         category = request.form.get("category", "composite")
         try:
             env_key = kb_env_key(category)
-            disabled_key = kb_disabled_key(category) if category != "composite" else None
+            disabled_key = kb_disabled_key(category)
         except ValueError as error:
             return jsonify({"ok": False, "error": str(error)}), 400
-        locked = is_env_locked(env_key) or bool(
-            disabled_key and is_env_locked(disabled_key))
+        locked = is_env_locked(env_key) or is_env_locked(disabled_key)
         try:
             with env_lock, write_lock(os.path.dirname(os.path.abspath(env_path))):
                 result = import_kb(upload, data_root, env_path,

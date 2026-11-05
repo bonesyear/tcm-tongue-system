@@ -6,6 +6,7 @@
 
 - [Web 快速上手](web-quickstart.md)
 - [完整使用手册](user-guide.md)（[HTML 版](user-guide.html)）
+- [从中医著作到知识库](kb-guide.md)（[HTML 版](kb-guide.html)）
 - [自建知识库规范](KB_AUTHORING.md)
 - [医学治理与边界](GOVERNANCE_2026-10-27.md)
 - [已知问题](KNOWN_ISSUES.md)
@@ -49,6 +50,8 @@
 - [B26 正式报告链路与缺类隔离](MIGRATION_2026-11-04_B26.md)
 - [B27 统一视图一致性与缓存清理](MIGRATION_2026-11-04_B27.md)
 - [B28 受管统一视图与并发恢复](MIGRATION_2026-11-04_B28.md)
+- [B29 统一视图归属与缓存完整性](MIGRATION_2026-11-04_B29.md)
+- [单一综合回退根修正与系统验收](MIGRATION_2026-11-05_KB_SINGLE_SHARED_ROOT.md)
 
 ## 新增文档约定
 

@@ -191,6 +191,7 @@ def test_unified_source_change_during_build_not_published(tmp_path, monkeypatch)
 
 def test_unified_corrupt_manifest_is_rebuilt(tmp_path, monkeypatch):
     import json
+    import kb_view
     _, roots = _corpus(tmp_path)
     seen = _capture_views(monkeypatch)
     cache = tmp_path / 'cache'
@@ -200,7 +201,71 @@ def test_unified_corrupt_manifest_is_rebuilt(tmp_path, monkeypatch):
     second = _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
     assert _signature(second) == _signature(first)
     assert seen[0] == seen[1]
-    assert json.loads(manifest.read_text(encoding='utf-8'))['schema'] == 1
+    assert json.loads(manifest.read_text(encoding='utf-8'))['schema'] == kb_view._VIEW_SCHEMA
+
+
+def test_unified_corrupt_markdown_is_rebuilt(tmp_path, monkeypatch):
+    _, roots = _corpus(tmp_path)
+    source = tmp_path / 'diet' / 'diet-lifestyle' / 'integrity.md'
+    source.write_text('缓存正文原始标记', encoding='utf-8')
+    seen = _capture_views(monkeypatch)
+    cache = tmp_path / 'cache'
+    first = _kb_references_unified(
+        _record(), roots, ['缓存正文原始标记'], cache_root=cache)
+    cached = Path(seen[0]) / 'diet-lifestyle' / 'integrity.md'
+    cached.write_text('缓存正文损坏标记', encoding='utf-8')
+    second = _kb_references_unified(
+        _record(), roots, ['缓存正文原始标记'], cache_root=cache)
+    assert _signature(second) == _signature(first)
+    assert cached.read_text(encoding='utf-8') == '缓存正文原始标记'
+    assert source.read_text(encoding='utf-8') == '缓存正文原始标记'
+
+
+def test_unified_rebuild_invalidates_poisoned_rag(tmp_path):
+    from kb_view import unified_view
+    from src.retrieval import grep_search, retrieve
+    _, roots = _corpus(tmp_path)
+    source = tmp_path / 'diet' / 'diet-lifestyle' / 'integrity.md'
+    source.write_text('缓存索引原始标记', encoding='utf-8')
+    cache = tmp_path / 'cache'
+    with unified_view(roots, cache_root=cache) as (view, owners, aliases):
+        cached = Path(view) / 'diet-lifestyle' / 'integrity.md'
+        cached.write_text('缓存索引污染标记', encoding='utf-8')
+        assert retrieve('缓存索引污染标记', kb_root=view, syn_map=aliases)['results']
+        with grep_search._FILE_CACHE_LOCK:
+            for path in list(grep_search._FILE_CACHE):
+                if Path(path).is_relative_to(view):
+                    grep_search._FILE_CACHE.pop(path, None)
+    refs = _kb_references_unified(
+        _record(), roots, ['缓存索引污染标记'], cache_root=cache)
+    # RAG 可以对近形查询返回原始条文，但绝不能返回已清除的污染文本。
+    assert refs
+    assert all(ref['excerpt'] == '缓存索引原始标记' for ref in refs)
+    assert cached.read_text(encoding='utf-8') == '缓存索引原始标记'
+
+
+def test_unified_readme_directory_does_not_invalidate_view(tmp_path, monkeypatch):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    nested = tmp_path / 'diet' / 'README.md' / 'nested.md'
+    nested.parent.mkdir(parents=True)
+    nested.write_text('说明目录中的文件不参与检索', encoding='utf-8')
+    seen = _capture_views(monkeypatch)
+    copies = []
+    original_copy = kb_view.shutil.copyfile
+
+    def counted_copy(source, target):
+        copies.append(source)
+        return original_copy(source, target)
+
+    monkeypatch.setattr(kb_view.shutil, 'copyfile', counted_copy)
+    cache = tmp_path / 'cache'
+    first = _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    copy_count = len(copies)
+    second = _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert _signature(second) == _signature(first)
+    assert seen[0] == seen[1]
+    assert len(copies) == copy_count
 
 
 def test_unified_overlapping_cache_uses_ephemeral_view(tmp_path, monkeypatch):
