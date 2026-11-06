@@ -15,7 +15,6 @@
 ## 架构与证据
 
 - [检索架构](architecture/retrieval-design.md)
-- [Web 设计交接](web-design-handoff.md)
 - [术语出处台账](VOCAB_PROVENANCE_2026-10-16.md)
 
 ## 审查记录

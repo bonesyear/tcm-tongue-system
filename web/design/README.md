@@ -1,25 +1,15 @@
-# web/design — 六维望诊 Web 层设计稿
+# web/design — 设计资源与历史 mockup
 
-静态 mockup，不是可运行产品。**时效声明（2026-10-23 审查补记）**：
-`assets/tokens.css` 令牌层（色板/字体/阴影/纸纹）仍是视觉规范的单一来源；
-`pages/` 中 **record 页规格已实质脱钩**（2026-09-30 快照：缺两带布局/全案卡/
-调理三表/kb-refs/dose-slip/煎服法嵌条，红线数与「声明正常」语义均为旧版），
-以 `web/templates/record.html` 为唯一事实；index/trends/wizard/settings 页
-大体仍相符。实现交接说明见 `docs/web-design-handoff.md`（其「声明正常计入
-覆盖度」「九项红线」两条同样已被后续版本修订，读时以代码与 CHANGELOG 为准）。
+本目录不是可运行产品。当前页面、交互和知识库入口以 `web/templates/` 与现行代码为准。
 
-## 预览
+## 当前仍有用途的资源
 
-```bash
-npm run dev            # → http://127.0.0.1:7100/
-# 或直接用浏览器打开 pages/index.html（无 fetch 依赖，file:// 可跑）
-```
+- `assets/mock-data.js`：`tests/test_web_app.py` 用它核对拍照向导各部位的拍摄提示，删除前须同步调整该回归。
+- `assets/tokens.css`、`assets/base.css`：早期视觉规范参考。实际生效样式以 `web/static/css/` 和模板为准，修改设计稿不会改变产品页面。
+- `vendor/echarts.min.js`：本地图表库的历史副本；当前运行使用的资源以 `web/static/` 为准。
 
-## 目录
+## 静态历史资料
 
-- `assets/tokens.css` — 设计令牌（色板/字体/阴影/纸纹），实现只准消费变量
-- `assets/base.css` — 共用组件（印章 logo、卡片、分数徽章+进度条、步骤条、弹层、表单）
-- `assets/mock-data.js` — 演示数据，结构对齐记录形状 B 与周报 dict
-- `pages/` — 记录列表 / 单日详情 / 趋势 / 拍照向导 / 设置
-- `vendor/echarts.min.js` — ECharts 5.6.0 本地版（一切 JS/CSS vendor 到本地）
-- `previews/` — 2026-09-30 实测渲染截图
+`pages/` 和 `previews/` 是 2026-09-30 的静态页面与截图，只用于回看早期设计。record、settings、知识库分组、独立折叠和下载入口均已不同于这些快照，不要用它们判断当前功能。
+
+`package.json` 与 `dev-server.js` 仅用于需要时预览这些静态页面，不参与产品构建或运行。
