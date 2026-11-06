@@ -288,7 +288,8 @@ def create_app(env_file: str | None = None,
         settings_endpoints = {"settings", "settings_save", "settings_toggle",
                               "settings_kb_import", "settings_kb_mode", "settings_kb_reset"}
         if request.endpoint in ("welcome", "welcome_ack", "license_text", "settings_login",
-                                "guide", "guide_doc", "guide_images", "static"):
+                                "guide", "guide_doc", "guide_images", "kb_authoring_download",
+                                "static"):
             return None
         if request.cookies.get("boot_ack") != boot_token:
             return redirect("/welcome")
@@ -360,6 +361,15 @@ def create_app(env_file: str | None = None,
         if not os.path.exists(path):
             return f"使用手册缺失：docs/{filename} 不存在", 404
         return send_file(path, mimetype="text/html")
+
+    @app.get("/kb-authoring.md")
+    def kb_authoring_download():
+        """固定公开规范附件；不接受用户路径，便于局域网交给 AI。"""
+        path = os.path.join(_REPO_ROOT, "docs", "KB_AUTHORING.md")
+        if not os.path.isfile(path):
+            return "使用规范缺失：docs/KB_AUTHORING.md 不存在", 404
+        return send_file(path, mimetype="text/markdown",
+                         as_attachment=True, download_name="KB_AUTHORING.md")
 
     @app.get("/guide/images/<path:filename>")
     def guide_images(filename):

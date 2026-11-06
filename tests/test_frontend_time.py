@@ -78,6 +78,37 @@ def test_settings_toggle_rejects_invalid_input_without_writes(client, tmp_path):
     assert not (tmp_path / ".env").exists()
 
 
+def test_model_cards_fold_independently_of_enable_switches(client, tmp_path):
+    """启用状态与卡片折叠分离；停用后仍可展开查看既有配置。"""
+    html = client.get("/settings").get_data(as_text=True)
+    for target, form_id in (("vision", "form-vision"), ("llm", "form-llm")):
+        opening = f'<details class="model-details" id="{target}-card"'
+        assert opening in html
+        opening_tag = html.split(opening, 1)[1].split(">", 1)[0]
+        assert " open" in opening_tag
+        details_end = html.index("</details>", html.index(opening))
+        toggle = html.index('class="switch model-card-toggle"', html.index(opening))
+        assert details_end < toggle
+        form_tag = html.split(f'<form method="post" action="/settings" id="{form_id}"', 1)[1] \
+            .split(">", 1)[0]
+        assert "display:none" not in form_tag
+
+    script = html.split("/* 模型开关独立保存", 1)[1] \
+        .split("/* 五个知识库开关", 1)[0]
+    assert "form.style.display" not in script
+    assert "location.reload" not in script
+
+    envfile.write_env(str(tmp_path / ".env"), {
+        "VISION_DISABLED": "1", "LLM_DISABLED": "1"})
+    html = client.get("/settings").get_data(as_text=True)
+    for target, form_id in (("vision", "form-vision"), ("llm", "form-llm")):
+        opening = f'<details class="model-details" id="{target}-card"'
+        assert " open" not in html.split(opening, 1)[1].split(">", 1)[0]
+        form_tag = html.split(f'<form method="post" action="/settings" id="{form_id}"', 1)[1] \
+            .split(">", 1)[0]
+        assert "display:none" not in form_tag
+
+
 def test_welcome_ack_honours_disabled_vision(client, tmp_path):
     envfile.write_env(str(tmp_path / ".env"), {"VISION_DISABLED": "1"})
     response = client.post("/welcome", headers={"Origin": "http://localhost"})

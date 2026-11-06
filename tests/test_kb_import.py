@@ -476,6 +476,25 @@ def test_kb_group_is_collapsed_and_has_five_independent_switches(client):
     assert group_label < group_toggle < markup.index('kb-card-composite')
 
 
+def test_composite_kb_has_header_switch_and_independent_disclosure(client, tmp_path):
+    html = client.get('/settings').get_data(as_text=True)
+    opening = '<details class="kb-group kb-composite-details" id="kb-composite-disclosure"'
+    assert opening in html
+    assert ' open' in html.split(opening, 1)[1].split('>', 1)[0]
+    start = html.index(opening)
+    label = html.index('<label class="switch kb-group-toggle"', start)
+    body = html[start:label]
+    assert 'class="kb-group-head"' in body
+    assert body.rstrip().endswith('</details>')
+    assert 'data-kb-toggle="kb_composite"' not in body
+    toggle = html.index('data-kb-toggle="kb_composite"', label)
+    assert start < label < toggle
+
+    envfile.write_env(str(tmp_path / '.env'), {'TCM_KB_COMPOSITE_DISABLED': '1'})
+    html = client.get('/settings').get_data(as_text=True)
+    assert ' open' not in html.split(opening, 1)[1].split('>', 1)[0]
+
+
 def test_kb_group_override_is_visible_without_losing_sub_preferences(client, tmp_path):
     envfile.write_env(str(tmp_path / '.env'), {
         'TCM_KB_CATEGORIES_DISABLED': '1',

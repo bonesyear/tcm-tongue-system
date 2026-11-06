@@ -392,9 +392,27 @@ def test_settings_links_custom_kb_guide(client):
     assert 'href="/kb-guide/"' in html
     assert "自建知识库指南 ↗" in html
     assert 'target="_blank" rel="noopener"' in html
+    assert 'href="/kb-authoring.md" download' in html
     heading_index = html.index("<h2>知识库</h2>")
     link_index = html.index('href="/kb-guide/"', heading_index)
     assert heading_index < link_index < html.index('id="kb-card-constitution"')
+
+
+def test_kb_authoring_download_is_public_and_matches_source(env_path, monkeypatch):
+    """固定规范附件无需 welcome 或管理会话，内容只能来自公开文档。"""
+    monkeypatch.delenv("VISION_API_KEY", raising=False)
+    app = create_app(env_file=env_path,
+                     data_root=os.path.join(os.path.dirname(env_path), "data"))
+    app.config["TESTING"] = True
+    c = app.test_client()
+    response = c.get("/kb-authoring.md", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
+    assert response.status_code == 200
+    assert response.mimetype == "text/markdown"
+    assert response.headers["Content-Type"].count("charset=utf-8") == 1
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert "KB_AUTHORING.md" in response.headers["Content-Disposition"]
+    with open(os.path.join(_ROOT, "docs", "KB_AUTHORING.md"), "rb") as source:
+        assert response.data == source.read()
 
 
 def test_kb_guide_public_but_settings_requires_boot_ack(env_path, monkeypatch):
@@ -407,12 +425,13 @@ def test_kb_guide_public_but_settings_requires_boot_ack(env_path, monkeypatch):
     response = c.get("/kb-guide/", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    for text in ("从中医著作到知识库", "让 AI 分批整理资料",
-                 "第一步：核对资料", "第二步：收到", "第三步：收到",
-                 "清单已确认", "正文已核对", "正文格式与原文复核",
-                 "导入综合知识库", "导入后的验收"):
+    for text in ("从中医著作到知识库", "开发样本怎样搭配资料",
+                 "怎样判断一本书适不适合", "把资料和格式规范交给 AI",
+                 "导入前自己要做的复核", "导入综合知识库并检查结果",
+                 "docs/KB_AUTHORING.md"):
         assert text in html
     assert 'href="/settings"' in html
+    assert 'href="/kb-authoring.md" download' in html
     settings = c.get("/settings", environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
     assert settings.status_code == 302
     assert settings.headers["Location"] == "/welcome"
@@ -427,19 +446,16 @@ def test_kb_guide_markdown_source_is_indexed():
     import io
     guide = io.open(os.path.join(_ROOT, "docs", "kb-guide.md"),
                     encoding="utf-8").read()
-    for text in ("从中医著作到知识库", "schema_version: 1",
-                 "category: composite", "category: constitution",
-                 "diagnostics/", "diet-lifestyle/", "formulas/",
-                 "候选参考不等于模型实际引用", "主题—出处",
-                 "第二步：收到“清单已确认”", "第三步：收到“正文已核对”",
-                 "普通聊天 AI", "AI 可以协助列出原文与摘要的差异"):
+    for text in ("从中医著作到知识库", "KB_AUTHORING.md",
+                 "著作资料的电子版", "综合知识库 ZIP", "原文节选、摘要",
+                 "候选参考", "不能作为诊断依据"):
         assert text in guide
     assert "tcm-kb-packages" not in guide and "C:\\Users" not in guide
     html = io.open(os.path.join(_ROOT, "docs", "kb-guide.html"),
                    encoding="utf-8").read()
-    for text in ("从中医著作到知识库", "让 AI 分批整理资料",
-                 "category: composite", "第一步：核对资料",
-                 "第二步：收到", "第三步：收到", "清单已确认", "正文已核对"):
+    for text in ("从中医著作到知识库", "把资料和格式规范交给 AI",
+                 "按规范生成一个可导入本系统的综合知识库 ZIP",
+                 "导入前自己要做的复核", "导入综合知识库并检查结果"):
         assert text in html
     index = io.open(os.path.join(_ROOT, "docs", "README.md"),
                     encoding="utf-8").read()
@@ -455,6 +471,54 @@ def test_custom_kb_docs_recommend_single_composite_zip():
         text = io.open(os.path.join(_ROOT, relative), encoding="utf-8").read()
         assert expected in text, relative
         assert "综合包内的标准目录只用于主题归类，不是三个子库" in text, relative
+
+
+def test_kb_guide_focuses_on_book_selection_and_delegates_format():
+    """指南负责选书，技术格式交给规范；不保留实现教程或刻意隐身表述。"""
+    import io
+    expected = (
+        "开发样本怎样搭配资料", "《中医诊断学》", "ZYYXH/T 157-2009",
+        "方剂、经方类著作", "著作资料的电子版", "docs/KB_AUTHORING.md",
+        "按规范生成一个可导入本系统的综合知识库 ZIP",
+        "团体标准，不是行业标准", "GB/T 46939-2025", "2026 年 4 月 1 日",
+    )
+    implementation_details = (
+        "这里只公开", "不列书名", "tongue-observation.md", "my-kb/",
+        "diagnostics/", "schema_version: 1", "第一步：核对资料", "分阶段任务说明",
+    )
+    for relative in ("docs/kb-guide.md", "docs/kb-guide.html"):
+        text = io.open(os.path.join(_ROOT, relative), encoding="utf-8").read()
+        for snippet in expected:
+            assert snippet in text, (relative, snippet)
+        for snippet in implementation_details:
+            assert snippet not in text, (relative, snippet)
+        assert "这是行业标准" not in text, relative
+    html = io.open(os.path.join(_ROOT, "docs", "kb-guide.html"),
+                   encoding="utf-8").read()
+    assert 'href="#sec-sample"' in html and 'id="sec-sample"' in html
+    assert 'href="#sec-workflow"' in html and 'id="sec-workflow"' in html
+    assert '<div class="table-scroll" tabindex="0" role="region"' in html
+    assert ".table-scroll .sample-sources{display:table;min-width:640px}" in html
+    authoring = io.open(os.path.join(_ROOT, "docs", "KB_AUTHORING.md"),
+                        encoding="utf-8").read()
+    assert "把电子版资料与本文一起交给 AI" in authoring
+    assert "指南包含可直接复制的分阶段任务说明" not in authoring
+
+
+def test_kb_authoring_is_self_contained_generation_contract():
+    """规范独立覆盖导入、检索、取材和交付，而不只描述 ZIP 外观。"""
+    import io
+    text = io.open(os.path.join(_ROOT, "docs", "KB_AUTHORING.md"),
+                   encoding="utf-8").read()
+    for snippet in (
+            "单条不超过 240 字符", "出现的字段不能为空", "不加引号",
+            "完全一致时才展开", "展开是单向的", "实际出现在正文中",
+            "最小综合库示例（非医学合成内容）", "不要把整章内容压成一行",
+            "只能依据使用者明确提供的著作和资料", "实际打开的文件、章节和页码范围",
+            "不读取或修改真实 `.env`", "交付检查清单", "ZIP 路径、完整文件清单"):
+        assert snippet in text, snippet
+    assert "ZIP 可以包含一层普通文件夹" not in text
+    assert "不要把整个知识库再套进一层 `my-kb/`" in text
 
 
 def test_user_facing_docs_link_custom_kb_guide():

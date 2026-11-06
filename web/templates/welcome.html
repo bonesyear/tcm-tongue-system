@@ -1,72 +1,138 @@
 {% extends "base.html" %}
 {% block title %}使用前须知 · 六维望诊{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/welcome.css') }}">{% endblock %}
 {% block content %}
-<div>
-  <h1 class="page-title">使用前须知</h1>
-  <p class="page-sub">请逐项阅读并确认后进入系统（每次服务重启后需重新确认）</p>
-</div>
+<header class="welcome-hero">
+  <div class="welcome-hero__copy">
+    <p class="welcome-eyebrow"><span aria-hidden="true"></span>进入系统前，请完成三项确认</p>
+    <h1 class="page-title welcome-title">使用前须知</h1>
+    <p class="page-sub welcome-sub">请逐项阅读并确认后进入系统（每次服务重启后需重新确认）</p>
+  </div>
+  <div class="welcome-overview" id="welcome-progress">
+    <div class="welcome-progress__summary">
+      <strong id="welcome-progress-value" aria-live="polite">0 / 3 已确认</strong>
+      <span>逐项阅读</span>
+    </div>
+    <div class="welcome-progress__track" aria-hidden="true"><i id="welcome-progress-fill"></i></div>
+    <ol class="welcome-steps" aria-label="须知章节">
+      <li><a href="#welcome-license" data-welcome-step="1"><span class="welcome-step__number">01</span><span>开源许可</span></a></li>
+      <li><a href="#welcome-legal" data-welcome-step="2"><span class="welcome-step__number">02</span><span>合法使用</span></a></li>
+      <li><a href="#welcome-model" data-welcome-step="3"><span class="welcome-step__number">03</span><span>模型边界</span></a></li>
+    </ol>
+  </div>
+</header>
 
-<form method="post" action="/welcome" class="stack">
+<form method="post" action="/welcome" class="stack welcome-form">
 
-  <div class="card">
-    <div class="card-head"><h2>一、开源许可</h2></div>
+  <section class="card welcome-card" id="welcome-license" aria-labelledby="welcome-license-title">
+    <div class="card-head welcome-card__head"><h2 id="welcome-license-title">一、开源许可</h2><span class="welcome-card__index">第 1 项确认</span></div>
     <p>本系统<strong>代码及项目自有模板</strong>以 <strong>GNU GPL v3</strong> 许可证开源（Copyright © 2026 bonesyear）。
-      这些代码的衍生作品必须以相同许可证开源并保留版权声明。
-      完整条款见 <a href="/license" target="_blank">LICENSE 全文</a>（网上版本：<a href="https://www.gnu.org/licenses/gpl-3.0.txt" target="_blank">gnu.org/licenses/gpl-3.0.txt</a>）。</p>
-    <p>知识库内容、原始引文、AI 示意图及第三方组件有各自的版权与许可边界，不适用上述代码许可。
-      公开包不附带原知识库；可在设置页分别导入中医体质辨证、食疗和方剂知识库。
+      复制、修改和再分发须遵守该许可证；<strong>对外分发衍生作品时</strong>须以相同许可证提供相应源代码并保留版权及修改声明，
+      仅私人使用或修改不当然产生公开义务。完整条款见
+      <a href="/license" target="_blank" rel="noopener">LICENSE 全文</a>（网上版本：<a href="https://www.gnu.org/licenses/gpl-3.0.txt" target="_blank" rel="noopener noreferrer">gnu.org/licenses/gpl-3.0.txt</a>）。</p>
+    <p>知识库内容、原始引文、AI 示意图、第三方组件与模型各有其版权、许可和服务条款，不因随本系统使用而改适用 GPL。
+      示意图仅作取景演示，不是实际病例、医学验证或疗效证据。公开包不附带原知识库；可在设置页分别导入中医体质辨证、食疗和方剂知识库。
       新 clone 默认不读取外部旧库，程序管理副本会自动启用；缺少某类时，对应前端信息不可显示，
-      其他记录、评分、趋势功能仍可使用。公开历史仍按既有决定接受并登记，不视为已清除。</p>
-    <label class="ack-row"><input type="checkbox" class="ack"> 我已阅读并理解开源许可条款</label>
-  </div>
+      其他记录、评分、趋势功能仍可使用。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"><span class="ack-copy">我已阅读并理解开源许可及第三方权利边界</span><span class="ack-state" aria-hidden="true">待确认</span></label>
+  </section>
 
-  <div class="card">
-    <div class="card-head"><h2>二、免责声明</h2></div>
-    <p>本系统<strong>不是医疗器械</strong>，所有输出（观察记录、评分、辨证报告）均为
-      <strong>健康管理的参考信息，不构成医疗诊断</strong>。中医望诊必须由具备执业资质的
-      医师完成；如有不适或急重症表现，请及时就医。作者与贡献者不对因使用本系统
-      产生的任何后果承担责任。记录、照片与知识库文件保存在你的本机，请自行做好备份；
-      如主动配置云端模型，清洗后的照片和相关文本会发送给你选择的服务商，请自行评估其隐私条款。</p>
-    <p><strong>使用自建知识库时</strong>，你只可导入自己<strong>有权复制、整理和使用</strong>的资料，
-      并自行核验内容准确性、适用条件和许可边界。导入只改变本地检索语料与候选参考，不表示系统或作者认可其内容，
-      也不构成医学审核、模型训练或规则变更。模型可能误读、误引或忽略资料，
-      <strong>候选条文不等于模型实际引用</strong>；报告须回查原资料并由执业中医师复核。</p>
-    <label class="ack-row"><input type="checkbox" class="ack"> 我已阅读并接受免责声明（含自建知识库责任）</label>
-  </div>
+  <section class="card welcome-card" id="welcome-legal" aria-labelledby="welcome-legal-title">
+    <div class="card-head welcome-card__head"><h2 id="welcome-legal-title">二、免责声明与合法使用</h2><span class="welcome-card__index">第 2 项确认</span></div>
+    <p>本页说明常见风险，<strong>不是对任何部署场景的合规认证，也不能穷尽所有法域或使用方式的法律要求</strong>。
+      法律适用取决于部署地、服务对象、实际功能、宣传方式和数据流向；本页勾选不免除任何法定义务。</p>
+    <p><strong>医疗与用药边界。</strong>本系统按未经验证的健康记录和信息参考工具提供，不构成医疗诊断，也不作为医疗器械、互联网医院或诊疗服务提供。
+      观察记录、评分、趋势、危险提示、辨证报告、食疗及方药内容均不构成疾病诊断、处方、疗效保证或个体化治疗建议。
+      覆盖度、置信度和 HIGH 仅描述输入覆盖及既有规则状态，不代表医学准确率或处方授权。</p>
+    <p><strong>不得自行用药或延误就医。</strong>具体方名和剂量均为待医师复核的候选文本，不是处方；
+      不得据此自行配药、购药、服药、加减剂量、停药或替代必要检查。诊断、处方及用药调整应由合法医疗机构的合格医师完成；
+      互联网诊疗中不得冒用或替代医师，也不得使用人工智能自动生成处方。出现不适、病情恶化或急重症应立即就医，
+      必要时拨打 120，不等待拍照或模型输出。</p>
+    <p><strong>监管属性不能靠声明排除。</strong>实际功能、宣传、部署和收费方式可能触发医疗执业、医疗器械、药品、广告、
+      消费者保护等监管要求。不得以「仅供参考」或本页勾选替代依法需要的注册、备案、许可、人员资质或医学审核，
+      不得宣传未经证实的准确率、治愈率或疗效，也不得仅凭系统输出作出对个人权益有重大影响的自动化决定。</p>
+    <p><strong>照片与健康信息。</strong>舌面、舌底、头面、目、耳、手、皮肤照片，以及问诊、记录和报告，
+      可能涉及肖像、隐私、生物识别或医疗健康等敏感个人信息。剥离 EXIF、GPS 或设备元数据<strong>不等于匿名化</strong>。
+      只拍摄本人或已获得合法授权的人，不收集与使用目的无关的信息，不在画面或文件名中加入姓名、证件号、住址等额外信息。</p>
+    <p><strong>本地保存与云端传输。</strong>项目代码无遥测或统计上报，记录、照片与知识库文件保存在你的本机（即部署者设备）；
+      请自行做好访问控制、备份与删除。主动配置云端模型（视觉或辨证）时，清洗后的照片和相关文本会发送给所选服务商；
+      选择前应核查其接收方、处理地点、保存期限、安全措施、是否用于训练、再委托及境内外处理规则。
+      第三方服务商的行为不由本页或项目方控制。</p>
+    <p><strong>他人、未成年人与跨境信息。</strong>本页勾选仅表示风险知悉，<strong>不替代被拍摄人的单独同意、监护人同意或其他授权</strong>。
+      处理他人信息、向第三方或境外提供信息前，部署者须按适用法律另行履行告知、单独同意、影响评估、合同、认证或安全评估等义务；
+      处理不满十四周岁未成年人信息须取得父母或其他监护人同意并制定专门规则。还应保障查阅、复制、更正、删除、撤回同意等权利，
+      采用最短必要保存期限、严格安全措施及泄露补救和通知机制。无法确认授权或合规时，请勿拍摄、上传或开放给他人使用。</p>
+    <p><strong>对外服务与 AI 内容。</strong>当前版本默认用于个人、家庭或合法授权的受控局域网辅助场景。
+      用于门诊、互联网诊疗、收费咨询、科研教学、公开 API 或面向公众服务前，部署者须按实际情形另行完成医疗、网络信息、数据安全、
+      算法备案或安全评估、生成合成内容标识、消费者和广告等合规。对外发布 AI 生成内容时应依法声明并使用所需标识，
+      不得恶意删除、篡改、伪造或隐匿标识，不得冒称真实病例或医师意见，也不得生成、传播违法、有害、歧视或侵权内容。</p>
+    <p><strong>自建知识库与知识产权。</strong>使用自建知识库时，只导入自己<strong>有权复制、整理和使用</strong>（包括依法改编）的资料，
+      保留作者、来源和许可信息，并自行核验准确性、适用条件和许可边界；导入不表示系统或作者认可其内容。
+      个人学习、研究或教学不当然意味着可以整书数字化、AI 加工、公开传播或商业使用；超出法定许可范围时应另行取得授权。
+      导入只改变本地检索语料与候选参考，不构成医学审核、模型训练或规则变更。
+      模型可能误读、误引或忽略资料，<strong>候选条文不等于模型实际引用</strong>；报告须回查原资料并人工复核。</p>
+    <p><strong>责任限制。</strong>在适用法律允许范围内，代码按 GPLv3 第 15—17 条提供，不含明示或默示担保。
+      对因违法使用、擅自改变用途、选择第三方服务或资料、未履行人工复核或违反本页提示而产生的后果，各方按法律规定及各自过错承担责任。
+      本声明<strong>不排除或限制依法不得排除或限制的责任</strong>，包括人身损害、故意或重大过失、侵害个人信息、隐私、肖像或知识产权，
+      以及违反其他强制性规定产生的责任；任何一方的法定权利和义务均不因勾选而消灭。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"><span class="ack-copy">我已阅读并理解上述风险与合法使用要求，知悉本确认不替代依法需要的同意、授权、注册、备案或许可</span><span class="ack-state" aria-hidden="true">待确认</span></label>
+  </section>
 
-  <div class="card">
-    <div class="card-head"><h2>三、视觉模型与望诊精确度</h2></div>
-    <p>望诊识图由<strong>你在设置页自配置的视觉模型</strong>完成，识图准确度直接取决于
-      所选模型的能力：</p>
+  <section class="card welcome-card" id="welcome-model" aria-labelledby="welcome-model-title">
+    <div class="card-head welcome-card__head"><h2 id="welcome-model-title">三、模型、规则与望诊精确度</h2><span class="welcome-card__index">第 3 项确认</span></div>
+    <p>望诊识图由<strong>你在设置页自配置的视觉模型</strong>完成，辨证报告由自配置语言模型或本地规则生成，
+      其准确度受模型能力和本地未标定规则共同限制：</p>
     <ul class="plain-list">
-      <li>不同模型对舌色、苔质等特征的辨识差异很大，模型偏弱会拉低整体结论质量；</li>
+      <li>不同模型对舌色、苔质等特征的辨识差异很大；同一模型的输出也可能误读、漏报、误报、虚构或误引，
+        未提示危险不等于排除疾病或急重症；</li>
+      <li>本地评分、权重、总分、危险提示及剂量权限均未独立医学标定，本地规则速览也不因不调用云端模型而自动更可靠；</li>
       <li>评分使用封闭词表，更换模型后其输出措辞可能落出词表；新流程会标为「未知」，
-        旧接口的兼容 0 分也不代表确认正常，换模型需重新核对识图结果；</li>
+        旧接口的兼容 0 分也不代表确认正常，换模型需重新核对输出结构、措辞落域和重复识图稳定性；</li>
       <li>拍摄条件同样显著影响识图准确度：手机镜头与传感器素质（低分辨率或
         强涂抹降噪会抹掉点刺、齿痕、苔质等细纹理体征）、现场光线的强度与
         色温（白平衡）、逆光与阴影遮挡、闪光灯使用、拍摄角度与距离，都会
         改变颜色与形态类体征的判读。</li>
     </ul>
-    <p>首次分析后请对照原图人工复核观察值，必要时使用修正功能。</p>
-    <label class="ack-row"><input type="checkbox" class="ack"> 我了解自配视觉模型对望诊精确度的影响</label>
-  </div>
+    <p><strong>每次分析后</strong>均须对照原图人工复核，并结合实际情况核对观察值与报告，必要时使用修正功能；
+      同图多次输出一致只代表稳定，不代表判断正确。涉及方药的内容还须由执业中医师审核。</p>
+    <label class="ack-row"><input type="checkbox" class="ack"><span class="ack-copy">我了解自配模型、本地规则与拍摄条件的局限，并会逐次人工复核</span><span class="ack-state" aria-hidden="true">待确认</span></label>
+  </section>
 
-  <div class="row">
-    <a href="/guide" target="_blank" rel="noopener"
-       style="font-size:13px; color:var(--cinnabar); display:inline-block; margin-top:10px;">先读《使用手册》了解拍摄要求 ↗</a>
-    <span class="spacer"></span>
-    <button id="enter-btn" class="btn btn-primary" type="submit" disabled>全部已了解，进入系统</button>
-  </div>
+  <footer class="welcome-actions">
+    <div class="welcome-actions__guide">
+      <span>拍摄前，先了解光线、角度与部位要求。</span>
+      <a href="/guide" target="_blank" rel="noopener">先读《使用手册》了解拍摄要求 ↗</a>
+    </div>
+    <button id="enter-btn" class="btn btn-primary welcome-enter" type="submit" disabled><span>全部已了解，进入系统</span><span aria-hidden="true">→</span></button>
+  </footer>
 </form>
 
 <script>
 (function () {
   var boxes = document.querySelectorAll(".ack");
   var btn = document.getElementById("enter-btn");
+  var progressValue = document.getElementById("welcome-progress-value");
+  var progressFill = document.getElementById("welcome-progress-fill");
   function sync() {
-    btn.disabled = !Array.prototype.every.call(boxes, function (b) { return b.checked; });
+    var checked = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+    btn.disabled = checked !== boxes.length;
+    progressValue.textContent = checked + " / " + boxes.length + " 已确认";
+    progressFill.style.width = (checked / boxes.length * 100) + "%";
+    boxes.forEach(function (b, index) {
+      var card = b.closest(".welcome-card");
+      var state = b.parentElement.querySelector(".ack-state");
+      var step = document.querySelector('[data-welcome-step="' + (index + 1) + '"]');
+      card.classList.toggle("is-acknowledged", b.checked);
+      state.textContent = b.checked ? "已确认" : "待确认";
+      if (b.checked) {
+        step.setAttribute("data-confirmed", "true");
+      } else {
+        step.removeAttribute("data-confirmed");
+      }
+    });
   }
   boxes.forEach(function (b) { b.addEventListener("change", sync); });
+  sync();
 })();
 </script>
 {% endblock %}

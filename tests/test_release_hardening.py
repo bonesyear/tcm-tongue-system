@@ -44,6 +44,37 @@ def test_license_is_complete_and_welcome_separates_kb(client):
     assert "程序管理副本会自动启用" in welcome
 
 
+def test_welcome_covers_legal_boundaries_without_absolute_disclaimer(client):
+    welcome = client.get("/welcome").get_data(as_text=True)
+    assert welcome.count('class="ack"') == 3
+    for text in (
+        "不作为医疗器械、互联网医院或诊疗服务提供",
+        "不是处方",
+        "不等于匿名化",
+        "不替代被拍摄人的单独同意",
+        "不满十四周岁未成年人",
+        "向第三方或境外提供信息",
+        "对外发布 AI 生成内容",
+        "不排除或限制依法不得排除或限制的责任",
+        "每次分析后",
+    ):
+        assert text in welcome
+    assert "不对因使用本系统" not in welcome
+    assert "公开历史仍按既有决定" not in welcome
+
+
+def test_report_and_guide_keep_ai_and_non_prescription_labels(client):
+    client.post("/demo")
+    detail = client.get("/record/2026-06-25").get_data(as_text=True)
+    assert "AI 生成 · 非诊断" in detail
+    from pathlib import Path
+    for name in ("docs/user-guide.md", "docs/user-guide.html"):
+        text = Path(name).read_text(encoding="utf-8")
+        assert "剂量候选文本（非处方）" in text
+        assert "不得据此自行配药" in text
+        assert "不替代被拍摄人的单独同意" in text
+
+
 def test_production_server_has_bounded_pool_and_timeouts(monkeypatch):
     import waitress
     calls = []

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* 真实 Chrome 回归：知识库默认折叠、五个独立开关、失败回滚与窄屏。
+/* 真实 Chrome 回归：模型与知识库独立折叠、开关持久化、失败回滚与窄屏。
  * 运行：node tests/browser/kb_switches.cjs
  * 保留截图和隔离日志：node tests/browser/kb_switches.cjs --keep-artifacts
  * 可用 CHROME_BIN 指定 Chrome；只使用隔离配置和合成知识库。
@@ -155,7 +155,7 @@ async function main() {
   const kbRoot = path.join(WORK, "kb");
   const envFile = path.join(WORK, "isolated.env");
   const names = {constitution: "体质", diet: "食疗", formula: "方剂"};
-  const lines = ["VISION_DISABLED=1", "LLM_DISABLED=1", "TCM_KB_ALLOW_EXTERNAL_KB=1"];
+  const lines = ["TCM_KB_ALLOW_EXTERNAL_KB=1"];
   for (const category of Object.keys(names)) {
     const root = path.join(kbRoot, category);
     fs.mkdirSync(root, {recursive: true});
@@ -255,6 +255,47 @@ serve_http(app, "127.0.0.1", int(sys.argv[3]))
       await cdp.send("Input.dispatchMouseEvent", {...point, type, button: "left", clickCount: 1}, sessionId);
     }
   };
+  const modelState = target => evaluate(`(() => {
+    const card = document.getElementById("${target}-card");
+    const input = document.querySelector('input[form="form-${target}"]');
+    return {
+      open: card.open, enabled: input.checked, busy: input.disabled,
+      formVisible: document.getElementById("form-${target}").getBoundingClientRect().height > 0,
+    };
+  })()`);
+  const clickModelSwitch = async (target, desired) => {
+    const before = await modelState(target);
+    const key = target === "vision" ? "VISION_DISABLED" : "LLM_DISABLED";
+    await physicalClick(`input[form="form-${target}"]`);
+    await waitFor(async () => {
+      const state = await modelState(target);
+      const saved = (readEnv(envFile)[key] || "") === (desired ? "" : "1");
+      return state.enabled === desired && !state.busy && saved;
+    }, `${target} 模型开关保存`);
+    const after = await modelState(target);
+    assert.equal(after.open, before.open, `${target} 开关保存不能改变折叠状态`);
+  };
+  const exerciseModelCard = async target => {
+    let state = await modelState(target);
+    assert.deepEqual({open: state.open, enabled: state.enabled}, {open: true, enabled: true},
+      `${target} 默认启用并展开`);
+    await physicalClick(`#${target}-card > summary`);
+    await waitFor(async () => !(await modelState(target)).open, `${target} 启用状态真实折叠`);
+    assert.equal((await modelState(target)).enabled, true, `${target} 折叠不改变启用状态`);
+    await clickModelSwitch(target, false);
+    assert.equal((await modelState(target)).open, false, `${target} 停用后保持手动折叠`);
+    await physicalClick(`#${target}-card > summary`);
+    await waitFor(async () => {
+      const current = await modelState(target);
+      return current.open && current.formVisible;
+    }, `${target} 停用状态仍可展开配置`);
+    await clickModelSwitch(target, true);
+    assert.equal((await modelState(target)).open, true, `${target} 启用后保持手动展开`);
+    await physicalClick(`#${target}-card > summary`);
+    await waitFor(async () => !(await modelState(target)).open, `${target} 重新启用后仍可折叠`);
+    state = await modelState(target);
+    assert.equal(state.enabled, true, `${target} 最终恢复启用`);
+  };
   const clickAndSave = async target => {
     const before = await evaluate(`document.querySelector('[data-kb-toggle="${target}"]').checked`);
     await physicalClick(`[data-kb-toggle="${target}"]`);
@@ -279,11 +320,56 @@ serve_http(app, "127.0.0.1", int(sys.argv[3]))
   })()`);
   await waitFor(() => evaluate(`location.pathname !== "/welcome" && document.readyState === "complete"`), "须知确认");
   await navigate(`${base}/settings`);
+  assert.equal(await evaluate(`!!document.querySelector('.kb-doc-links a[href="/kb-authoring.md"][download]')`), true,
+    "设置页提供本机规范下载入口");
+  await cdp.send("Browser.setDownloadBehavior", {behavior: "allow", downloadPath: WORK}, sessionId);
+  await navigate(`${base}/kb-guide/`);
+  assert.equal(await evaluate(`!!document.querySelector('.actions a[href="/kb-authoring.md"][download]')`), true,
+    "指南顶部提供本机规范下载入口");
+  assert.equal(await noOverflow(), true, "指南桌面无横向溢出");
+  await physicalClick(".actions a[href=\"/kb-authoring.md\"]");
+  const downloadedSpec = path.join(WORK, "KB_AUTHORING.md");
+  await waitFor(() => fs.existsSync(downloadedSpec) && fs.statSync(downloadedSpec).size > 0,
+    "浏览器实际下载 KB_AUTHORING.md");
+  await waitFor(() => !fs.existsSync(downloadedSpec + ".crdownload"), "规范下载完成");
+  assert.deepEqual(fs.readFileSync(downloadedSpec),
+    fs.readFileSync(path.join(ROOT, "docs", "KB_AUTHORING.md")), "下载内容与公开规范逐字节一致");
+  await navigate(`${base}/settings`);
   assert.equal(await evaluate(`document.getElementById("kb-categories-card").open`), false, "子知识库默认折叠");
   assert.deepEqual(await switchStates(), {
     kb_categories: true, kb_constitution: true, kb_diet: false,
     kb_formula: true, kb_composite: true,
   });
+  await evaluate(`window.__settingsFoldMarker = "model-fold-no-reload"`);
+  await exerciseModelCard("vision");
+  await exerciseModelCard("llm");
+  assert.equal(await evaluate(`window.__settingsFoldMarker`), "model-fold-no-reload",
+    "模型开关保存不能刷新页面");
+  await screenshot(".model-card", "model-enabled-collapsed.jpg");
+
+  assert.equal(await evaluate(`document.getElementById("kb-composite-disclosure").open`), true,
+    "综合知识库启用时默认展开");
+  await physicalClick("#kb-composite-disclosure > .kb-group-head");
+  await waitFor(() => evaluate(`!document.getElementById("kb-composite-disclosure").open`),
+    "综合知识库标题真实折叠");
+  assert.equal(await evaluate(`document.querySelector('[data-kb-toggle="kb_composite"]').checked`), true,
+    "综合知识库折叠不改变启用状态");
+  await evaluate(`document.querySelector('[data-kb-toggle="kb_composite"]').scrollIntoView({block: "center"})`);
+  assert.equal(await evaluate(`(() => {
+    const card = document.getElementById("kb-composite-disclosure").getBoundingClientRect();
+    const toggle = document.querySelector('[data-kb-toggle="kb_composite"]').getBoundingClientRect();
+    const summary = document.querySelector("#kb-composite-disclosure > .kb-group-head").getBoundingClientRect();
+    return toggle.left >= card.left && toggle.right <= card.right &&
+      toggle.top >= summary.top && toggle.bottom <= summary.bottom &&
+      document.elementFromPoint(toggle.left + toggle.width / 2, toggle.top + toggle.height / 2)
+        ?.dataset.kbToggle === "kb_composite";
+  })()`), true, "综合知识库折叠头开关必须可见可点击");
+  await physicalClick("#kb-composite-disclosure > .kb-group-head");
+  await waitFor(() => evaluate(`document.getElementById("kb-composite-disclosure").open`),
+    "综合知识库标题真实展开");
+  await physicalClick("#kb-composite-disclosure > .kb-group-head");
+  await waitFor(() => evaluate(`!document.getElementById("kb-composite-disclosure").open`),
+    "综合知识库再次折叠");
   await screenshot("#kb-import-card", "desktop-collapsed.jpg");
   await evaluate(`document.querySelector(".kb-group-toggle").scrollIntoView({block: "center"})`);
   assert.equal(await evaluate(`(() => {
@@ -373,22 +459,29 @@ serve_http(app, "127.0.0.1", int(sys.argv[3]))
         ?.dataset.kbToggle === "kb_categories";
   })()`), true, "折叠头开关不遮挡且在可点击区域");
   await screenshot("#kb-import-card", "mobile-expanded.jpg");
-  assert.equal(toggleStatuses.length, 9, "五个开关共完成九次真实保存");
+  await navigate(`${base}/kb-guide/`);
+  assert.equal(await noOverflow(), true, "390px 指南无横向溢出");
+  await screenshot(".actions", "mobile-guide.jpg");
+  assert.equal(toggleStatuses.length, 13, "模型与知识库开关共完成十三次真实保存");
   assert.ok(toggleStatuses.every(status => status === 200), "真实开关请求全部成功");
   assert.deepEqual(exceptions, [], "浏览器无未捕获 JavaScript 异常");
   const saved = readEnv(envFile);
-  for (const key of ["TCM_KB_CATEGORIES_DISABLED", "TCM_KB_COMPOSITE_DISABLED",
+  for (const key of ["VISION_DISABLED", "LLM_DISABLED",
+    "TCM_KB_CATEGORIES_DISABLED", "TCM_KB_COMPOSITE_DISABLED",
     "TCM_KB_CONSTITUTION_DISABLED", "TCM_KB_DIET_DISABLED", "TCM_KB_FORMULA_DISABLED"]) {
     assert.equal(saved[key] || "", "", `${key} 最终恢复启用`);
   }
   console.log(JSON.stringify({
     result: "BROWSER_REGRESSION_OK",
     welcome_gate: true, default_collapsed: true, independent_switches: 5,
+    independent_model_disclosures: 2, composite_disclosure: true,
+    model_switches_preserve_disclosure_without_reload: true,
     successful_toggle_requests: toggleStatuses.length,
     failure_rollback: true, sublibrary_preferences_preserved: true,
+    kb_authoring_download: true,
     desktop_overflow: false, mobile_390px_overflow: false,
     javascript_exceptions: exceptions.length,
-    screenshots: ["desktop-collapsed.jpg", "desktop-expanded.jpg", "mobile-expanded.jpg"].map(file => path.join(WORK, file)),
+    screenshots: ["model-enabled-collapsed.jpg", "desktop-collapsed.jpg", "desktop-expanded.jpg", "mobile-expanded.jpg", "mobile-guide.jpg"].map(file => path.join(WORK, file)),
   }, null, 2));
 }
 

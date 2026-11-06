@@ -15,7 +15,7 @@
   .radio-row label { display: flex; gap: 7px; align-items: center; color: var(--ink); font-size: 14px; text-align: left; }
   .radio-row input { accent-color: var(--cinnabar); }
   .sec-tag { font-size: 12px; color: var(--ink-3); letter-spacing: .06em; }
-  /* 模型启用滑动开关（卡片头右上）；关闭时表单折叠 */
+  /* 卡片头右上开关只控制启用；标题独立控制折叠 */
   .switch { position: relative; display: inline-flex; align-items: center; min-width: 44px; height: 24px; flex: none; }
   .switch .slider { width: 44px; }
   .switch input { position: absolute; inset: 0; appearance: none; border: 0; background: transparent; width: 100%; height: 100%; margin: 0; cursor: pointer; }
@@ -35,16 +35,27 @@
   .switch input:focus-visible + .slider { outline: 2px solid var(--cinnabar); outline-offset: 3px; }
   .secret-row .input { min-width: 0; }
   @media (max-width: 760px) { .secret-row { flex-wrap: wrap; } }
-  /* 可折叠卡片（访问与安全）：头部箭头旋转指示 */
+  /* 可折叠卡片：标题控制展示，外侧开关只控制启用 */
   .collapse-head { cursor: pointer; user-select: none; }
   .collapse-head .chev {
     display: inline-block; transition: transform .2s ease;
     color: var(--ink-3); font-size: 13px;
   }
   .collapse-head .chev.open, details[open] .collapse-head .chev { transform: rotate(90deg); }
+  .model-card { position: relative; }
+  .model-details > .model-card-head {
+    flex-wrap: wrap; padding-right: 58px; cursor: pointer; user-select: none; list-style: none;
+  }
+  .model-details > .model-card-head::-webkit-details-marker { display: none; }
+  .model-details > .model-card-head .chev { flex: none; align-self: center; }
+  .model-details:not([open]) > .model-card-head {
+    margin-bottom: 0; padding-bottom: 0; border-bottom: 0;
+  }
+  .model-card-toggle { position: absolute; top: 20px; right: 22px; z-index: 1; }
   /* 知识库：状态与导入分栏，技术操作留在次级折叠区 */
   #kb-import-card > .card-head { margin-bottom: 8px; }
   #kb-import-card > .card-head a { font-size: 13px; white-space: nowrap; }
+  .kb-doc-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; }
   .kb-module {
     display: grid;
     grid-template-columns: minmax(190px, .8fr) minmax(0, 2fr);
@@ -206,131 +217,135 @@
 {%- endmacro %}
 
 <!-- 视觉模型 -->
-<div class="card">
-  <div class="card-head">
-    <h2>视觉模型</h2>
-    <span class="sec-tag">识图 · 七部位照片分析</span>
-    <span class="spacer"></span>
-    <label class="switch" title="启用/关闭视觉模型（切换即保存）。关闭后拍照页改用手动录入模式">
-      <input type="checkbox" name="VISION_ENABLED" value="1" form="form-vision"
-             aria-label="启用视觉模型"
-             {% if not vision_disabled %}checked{% endif %} {% if read_only or 'VISION_DISABLED' in env_locked %}disabled{% endif %}>
-      <span class="slider"></span>
-    </label>
-    {% if 'VISION_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
-  </div>
-  <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
-    作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口</strong>。未配置或在下方关闭时，拍照页改用<strong>手动录入模式</strong>（肉眼观察后逐项选择，评分/红线/趋势照常由本地引擎完成）。需用具备图像理解能力的多模态视觉模型。
-  </p>
-  <form method="post" action="/settings" id="form-vision"
-        {% if vision_disabled %}style="display:none;"{% endif %}>
-    <input type="hidden" name="FORM_VISION" value="1">
-    <div class="form-grid">
-      <label>API Key</label>
-      {{ secret_input("VISION_API_KEY", "sk-…") }}
-      <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span> · 当前来源：{{ values["VISION_API_KEY"].source }}</div>
-
-      <label>端点</label>
-      <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；缺 <span class="env-note">/chat/completions</span> 后缀时 Web 层会自动补齐（命令行脚本 vision_client.py 不规整，直接用脚本时请填全）{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
-
-      <label>模型</label>
-      <div class="row" style="gap:8px;">
-        <input class="input" name="VISION_MODEL" list="models-vision" value="{{ values['VISION_MODEL'].value }}" {% if read_only or 'VISION_MODEL' in env_locked %}disabled{% endif %}>
-        <datalist id="models-vision"></datalist>
-        <button class="btn btn-ghost btn-sm" type="button" data-models="vision" style="white-space:nowrap;"
-                {% if read_only %}disabled{% endif %}>获取列表</button>
-      </div>
-      <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；先填端点再点「获取列表」从端点拉取可选模型；换模型后需重新标定封闭词表<span id="models-vision-hint"></span></div>
-
-      <label>温度</label>
-      <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TEMPERATURE' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 控制模型输出的随机性：越低措辞越稳定，越高越发散。<strong>推荐留空</strong>（不发送该参数，由模型默认值生效）；注意部分端点有服务端下限（如 DashScope 钳制到 0.6，设 0 也按 0.6 算）</div>
-
-      <label>超时（秒）</label>
-      <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TIMEOUT' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span> · <strong>推荐 150–300</strong>：识图是大请求（照片 base64 + 结构化输出），过短会中途超时失败；思考型模型取大些。留空则用代码默认 150</div>
-
-      <label for="vision-max-tokens">输出 token 上限</label>
-      <input class="input" id="vision-max-tokens" name="VISION_MAX_TOKENS" type="number"
-             min="1" step="1" inputmode="numeric" autocomplete="off"
-             value="{{ values['VISION_MAX_TOKENS'].value }}" placeholder="600"
-             aria-describedby="vision-max-tokens-hint" style="max-width:160px;"
-             {% if read_only or 'VISION_MAX_TOKENS' in env_locked %}disabled{% endif %}>
-      <div class="form-hint" id="vision-max-tokens-hint"><span class="env-note">VISION_MAX_TOKENS</span> · 默认 600；思考型模型建议 ≥8000，输出被截断时请调高</div>
-
-    </div>
-    <hr class="divider">
-    <div class="row">
-      {{ test_button("vision") }}
+<div class="card model-card">
+  <details class="model-details" id="vision-card" {% if not vision_disabled %}open{% endif %}>
+    <summary class="card-head collapse-head model-card-head">
+      <span class="chev" aria-hidden="true">▶</span>
+      <h2>视觉模型</h2>
+      <span class="sec-tag">识图 · 七部位照片分析</span>
       <span class="spacer"></span>
-      <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
-    </div>
-  </form>
+      {% if 'VISION_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
+    </summary>
+    <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
+      作用：把七部位照片（舌面/舌底/头面/目/耳/手/皮肤）判读为结构化观察值——系统的<strong>数据入口</strong>。未配置或在下方关闭时，拍照页改用<strong>手动录入模式</strong>（肉眼观察后逐项选择，评分/红线/趋势照常由本地引擎完成）。需用具备图像理解能力的多模态视觉模型。
+    </p>
+    <form method="post" action="/settings" id="form-vision">
+      <input type="hidden" name="FORM_VISION" value="1">
+      <div class="form-grid">
+        <label>API Key</label>
+        {{ secret_input("VISION_API_KEY", "sk-…") }}
+        <div class="form-hint">环境变量 <span class="env-note">VISION_API_KEY</span> · 当前来源：{{ values["VISION_API_KEY"].source }}</div>
+
+        <label>端点</label>
+        <input class="input" name="VISION_BASE_URL" value="{{ values['VISION_BASE_URL'].value }}" {% if read_only or 'VISION_BASE_URL' in env_locked %}disabled{% endif %}>
+        <div class="form-hint"><span class="env-note">VISION_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 完整地址（形如 https://…/v1/chat/completions）；Anthropic 协议端点不支持；缺 <span class="env-note">/chat/completions</span> 后缀时 Web 层会自动补齐（命令行脚本 vision_client.py 不规整，直接用脚本时请填全）{% if 'VISION_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+
+        <label>模型</label>
+        <div class="row" style="gap:8px;">
+          <input class="input" name="VISION_MODEL" list="models-vision" value="{{ values['VISION_MODEL'].value }}" {% if read_only or 'VISION_MODEL' in env_locked %}disabled{% endif %}>
+          <datalist id="models-vision"></datalist>
+          <button class="btn btn-ghost btn-sm" type="button" data-models="vision" style="white-space:nowrap;"
+                  {% if read_only %}disabled{% endif %}>获取列表</button>
+        </div>
+        <div class="form-hint"><span class="env-note">VISION_MODEL</span> · 任意 OpenAI 兼容视觉模型；先填端点再点「获取列表」从端点拉取可选模型；换模型后需重新标定封闭词表<span id="models-vision-hint"></span></div>
+
+        <label>温度</label>
+        <input class="input" name="VISION_TEMPERATURE" value="{{ values['VISION_TEMPERATURE'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TEMPERATURE' in env_locked %}disabled{% endif %}>
+        <div class="form-hint"><span class="env-note">VISION_TEMPERATURE</span> · 控制模型输出的随机性：越低措辞越稳定，越高越发散。<strong>推荐留空</strong>（不发送该参数，由模型默认值生效）；注意部分端点有服务端下限（如 DashScope 钳制到 0.6，设 0 也按 0.6 算）</div>
+
+        <label>超时（秒）</label>
+        <input class="input" name="VISION_TIMEOUT" value="{{ values['VISION_TIMEOUT'].value }}" style="max-width: 160px;" {% if read_only or 'VISION_TIMEOUT' in env_locked %}disabled{% endif %}>
+        <div class="form-hint"><span class="env-note">VISION_TIMEOUT</span> · <strong>推荐 150–300</strong>：识图是大请求（照片 base64 + 结构化输出），过短会中途超时失败；思考型模型取大些。留空则用代码默认 150</div>
+
+        <label for="vision-max-tokens">输出 token 上限</label>
+        <input class="input" id="vision-max-tokens" name="VISION_MAX_TOKENS" type="number"
+               min="1" step="1" inputmode="numeric" autocomplete="off"
+               value="{{ values['VISION_MAX_TOKENS'].value }}" placeholder="600"
+               aria-describedby="vision-max-tokens-hint" style="max-width:160px;"
+               {% if read_only or 'VISION_MAX_TOKENS' in env_locked %}disabled{% endif %}>
+        <div class="form-hint" id="vision-max-tokens-hint"><span class="env-note">VISION_MAX_TOKENS</span> · 默认 600；思考型模型建议 ≥8000，输出被截断时请调高</div>
+
+      </div>
+      <hr class="divider">
+      <div class="row">
+        {{ test_button("vision") }}
+        <span class="spacer"></span>
+        <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
+      </div>
+    </form>
+  </details>
+  <label class="switch model-card-toggle" title="启用/关闭视觉模型（切换即保存）。关闭后拍照页改用手动录入模式">
+    <input type="checkbox" name="VISION_ENABLED" value="1" form="form-vision"
+           aria-label="启用视觉模型"
+           {% if not vision_disabled %}checked{% endif %} {% if read_only or 'VISION_DISABLED' in env_locked %}disabled{% endif %}>
+    <span class="slider"></span>
+  </label>
 </div>
 
 <!-- 辨证模型 -->
-<div class="card">
-  <div class="card-head">
-    <h2>辨证模型</h2>
-    <span class="sec-tag">六经辨证 · 报告生成</span>
-    <span class="spacer"></span>
-    <label class="switch" title="启用/关闭辨证模型（切换即保存）。关闭后报告区改用本地规则「四证倾向速览」">
-      <input type="checkbox" name="LLM_ENABLED" value="1" form="form-llm"
-             aria-label="启用辨证模型"
-             {% if not llm_disabled %}checked{% endif %} {% if read_only or 'LLM_DISABLED' in env_locked %}disabled{% endif %}>
-      <span class="slider"></span>
-    </label>
-    {% if 'LLM_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
-  </div>
-  <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
-    作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置或在下方关闭时，详情页报告区改用本地规则「四证倾向速览」，拍照记录、评分、红线、趋势全部照常。任何文本模型均可担任；也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
-  </p>
-  <form method="post" action="/settings" id="form-llm"
-        {% if llm_disabled %}style="display:none;"{% endif %}>
-    <input type="hidden" name="FORM_LLM" value="1">
-    <div class="form-grid">
-      <label>API Key</label>
-      {{ secret_input("LLM_API_KEY", "sk-…") }}
-      <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span> · 当前来源：{{ values["LLM_API_KEY"].source }}</div>
-
-      <label>端点</label>
-      <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
-      <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 地址；缺 <span class="env-note">/chat/completions</span> 后缀时会自动补齐并在服务日志告警，建议填全（形如 https://…/v1/chat/completions）{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
-
-      <label>模型</label>
-      <div class="row" style="gap:8px;">
-        <input class="input" name="LLM_MODEL" list="models-llm" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only or 'LLM_MODEL' in env_locked %}disabled{% endif %}>
-        <datalist id="models-llm"></datalist>
-        <button class="btn btn-ghost btn-sm" type="button" data-models="llm" style="white-space:nowrap;"
-                {% if read_only %}disabled{% endif %}>获取列表</button>
-      </div>
-      <div class="form-hint"><span class="env-note">LLM_MODEL</span> · 先填端点再点「获取列表」从端点拉取可选模型<span id="models-llm-hint"></span></div>
-
-      <label for="llm-max-tokens">报告 token 上限</label>
-      <input class="input" id="llm-max-tokens" name="LLM_MAX_TOKENS" type="number"
-             min="1" step="1" inputmode="numeric" autocomplete="off"
-             value="{{ values['LLM_MAX_TOKENS'].value }}" placeholder="16000"
-             aria-describedby="llm-max-tokens-hint" style="max-width:160px;"
-             {% if read_only or 'LLM_MAX_TOKENS' in env_locked %}disabled{% endif %}>
-      <div class="form-hint" id="llm-max-tokens-hint"><span class="env-note">LLM_MAX_TOKENS</span> · 默认 16000；报告被截断时须调高，思考过程也占额度</div>
-
-      <label for="llm-timeout">报告超时（秒）</label>
-      <input class="input" id="llm-timeout" name="LLM_TIMEOUT" type="number"
-             min="1" step="1" inputmode="numeric" autocomplete="off"
-             value="{{ values['LLM_TIMEOUT'].value }}" placeholder="150"
-             aria-describedby="llm-timeout-hint" style="max-width:160px;"
-             {% if read_only or 'LLM_TIMEOUT' in env_locked %}disabled{% endif %}>
-      <div class="form-hint" id="llm-timeout-hint"><span class="env-note">LLM_TIMEOUT</span> · 默认 150；包含连接、重定向、重试和读取响应的总时限</div>
-
-    </div>
-    <hr class="divider">
-    <div class="row">
-      {{ test_button("llm") }}
+<div class="card model-card">
+  <details class="model-details" id="llm-card" {% if not llm_disabled %}open{% endif %}>
+    <summary class="card-head collapse-head model-card-head">
+      <span class="chev" aria-hidden="true">▶</span>
+      <h2>辨证模型</h2>
+      <span class="sec-tag">六经辨证 · 报告生成</span>
       <span class="spacer"></span>
-      <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
-    </div>
-  </form>
+      {% if 'LLM_DISABLED' in env_locked %}<span class="faint" style="font-size:12px;">（环境变量锁定）</span>{% endif %}
+    </summary>
+    <p class="muted" style="font-size:13px; margin:2px 0 14px; line-height:1.7;">
+      作用：把<strong>已评分</strong>的结构化记录（纯文本，不含照片）综合为辨证报告——三观/四证/六经结论、饮食建议、起居情志、方剂/剂量/煎服法。<strong>非必须</strong>：未配置或在下方关闭时，详情页报告区改用本地规则「四证倾向速览」，拍照记录、评分、红线、趋势全部照常。任何文本模型均可担任；也可与上方视觉模型填<strong>同一端点、同一模型</strong>（一份 key 两用）。
+    </p>
+    <form method="post" action="/settings" id="form-llm">
+      <input type="hidden" name="FORM_LLM" value="1">
+      <div class="form-grid">
+        <label>API Key</label>
+        {{ secret_input("LLM_API_KEY", "sk-…") }}
+        <div class="form-hint">环境变量 <span class="env-note">LLM_API_KEY</span> · 当前来源：{{ values["LLM_API_KEY"].source }}</div>
+
+        <label>端点</label>
+        <input class="input" name="LLM_BASE_URL" value="{{ values['LLM_BASE_URL'].value }}" placeholder="https://…/v1/chat/completions" {% if read_only or 'LLM_BASE_URL' in env_locked %}disabled{% endif %}>
+        <div class="form-hint"><span class="env-note">LLM_BASE_URL</span> · 必须是 <strong>OpenAI 兼容</strong>的 <span class="env-note">chat/completions</span> 地址；缺 <span class="env-note">/chat/completions</span> 后缀时会自动补齐并在服务日志告警，建议填全（形如 https://…/v1/chat/completions）{% if 'LLM_BASE_URL' in env_locked %} · <strong>来自环境变量，页面不可改</strong>{% endif %}</div>
+
+        <label>模型</label>
+        <div class="row" style="gap:8px;">
+          <input class="input" name="LLM_MODEL" list="models-llm" value="{{ values['LLM_MODEL'].value }}" placeholder="例如 qwen-max / deepseek-v3" {% if read_only or 'LLM_MODEL' in env_locked %}disabled{% endif %}>
+          <datalist id="models-llm"></datalist>
+          <button class="btn btn-ghost btn-sm" type="button" data-models="llm" style="white-space:nowrap;"
+                  {% if read_only %}disabled{% endif %}>获取列表</button>
+        </div>
+        <div class="form-hint"><span class="env-note">LLM_MODEL</span> · 先填端点再点「获取列表」从端点拉取可选模型<span id="models-llm-hint"></span></div>
+
+        <label for="llm-max-tokens">报告 token 上限</label>
+        <input class="input" id="llm-max-tokens" name="LLM_MAX_TOKENS" type="number"
+               min="1" step="1" inputmode="numeric" autocomplete="off"
+               value="{{ values['LLM_MAX_TOKENS'].value }}" placeholder="16000"
+               aria-describedby="llm-max-tokens-hint" style="max-width:160px;"
+               {% if read_only or 'LLM_MAX_TOKENS' in env_locked %}disabled{% endif %}>
+        <div class="form-hint" id="llm-max-tokens-hint"><span class="env-note">LLM_MAX_TOKENS</span> · 默认 16000；报告被截断时须调高，思考过程也占额度</div>
+
+        <label for="llm-timeout">报告超时（秒）</label>
+        <input class="input" id="llm-timeout" name="LLM_TIMEOUT" type="number"
+               min="1" step="1" inputmode="numeric" autocomplete="off"
+               value="{{ values['LLM_TIMEOUT'].value }}" placeholder="150"
+               aria-describedby="llm-timeout-hint" style="max-width:160px;"
+               {% if read_only or 'LLM_TIMEOUT' in env_locked %}disabled{% endif %}>
+        <div class="form-hint" id="llm-timeout-hint"><span class="env-note">LLM_TIMEOUT</span> · 默认 150；包含连接、重定向、重试和读取响应的总时限</div>
+
+      </div>
+      <hr class="divider">
+      <div class="row">
+        {{ test_button("llm") }}
+        <span class="spacer"></span>
+        <button class="btn btn-primary" type="submit" {% if read_only %}disabled{% endif %}>保存</button>
+      </div>
+    </form>
+  </details>
+  <label class="switch model-card-toggle" title="启用/关闭辨证模型（切换即保存）。关闭后报告区改用本地规则「四证倾向速览」">
+    <input type="checkbox" name="LLM_ENABLED" value="1" form="form-llm"
+           aria-label="启用辨证模型"
+           {% if not llm_disabled %}checked{% endif %} {% if read_only or 'LLM_DISABLED' in env_locked %}disabled{% endif %}>
+    <span class="slider"></span>
+  </label>
 </div>
 
 <!-- 访问与安全 -->
@@ -374,7 +389,10 @@
   <div class="card-head">
     <h2>知识库</h2>
     <span class="spacer"></span>
-    <a href="/kb-guide/" target="_blank" rel="noopener">自建知识库指南 ↗</a>
+    <div class="kb-doc-links">
+      <a href="/kb-authoring.md" download>格式规范 ↓</a>
+      <a href="/kb-guide/" target="_blank" rel="noopener">自建知识库指南 ↗</a>
+    </div>
   </div>
   <p class="muted">导入你有权使用的资料；开关只控制对应内容是否参与检索和报告，不删除文件。子知识库用于按类别配置，普通自建库可直接使用综合知识库。</p>
   {% if read_only %}
@@ -451,40 +469,48 @@
   </div>
   {% set kb = kb_composite %}
   {% set status_class = 'is-disabled' if kb_composite_disabled or kb_strict else ('is-ready' if kb.status == 'ready' else ('is-empty' if kb.status == 'empty' else ('is-error' if kb.status == 'error' else 'is-unconfigured'))) %}
-  <section id="kb-card-composite" class="kb-module">
-    <div class="kb-module-summary">
-      <div class="kb-module-heading">
-        <h3>综合知识库</h3>
-        <span class="sec-tag">整包导入</span>
-        <strong class="kb-status-badge {{ status_class }}" id="kb-status-label-composite">{% if kb_composite_disabled %}已停用{% elif kb_strict %}综合库未参与检索{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
-        <label class="switch" title="关闭后综合根及其分类回退均不参与检索；独立专用根不受影响">
-          <input type="checkbox" data-kb-toggle="kb_composite" aria-label="启用综合知识库"
-                 {% if not kb_composite_disabled %}checked{% endif %} {% if 'TCM_KB_COMPOSITE_DISABLED' in env_locked %}disabled{% endif %}>
-          <span class="slider"></span>
-        </label>
+  <div class="kb-group-shell">
+    <details class="kb-group kb-composite-details" id="kb-composite-disclosure" {% if not kb_composite_disabled %}open{% endif %}>
+      <summary class="kb-group-head">
+        <span class="chev" aria-hidden="true">▶</span>
+        <span class="kb-group-title"><strong>综合知识库</strong><small>整包导入 · 一个 ZIP 包含多类资料</small></span>
+      </summary>
+      <div class="kb-group-body">
+        <section id="kb-card-composite" class="kb-module">
+          <div class="kb-module-summary">
+            <div class="kb-module-heading">
+              <strong class="kb-status-badge {{ status_class }}" id="kb-status-label-composite">{% if kb_composite_disabled %}已停用{% elif kb_strict %}综合库未参与检索{% elif kb.status == "ready" %}知识库可用{% elif kb.status == "empty" %}知识库为空{% elif kb.status == "error" %}知识库不可用{% else %}未配置知识库{% endif %}</strong>
+            </div>
+            <p class="muted kb-status-detail"><span id="kb-status-detail-composite">{% if kb_composite_disabled %}综合库及分类回退已停用；独立专用根不受影响{% elif kb_strict %}当前只使用分类专用根{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span></p>
+            <p class="muted kb-file-count">可检索 Markdown <span class="num" id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
+            {% if kb_strict %}<div class="alert-note">严格分类模式已开启，综合库未参与检索。可在上方子知识库中关闭该模式。</div>{% endif %}
+          </div>
+          <form class="kb-import-form kb-module-import" data-category="composite" method="post" action="/settings/kb/import" enctype="multipart/form-data">
+            <input type="hidden" name="category" value="composite">
+            <label for="kb-file-composite">导入综合知识库 ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
+            <div class="kb-upload-controls">
+              <input class="kb-file-input" id="kb-file-composite" name="kb_file" type="file" accept=".zip,application/zip" required
+                     aria-describedby="kb-import-help-composite kb-import-status-composite">
+              <button class="btn btn-primary" id="kb-import-submit-composite" type="submit">导入综合知识库</button>
+            </div>
+            <p class="form-hint" id="kb-import-help-composite">完整校验后替换综合导入副本并解除综合自身停用，保留三类专用副本及其状态，不修改外部原库。目录结构与建库步骤见右上角指南。{% if 'TCM_KB_ROOT' in env_locked %}<strong>TCM_KB_ROOT 被环境变量锁定，导入后当前配置不变。</strong>{% endif %}</p>
+            <p id="kb-import-status-composite" role="status" aria-live="polite"></p>
+          </form>
+          <div class="kb-module-tools">
+            <details>
+              <summary>技术详情</summary>
+              <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code></p>
+            </details>
+          </div>
+        </section>
       </div>
-      <p class="muted kb-status-detail"><span id="kb-status-detail-composite">{% if kb_composite_disabled %}综合库及分类回退已停用；独立专用根不受影响{% elif kb_strict %}当前只使用分类专用根{% elif kb.status == "ready" %}对应信息与候选参考可显示{% elif kb.status == "empty" %}目录中没有可检索 Markdown，对应信息不可显示{% elif kb.status == "error" %}{{ kb.error }}；对应信息不可显示{% else %}对应信息不可显示；其他本地功能仍可使用{% endif %}</span></p>
-      <p class="muted kb-file-count">可检索 Markdown <span class="num" id="kb-count-composite">{{ kb.file_count }}</span> 个</p>
-      {% if kb_strict %}<div class="alert-note">严格分类模式已开启，综合库未参与检索。可在上方子知识库中关闭该模式。</div>{% endif %}
-    </div>
-    <form class="kb-import-form kb-module-import" data-category="composite" method="post" action="/settings/kb/import" enctype="multipart/form-data">
-      <input type="hidden" name="category" value="composite">
-      <label for="kb-file-composite">导入综合知识库 ZIP（.md/.yaml/.yml，≤ 8 MiB）</label>
-      <div class="kb-upload-controls">
-        <input class="kb-file-input" id="kb-file-composite" name="kb_file" type="file" accept=".zip,application/zip" required
-               aria-describedby="kb-import-help-composite kb-import-status-composite">
-        <button class="btn btn-primary" id="kb-import-submit-composite" type="submit">导入综合知识库</button>
-      </div>
-      <p class="form-hint" id="kb-import-help-composite">完整校验后替换综合导入副本并解除综合自身停用，保留三类专用副本及其状态，不修改外部原库。目录结构与建库步骤见右上角指南。{% if 'TCM_KB_ROOT' in env_locked %}<strong>TCM_KB_ROOT 被环境变量锁定，导入后当前配置不变。</strong>{% endif %}</p>
-      <p id="kb-import-status-composite" role="status" aria-live="polite"></p>
-    </form>
-    <div class="kb-module-tools">
-      <details>
-        <summary>技术详情</summary>
-        <p class="muted">当前目录：<code id="kb-current-root-composite">{{ kb.root }}</code></p>
-      </details>
-    </div>
-  </section>
+    </details>
+    <label class="switch kb-group-toggle" title="关闭后综合根及其分类回退均不参与检索；独立专用根不受影响">
+      <input type="checkbox" data-kb-toggle="kb_composite" aria-label="启用综合知识库"
+             {% if not kb_composite_disabled %}checked{% endif %} {% if 'TCM_KB_COMPOSITE_DISABLED' in env_locked %}disabled{% endif %}>
+      <span class="slider"></span>
+    </label>
+  </div>
   {% endif %}
 </div>
 
@@ -509,7 +535,6 @@
 
 /* 顶部横幅提示（保存等轻反馈共用） */
 var _toastTimer = null;
-var _reloadTimer = null;
 function topToast(text, isErr) {
   var el = document.getElementById("top-toast");
   if (!el) {
@@ -527,7 +552,7 @@ function topToast(text, isErr) {
   _toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2000);
 }
 
-/* 模型开关独立保存，不携带表单中尚未保存的编辑 */
+/* 模型开关独立保存，不携带未保存的编辑，也不改变卡片折叠状态 */
 [["form-vision"], ["form-llm"]].forEach(function ([fid]) {
   var form = document.getElementById(fid);
   var sw = document.querySelector('input[form="' + fid + '"]');
@@ -535,7 +560,6 @@ function topToast(text, isErr) {
   sw.addEventListener("change", async function () {
     var desired = sw.checked;
     var previous = !desired;
-    form.style.display = desired ? "" : "none";
     sw.disabled = true;
     try {
       var response = await fetch("/settings/toggle", {
@@ -562,13 +586,9 @@ function topToast(text, isErr) {
           banner.classList.add("slide-out");
           banner.addEventListener("animationend", function () { banner.remove(); });
         }
-      } else {
-        clearTimeout(_reloadTimer);
-        _reloadTimer = setTimeout(function () { location.reload(); }, 600);
       }
     } catch (error) {
       sw.checked = previous;
-      form.style.display = previous ? "" : "none";
       topToast(error.message || String(error), true);
     } finally {
       sw.disabled = false;
