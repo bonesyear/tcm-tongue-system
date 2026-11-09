@@ -409,6 +409,15 @@ def validate_candidate(raw: dict, workdir: str, previous_raw: dict | None = None
             warnings.extend(f"⚠️ 存量校验问题（本次未新增）: {error}"
                             for error in errors if error in inherited)
             errors = [error for error in errors if error not in inherited]
+        from constitution_store import validate_assessment
+        assessment_errors = validate_assessment(raw)
+        if previous_raw is not None:
+            inherited_assessment = set(validate_assessment(previous_raw))
+            warnings.extend(f"⚠️ 存量校验问题（本次未新增）: {error}"
+                            for error in assessment_errors if error in inherited_assessment)
+            assessment_errors = [error for error in assessment_errors
+                                 if error not in inherited_assessment]
+        errors.extend(assessment_errors)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -844,6 +853,7 @@ def list_photos(photos_dir: str, date_str: str, rec=None):
 def record_detail(rec: DailyRecord, date_str=None) -> dict:
     """单日详情页的完整视图模型；未知项与正常 0 分明确区分。"""
     identity_date = date_str or rec.date
+    from constitution_store import assessment_view
     from src.scoring import assess_indicators
     assessments = _dim_assessments(rec)
     coverage = rec.get_dimension_coverage()
@@ -978,4 +988,5 @@ def record_detail(rec: DailyRecord, date_str=None) -> dict:
         "danger_all": [v["name"] for v in DANGER_FLAGS.values()],
         "diagnosis": diagnosis,
         "report": report,
+        "constitution_assessment": assessment_view(rec.raw),
     }

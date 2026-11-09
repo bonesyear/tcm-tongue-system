@@ -57,7 +57,7 @@ _DICT_FIELDS = ("observations", "vision_analysis", "doubao_vision_analysis",
                 "pattern_differentiation", "danger_flags", "formula",
                 # 形状 C 顶层维度键与辨证键
                 "tongue", "head_face", "eye", "ear", "hand", "skin",
-                "pattern_update", "context")
+                "pattern_update", "context", "constitution_assessment")
 
 
 def validate_record(filepath: str) -> Tuple[DailyRecord, List[str], List[str]]:

@@ -85,6 +85,36 @@
   .inq-item.locked .inq-chips { opacity: .4; pointer-events: none; }
   .inq-item.locked .inq-skip { display: none; }
   .inq-lock-note { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin-top: 6px; }
+
+  #constitution-modal {
+    width: min(880px, calc(100vw - 32px)); max-height: 88vh; overflow-y: auto;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-card);
+    background: var(--paper); color: var(--ink); padding: 22px;
+  }
+  #constitution-modal:modal { overscroll-behavior: contain; }
+  #constitution-modal::backdrop {
+    background: rgba(46, 42, 35, .45); overflow: hidden; overscroll-behavior: contain;
+  }
+  #constitution-genders { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; }
+  #constitution-genders legend { font-weight: 700; margin-bottom: 7px; }
+  #constitution-genders button[aria-pressed="true"],
+  .constitution-choice[aria-pressed="true"] {
+    background: var(--cinnabar); border-color: var(--cinnabar); color: #fff8f3;
+    box-shadow: 0 0 0 3px var(--cinnabar-tint);
+  }
+  .constitution-group { border: 1px solid var(--line); border-radius: var(--radius-inner);
+    margin: 14px 0; padding: 12px; }
+  .constitution-group legend { color: var(--cinnabar-deep); font-family: var(--font-serif); }
+  .constitution-item { border-bottom: 1px dashed var(--line); padding: 10px 0; }
+  .constitution-item:last-child { border-bottom: 0; }
+  .constitution-question { font-size: 14px; line-height: 1.7; margin-bottom: 7px; }
+  .constitution-source { color: var(--ink-3); font-size: 11.5px; margin-left: 8px; }
+  .constitution-choices { display: flex; flex-wrap: wrap; gap: 7px; }
+  .constitution-choice { border: 1px solid var(--line-strong); background: #fff;
+    color: var(--ink-2); border-radius: var(--radius-pill); padding: 5px 12px;
+    font-size: 13px; cursor: pointer; }
+  .constitution-choice:disabled { cursor: not-allowed; opacity: .45; }
+  .constitution-unavailable { color: var(--ink-3); font-size: 12px; }
 </style>
 
 <div>
@@ -133,6 +163,10 @@
     {% endfor %}
     <li data-part="问诊">问诊</li>
   </ol>
+  <div class="row wrap" style="margin-top:10px;">
+    <button class="btn btn-subtle btn-sm" id="constitution-open" type="button">国标体质评估</button>
+    <span class="faint" style="font-size:12px;">独立问卷，不改变六经 17 项问答</span>
+  </div>
 </div>
 
 <div class="card" id="review-card" style="display:none;">
@@ -271,6 +305,29 @@
   </div>
 </div>
 
+<dialog id="constitution-modal" aria-labelledby="constitution-title" aria-describedby="constitution-help">
+  <h2 id="constitution-title">国标体质评估</h2>
+  <p id="constitution-help" class="muted" style="font-size:13px; line-height:1.75;">
+    GB/T 46939—2025 · 独立评估，不混入六经、四证或现有17项问诊。请先选择男性或女性，再逐项回答近一年的体验和感觉；无法回答的题请明确标记，系统不会替你推测。
+  </p>
+  <fieldset id="constitution-genders">
+    <legend>性别（必选）</legend>
+    <button class="constitution-choice" type="button" data-gender="male" aria-pressed="false" autofocus>男性</button>
+    <button class="constitution-choice" type="button" data-gender="female" aria-pressed="false">女性</button>
+  </fieldset>
+  <p id="constitution-progress" class="muted" aria-live="polite" style="font-size:13px;"></p>
+  <div id="constitution-error" class="alert-danger" role="alert" aria-live="assertive" style="display:none;"></div>
+  <div id="constitution-questions"></div>
+  <div id="constitution-summary"></div>
+  <div class="modal-actions row wrap">
+    <button class="btn btn-ghost btn-sm" id="constitution-clear" type="button">清除本评估</button>
+    <button class="btn btn-ghost btn-sm" id="constitution-skip" type="button">整体跳过（不生成结果）</button>
+    <form method="dialog" style="display:inline;"><button class="btn btn-primary btn-sm" id="constitution-close" type="submit">完成并返回</button></form>
+  </div>
+</dialog>
+
+<script src="{{ url_for('static', filename='js/constitution_wizard.js') }}"></script>
+
 <!-- 危险信号拦截弹层：默认保留；误报逐键裁决并留审计 -->
 <dialog id="danger-modal" aria-labelledby="danger-title" aria-describedby="danger-help">
   <div class="alert-danger" style="margin-bottom:14px;">
@@ -296,6 +353,7 @@
 <script src="{{ url_for('static', filename='js/feedback.js') }}"></script>
 <script>
 var STATE = {{ state | tojson }};
+var CONSTITUTION_RULES = {{ constitution_rules | tojson }};
 var SERVER_DATE = {{ server_date | tojson }};
 (function () {
   var now = new Date();
@@ -1039,6 +1097,7 @@ document.getElementById("danger-fix").addEventListener("click", function () {
   document.getElementById("danger-modal").close();
 });
 
+initConstitutionWizard();
 render();
 </script>
 {% endblock %}

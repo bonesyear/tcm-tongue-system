@@ -389,6 +389,67 @@
 </div>
 {% endif %}
 
+{% set ca = constitution_assessment %}
+<div class="card" id="constitution-assessment">
+  <div class="card-head">
+    <h2>国标体质评估</h2>
+    <span class="tag">GB/T 46939—2025</span>
+    <span class="spacer"></span>
+    <a class="btn btn-subtle btn-sm" href="/wizard">进入评估</a>
+  </div>
+  {% if ca.status == "unassessed" %}
+  <p class="muted">尚未进行国标体质评估；不从旧17项问答、六经或四证结果推导。</p>
+  {% elif ca.status == "error" %}
+  <div class="alert-note">评估已过期或不可用：{{ ca.reasons | join("；") }}。请重新完成评估，当前旧结果不作为有效结论。</div>
+  {% elif ca.status == "skipped" %}
+  <p class="muted">用户选择整体跳过，未生成体质结果。</p>
+  {% else %}
+  {% set assessment = ca.assessment %}
+  <p class="muted" style="font-size:13px;">
+    {{ assessment.standard_id }} · {{ assessment.questionnaire_version }} ·
+    {{ "男性" if assessment.gender == "male" else "女性" }} ·
+    判定方法：{{ assessment.evaluation.method_source.clause }}（PDF {{ assessment.evaluation.method_source.pdf_page }}）
+  </p>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th>体质</th><th>转化分</th><th>判定</th><th>来源</th></tr></thead>
+    <tbody>
+    {% for name, item in assessment.evaluation.results.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td>{{ item.display_score if item.display_score is not none else "未知" }}</td>
+        <td>{{ item.result }}</td>
+        <td>{{ item.source_clause }}，PDF {{ item.source_pdf_page }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% set unknown = assessment.evaluation.unknown %}
+  {% if unknown.categories %}
+  <div class="alert-note">未知类别：{{ unknown.categories | join("、") }}；证据不足，不自动选择体质食养。</div>
+  {% endif %}
+  {% if assessment.evaluation.combined_results %}
+  <p class="muted" style="font-size:13px;">达到“是”或“倾向是”的偏颇类型：
+    {% for item in assessment.evaluation.combined_results %}
+    {{ item.constitution }}（{{ item.result }}，{{ item.display_score }}）{% if not loop.last %}；{% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+  <details>
+    <summary>原始答案与逐项来源</summary>
+    <ol class="kb-list">
+      {% for entry_id, source in assessment.evaluation.entry_sources.items() %}
+      <li class="kb-item">
+        <div class="kb-meta">{{ entry_id }} · {{ source.clause }} · PDF {{ source.pdf_page }}</div>
+        <p>{{ assessment.answers.get(entry_id, "无法回答" if entry_id in assessment.unanswered else "未提供") }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </details>
+  {% endif %}
+</div>
+
 {% set constitution_ready = kb_categories.constitution.status == "ready" %}
 {% set diet_ready = kb_categories.diet.status == "ready" %}
 {% set formula_ready = kb_categories.formula.status == "ready" %}

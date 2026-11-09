@@ -28,6 +28,14 @@ def observation_input_hash(rec) -> str:
         payload["danger_review"] = rec.raw["danger_review"]
     if "photos" in rec.raw:
         payload["photos"] = rec.raw["photos"]
+    if "constitution_assessment" in rec.raw:
+        assessment = rec.raw["constitution_assessment"]
+        if isinstance(assessment, dict):
+            payload["constitution_assessment"] = {
+                "standard_id": assessment.get("standard_id"),
+                "questionnaire_version": assessment.get("questionnaire_version"),
+                "input_hash": assessment.get("input_hash"),
+            }
     text = json.dumps(payload, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"), default=str)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

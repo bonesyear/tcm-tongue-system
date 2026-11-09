@@ -35,6 +35,7 @@ from flask import Flask, abort, g, jsonify, redirect, render_template, request, 
     send_file, send_from_directory, url_for
 
 import envfile
+import constitution_store
 import kb_routes
 import llm_client
 import local_report
@@ -456,6 +457,7 @@ def create_app(env_file: str | None = None,
             llm_configured=llm_ready(),
             local_mode=local_mode,
             kb_categories=current_categories, kb_category_defs=KB_CATEGORY_DEFS,
+            constitution_assessment=view["constitution_assessment"],
             local_overview=(local_report.build_pattern_overview(rec)
                             if local_mode else None),
             photos=records_store.list_photos(photos_dir, date, rec),
@@ -645,6 +647,7 @@ def create_app(env_file: str | None = None,
             correction_meta=records_store.correction_meta(),
             context_spec=wizard_store.CONTEXT_SPEC,
             context_error=request.args.get("context_error", ""),
+            constitution_rules=constitution_store.RULE_ENTRIES,
             manual_mode=not vision_ready(),
             server_date=_today(), resumed=today != _today(),
         )
@@ -770,6 +773,57 @@ def create_app(env_file: str | None = None,
                         "danger": danger,
                         "danger_names": [records_store.DANGER_FLAGS.get(
                             k, {}).get("name", k) for k in danger]})
+
+    @app.post("/wizard/constitution")
+    def wizard_constitution():
+        if not admin_allowed():
+            return jsonify({"ok": False, "error": "无权限：需管理口令"}), 403
+        body = json_object()
+        if not isinstance(body, dict):
+            return jsonify({"ok": False, "error": "请求体必须为对象"}), 400
+        action = body.get("action")
+        if action not in {"answer", "unanswered", "clear_answer", "gender", "skip", "clear"}:
+            return jsonify({"ok": False, "error": "未知体质评估操作"}), 400
+        today = _wizard_date(body.get("date")) or _today()
+        draft, draft_version = wizard_store.load_draft_with_version(daily_dir, today)
+        current = draft.get("constitution_assessment", {})
+        answers = dict(current.get("answers", {}))
+        unanswered = set(current.get("unanswered", []))
+        from io_utils import WriteConflictError
+        try:
+            if action in {"answer", "unanswered", "clear_answer"}:
+                entry_id = body.get("entry_id")
+                if not isinstance(entry_id, str) or entry_id not in constitution_store.RULE_BY_ID:
+                    return jsonify({"ok": False, "error": "未知题号"}), 400
+                if action == "answer":
+                    value = body.get("value")
+                    if not isinstance(value, str):
+                        return jsonify({"ok": False, "error": "答案必须为字符串"}), 400
+                    answers[entry_id] = value
+                    unanswered.discard(entry_id)
+                elif action == "unanswered":
+                    answers.pop(entry_id, None)
+                    unanswered.add(entry_id)
+                else:
+                    answers.pop(entry_id, None)
+                    unanswered.discard(entry_id)
+            if action == "clear":
+                current = None
+                draft.pop("constitution_assessment", None)
+            else:
+                gender = body.get("gender") if action == "gender" else current.get("gender")
+                current = constitution_store.build_assessment(
+                    answers, gender, sorted(unanswered),
+                    skipped=action == "skip", final=False,
+                    timezone_name=cfg("TCM_TIMEZONE") or None)
+                draft["constitution_assessment"] = current
+            wizard_store.save_draft(daily_dir, draft, draft_version)
+        except (TypeError, ValueError) as error:
+            return jsonify({"ok": False, "error": str(error)}), 400
+        except WriteConflictError as error:
+            return jsonify({"ok": False, "error": "草稿已被其他操作更新，请刷新后重试",
+                            "conflict": True}), 409
+        return jsonify({"ok": True, "assessment": current})
 
     @app.post("/wizard/inquiry")
     def wizard_inquiry():

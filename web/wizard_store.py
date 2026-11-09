@@ -127,6 +127,9 @@ def load_draft_with_version(daily_dir: str, date_str: str):
         for key in ("inquiry", "context"):
             if key in raw and not isinstance(raw[key], dict):
                 raise ValueError(f"草稿 {key} 不是对象")
+        if "constitution_assessment" in raw:
+            import constitution_store
+            constitution_store.validate_draft_assessment(raw["constitution_assessment"])
         if raw.get("date") != date_str:
             print(f"⚠️ 警告: 草稿 {p} 的日期与文件名不一致，按文件名读取",
                   file=sys.stderr)
@@ -186,6 +189,7 @@ def wizard_state(daily_dir: str, date_str: str, existing) -> dict:
         "inquiry": draft.get("inquiry", {}),
         "context": draft.get("context", {}),
         "existing": existing,  # None 或 {"coverage": n, "uncovered": [中文名...]}
+        "constitution_assessment": draft.get("constitution_assessment"),
     }
 
 
@@ -547,6 +551,10 @@ def assemble_record(draft: dict, version: str,
         )
     if "danger_review" in draft:
         raw["danger_review"] = draft["danger_review"]
+    import constitution_store
+    assessment = constitution_store.finalize_assessment(draft, timezone_name)
+    if assessment is not None:
+        raw["constitution_assessment"] = assessment
     rec_check = DailyRecord(raw)
     raw["confidence"] = from_coverage(rec_check.get_covered_dimension_count()).value
     from src.derived import current_derived_meta
