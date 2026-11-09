@@ -30,6 +30,16 @@ def _input_hash(status, gender, answers, unanswered):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _version_error(data):
+    if data.get("schema_version") != 1:
+        return f"schema_version 不支持: {data.get('schema_version')!r}"
+    if data.get("standard_id") != STANDARD_ID:
+        return f"standard_id 不支持: {data.get('standard_id')!r}"
+    if data.get("questionnaire_version") != QUESTIONNAIRE_VERSION:
+        return f"questionnaire_version 不支持: {data.get('questionnaire_version')!r}"
+    return None
+
+
 def _unanswered(values, answers):
     if not isinstance(values, (list, tuple)):
         raise TypeError("无法回答项必须是题号列表")
@@ -99,6 +109,9 @@ def assessment_view(raw):
         return {"status": "unassessed", "stale": False, "reasons": []}
     if not isinstance(data, dict):
         return {"status": "error", "stale": True, "reasons": ["体质评估结构不是对象"]}
+    version_error = _version_error(data)
+    if version_error:
+        return {"status": "error", "stale": True, "reasons": [version_error]}
     status = data.get("status")
     if status not in {"completed", "skipped"}:
         return {"status": "error", "stale": True,
@@ -127,6 +140,9 @@ def validate_assessment(raw):
 def validate_draft_assessment(data):
     if not isinstance(data, dict):
         raise ValueError("体质评估草稿不是对象")
+    version_error = _version_error(data)
+    if version_error:
+        raise ValueError(version_error)
     status = data.get("status")
     if status not in {"draft", "completed", "skipped"}:
         raise ValueError("体质评估草稿状态无效")

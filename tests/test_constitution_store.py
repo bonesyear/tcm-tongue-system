@@ -4,6 +4,7 @@ import pytest
 
 from constitution_store import (
     assessment_view, build_assessment, finalize_assessment, validate_assessment,
+    validate_draft_assessment,
 )
 from src.constitution_assessment import RULE_ENTRIES
 
@@ -84,3 +85,38 @@ def test_tampered_evaluation_or_unanswered_list_is_rejected():
     assert assessment_view({'constitution_assessment': tampered})['stale'] is True
     with pytest.raises(ValueError, match='无法回答'):
         build_assessment(_answers(), 'female', unanswered=['GB46939-A2-01'], final=True)
+
+
+@pytest.mark.parametrize('field,bad_value', [
+    ('schema_version', 2),
+    ('standard_id', 'ZYYXH/T157-2009'),
+    ('questionnaire_version', 'old'),
+])
+def test_tampered_version_fields_are_rejected_in_formal_and_draft(field, bad_value):
+    valid = build_assessment(_answers(), 'female', final=True)
+    tampered = dict(valid, **{field: bad_value})
+    view = assessment_view({'constitution_assessment': tampered})
+    assert view['status'] == 'error'
+    assert view['stale'] is True
+    assert field in view['reasons'][0]
+    with pytest.raises(ValueError, match=field):
+        validate_draft_assessment(tampered)
+    assert assessment_view({'constitution_assessment': valid})['stale'] is False
+    validate_draft_assessment(valid)
+
+
+@pytest.mark.parametrize('field', [
+    'schema_version', 'standard_id', 'questionnaire_version',
+])
+def test_missing_version_fields_are_rejected_in_formal_and_draft(field):
+    valid = build_assessment(_answers(), 'female', final=True)
+    tampered = dict(valid)
+    del tampered[field]
+    view = assessment_view({'constitution_assessment': tampered})
+    assert view['status'] == 'error'
+    assert view['stale'] is True
+    assert field in view['reasons'][0]
+    with pytest.raises(ValueError, match=field):
+        validate_draft_assessment(tampered)
+    assert assessment_view({'constitution_assessment': valid})['stale'] is False
+    validate_draft_assessment(valid)
