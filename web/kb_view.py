@@ -8,6 +8,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import sys
 import tempfile
 import time
 
@@ -268,11 +269,28 @@ def unified_view(active, cache_root=None):
                                       for relative in owners}}
                 (staging / "view.json").write_text(
                     json.dumps(manifest, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-                os.replace(staging, view)
+                for attempt in range(4):
+                    if _view_key(active) != key:
+                        raise ValueError("知识库在统一视图构建期间已变化，请重试")
+                    verified = _load_view(staging, key)
+                    if verified is None:
+                        raise ValueError("统一知识库暂存视图完整性校验失败")
+                    if view.exists() or view.is_symlink():
+                        raise FileExistsError("统一知识库目标视图在发布期间意外出现，请重试")
+                    try:
+                        os.replace(staging, view)
+                    except PermissionError as error:
+                        print(f"[kb-view] 原子发布第 {attempt + 1}/4 次失败: {error}",
+                              file=sys.stderr)
+                        if attempt == 3:
+                            raise
+                        time.sleep(0.05 * (2 ** attempt))
+                    else:
+                        loaded = verified
+                        break
             finally:
                 if staging.exists():
                     shutil.rmtree(staging)
-            loaded = owners, aliases
         os.utime(view, None)
         _prune(root, current=view)
     yield str(view), *loaded

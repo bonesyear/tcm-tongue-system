@@ -168,6 +168,61 @@ def test_unified_failed_build_has_no_partial_view(tmp_path, monkeypatch):
     assert len(list(cache.glob('*/view.json'))) == 1
 
 
+def test_unified_retries_transient_replace_permission_error(tmp_path, monkeypatch, capsys):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    cache = tmp_path / 'cache'
+    expected = _kb_references_unified(
+        _record(), roots, _ALL_ANCHORS, cache_root=tmp_path / 'expected')
+    original = kb_view.os.replace
+    attempts = []
+
+    def fail_once(source, target):
+        attempts.append((source, target))
+        if len(attempts) == 1:
+            raise PermissionError(13, '合成瞬态拒绝访问')
+        return original(source, target)
+
+    monkeypatch.setattr(kb_view.os, 'replace', fail_once)
+    monkeypatch.setattr(kb_view.time, 'sleep', lambda _: None)
+    refs = _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert _signature(refs) == _signature(expected)
+    assert len(attempts) == 2
+    assert not list(cache.glob('.*.staging-*'))
+    captured = capsys.readouterr()
+    assert 'kb-view' in captured.err and '1' in captured.err
+    assert '合成瞬态拒绝访问' in captured.err
+
+
+def test_unified_persistent_replace_failure_preserves_old_cache(
+        tmp_path, monkeypatch, capsys):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    cache = tmp_path / 'cache'
+    _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    old_manifests = {path: path.read_bytes() for path in cache.glob('*/view.json')}
+    assert len(old_manifests) == 1
+    source = tmp_path / 'diet' / 'diet-lifestyle' / 'version.md'
+    source.write_text('持续发布失败的新版本', encoding='utf-8')
+    unrelated = cache / 'unrelated.txt'
+    unrelated.write_text('不得改动', encoding='utf-8')
+    attempts = []
+
+    def fail_always(source, target):
+        attempts.append((source, target))
+        raise PermissionError(13, '合成持续拒绝访问')
+
+    monkeypatch.setattr(kb_view.os, 'replace', fail_always)
+    monkeypatch.setattr(kb_view.time, 'sleep', lambda _: None)
+    with pytest.raises(PermissionError, match='合成持续拒绝访问'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert len(attempts) == 4
+    assert {path: path.read_bytes() for path in cache.glob('*/view.json')} == old_manifests
+    assert not list(cache.glob('.*.staging-*'))
+    assert unrelated.read_text(encoding='utf-8') == '不得改动'
+    assert capsys.readouterr().err.count('[kb-view]') == 4
+
+
 def test_unified_source_change_during_build_not_published(tmp_path, monkeypatch):
     import kb_view
     _, roots = _corpus(tmp_path)
@@ -185,6 +240,81 @@ def test_unified_source_change_during_build_not_published(tmp_path, monkeypatch)
     monkeypatch.setattr(kb_view.shutil, 'copyfile', change_source)
     with pytest.raises(ValueError, match='构建期间已变化'):
         _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert not list(cache.glob('*/view.json'))
+    assert not list(cache.glob('.*.staging-*'))
+
+
+def test_unified_replace_retry_rechecks_source_version(tmp_path, monkeypatch):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    cache = tmp_path / 'cache'
+    source = tmp_path / 'diet' / 'diet-lifestyle' / 'version.md'
+    source.write_text('重试前版本', encoding='utf-8')
+    original = kb_view.os.replace
+    attempts = []
+
+    def change_after_failure(staging, view):
+        attempts.append((staging, view))
+        if len(attempts) == 1:
+            source.write_text('首次发布失败后源库已变化', encoding='utf-8')
+            raise PermissionError(13, '合成瞬态拒绝访问')
+        return original(staging, view)
+
+    monkeypatch.setattr(kb_view.os, 'replace', change_after_failure)
+    monkeypatch.setattr(kb_view.time, 'sleep', lambda _: None)
+    with pytest.raises(ValueError, match='构建期间已变化'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert len(attempts) == 1
+    assert not list(cache.glob('*/view.json'))
+    assert not list(cache.glob('.*.staging-*'))
+
+
+def test_unified_replace_retry_revalidates_staging(tmp_path, monkeypatch):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    cache = tmp_path / 'cache'
+    original = kb_view.os.replace
+    attempts = []
+
+    def corrupt_after_failure(staging, view):
+        attempts.append((staging, view))
+        if len(attempts) == 1:
+            target = Path(staging) / 'diet-lifestyle' / 'diet.md'
+            target.write_text('暂存正文在重试前损坏', encoding='utf-8')
+            raise PermissionError(13, '合成瞬态拒绝访问')
+        return original(staging, view)
+
+    monkeypatch.setattr(kb_view.os, 'replace', corrupt_after_failure)
+    monkeypatch.setattr(kb_view.time, 'sleep', lambda _: None)
+    with pytest.raises(ValueError, match='暂存视图完整性校验失败'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert len(attempts) == 1
+    assert not list(cache.glob('*/view.json'))
+    assert not list(cache.glob('.*.staging-*'))
+
+
+def test_unified_replace_retry_rejects_unexpected_target(tmp_path, monkeypatch):
+    import kb_view
+    _, roots = _corpus(tmp_path)
+    cache = tmp_path / 'cache'
+    attempts = []
+    unexpected = None
+
+    def create_target_after_failure(staging, view):
+        nonlocal unexpected
+        attempts.append((staging, view))
+        target = Path(view)
+        target.mkdir()
+        unexpected = target / 'unexpected.txt'
+        unexpected.write_text('目标目录的无关内容', encoding='utf-8')
+        raise PermissionError(13, '合成瞬态拒绝访问')
+
+    monkeypatch.setattr(kb_view.os, 'replace', create_target_after_failure)
+    monkeypatch.setattr(kb_view.time, 'sleep', lambda _: None)
+    with pytest.raises(FileExistsError, match='目标视图在发布期间意外出现'):
+        _kb_references_unified(_record(), roots, _ALL_ANCHORS, cache_root=cache)
+    assert len(attempts) == 1
+    assert unexpected.read_text(encoding='utf-8') == '目标目录的无关内容'
     assert not list(cache.glob('*/view.json'))
     assert not list(cache.glob('.*.staging-*'))
 

@@ -352,6 +352,56 @@ def test_composite_rejects_reserved_category_directories(tmp_path):
     _assert_no_transaction_dirs(tmp_path)
 
 
+def test_transient_activation_permission_error_retries(tmp_path, monkeypatch, capsys):
+    _import(tmp_path, _valid_zip(), category='constitution')
+    final = str(tmp_path / 'private_kb' / 'constitution')
+    real_replace = kb_import.os.replace
+    attempts = []
+
+    def fail_once(source, target):
+        if '.kb-staging' in source and target == final:
+            attempts.append((source, target))
+            if len(attempts) == 1:
+                raise PermissionError(13, '合成导入瞬态拒绝访问')
+        return real_replace(source, target)
+
+    monkeypatch.setattr(kb_import.os, 'replace', fail_once)
+    result, _ = _import(tmp_path, _replacement_zip(), category='constitution')
+    assert result['ok'] is True
+    assert len(attempts) == 2
+    assert (tmp_path / 'private_kb' / 'constitution' / 'new.md').is_file()
+    assert not (tmp_path / 'private_kb' / 'constitution' / 'a.md').exists()
+    _assert_no_transaction_dirs(tmp_path)
+    captured = capsys.readouterr()
+    assert captured.err.count('[kb-import]') == 1
+    assert '合成导入瞬态拒绝访问' in captured.err
+
+
+def test_persistent_activation_permission_error_restores_previous(
+        tmp_path, monkeypatch, capsys):
+    _import(tmp_path, _valid_zip(), category='constitution')
+    final = str(tmp_path / 'private_kb' / 'constitution')
+    managed_before = _snapshot(tmp_path / 'private_kb' / 'constitution')
+    config_before = (tmp_path / '.env').read_bytes()
+    attempts = []
+
+    def fail_always(source, target):
+        if '.kb-staging' in source and target == final:
+            attempts.append((source, target))
+            raise PermissionError(13, '合成导入持续拒绝访问')
+        return real_replace(source, target)
+
+    real_replace = kb_import.os.replace
+    monkeypatch.setattr(kb_import.os, 'replace', fail_always)
+    with pytest.raises(PermissionError, match='合成导入持续拒绝访问'):
+        _import(tmp_path, _replacement_zip(), category='constitution')
+    assert len(attempts) == 4
+    assert _snapshot(tmp_path / 'private_kb' / 'constitution') == managed_before
+    assert (tmp_path / '.env').read_bytes() == config_before
+    _assert_no_transaction_dirs(tmp_path)
+    assert capsys.readouterr().err.count('[kb-import]') == 4
+
+
 def test_activation_failure_restores_previous_managed_copy(tmp_path, monkeypatch):
     original = _original_kb(tmp_path)
     original_before = _snapshot(original)

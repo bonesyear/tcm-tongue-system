@@ -6,6 +6,8 @@ import os
 from pathlib import PurePosixPath
 import shutil
 import stat
+import sys
+import time
 import uuid
 import zipfile
 
@@ -183,7 +185,17 @@ def import_kb(upload, data_root, env_path, env_locked=False, write_env=None,
         if has_previous:
             os.replace(final, backup)
         try:
-            os.replace(staging, final)
+            for attempt in range(4):
+                try:
+                    os.replace(staging, final)
+                except PermissionError as error:
+                    print(f"[kb-import] 目录激活第 {attempt + 1}/4 次失败: {error}",
+                          file=sys.stderr)
+                    if attempt == 3:
+                        raise
+                    time.sleep(0.05 * (2 ** attempt))
+                else:
+                    break
             if category == "composite":
                 _restore_composite_categories(final, preserve)
         except Exception:
