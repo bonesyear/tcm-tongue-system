@@ -33,6 +33,99 @@ def _assessment_fingerprint(rec):
             ("standard_id", "questionnaire_version", "input_hash")}
 
 
+def _eligible_constitutions(rec):
+    from constitution_store import assessment_view
+    from src.constitution_assessment import CONSTITUTIONS
+    view = assessment_view(rec.raw)
+    if view["status"] != "completed":
+        return []
+    results = view["assessment"]["evaluation"]["results"]
+    return [name for name in CONSTITUTIONS
+            if results[name]["result"] in ({"是", "基本是"} if name == "平和质"
+                                          else {"是", "倾向是"})]
+
+
+def _constitution_diet_constitution(ref):
+    from src.constitution_assessment import CONSTITUTIONS
+    if not isinstance(ref, dict) or ref.get("domain") != "diet":
+        return None
+    excerpt = ref.get("excerpt", "")
+    if not excerpt.startswith("食疗资料｜"):
+        return None
+    parts = excerpt.split("｜")
+    if len(parts) < 2:
+        return None
+    constitution = parts[1].split("：", 1)[0].strip()
+    return constitution if constitution in CONSTITUTIONS else None
+
+
+def _constitution_diet_text(value):
+    import re
+    return re.sub(r"[\s，。；、,;]+", "", str(value).translate(
+        str.maketrans("０１２３４５６７８９Ｇｇ–—-", "0123456789Gg～～～"))).lower()
+
+
+def _constitution_diet_output_error(structured, kb_refs, rec):
+    """体质食养的体质、数量和安全边界必须对应同一条当前候选。"""
+    diet = structured.get("diet_advice", {})
+    if not isinstance(diet, dict):
+        return None
+    candidates = []
+    for ref in kb_refs or []:
+        constitution = _constitution_diet_constitution(ref)
+        if constitution is None:
+            continue
+        parts = ref["excerpt"].split("｜")
+        full_name = parts[1].strip()
+        boundary = next((part.split("：", 1)[1] for part in parts
+                         if part.startswith("项目边界：") and "：" in part), "")
+        candidates.append({
+            "constitution": constitution, "names": {full_name, full_name.rsplit("：", 1)[-1]},
+            "source": f"{ref['file']}:{ref['line']}", "text": _constitution_diet_text(ref["excerpt"]),
+            "boundary": boundary,
+        })
+    eligible = set(_eligible_constitutions(rec))
+    for group in ("daily_foods", "med_foods"):
+        items = diet.get(group, []) or []
+        if not isinstance(items, list):
+            return f"食疗字段 {group} 不是列表，报告未保存"
+        for item in items:
+            if not isinstance(item, dict):
+                return "食疗条目结构不是对象，报告未保存"
+            name = str(item.get("name", "")).strip()
+            constitution = str(item.get("constitution", "")).strip()
+            source = str(item.get("source", "")).strip()
+            matches = [candidate for candidate in candidates if name in candidate["names"]]
+            if not matches:
+                if constitution or source:
+                    return f"体质食养条目“{name[:60]}”未对应本次候选，报告未保存"
+                continue
+            selected = [candidate for candidate in matches if candidate["source"] == source]
+            if not selected:
+                return f"体质食养条目“{name[:60]}”的来源未对应同一条候选，报告未保存"
+            candidate = selected[0]
+            if candidate["constitution"] not in eligible:
+                return f"体质食养条目“{name[:60]}”的体质未通过当前评估，报告未保存"
+            if constitution != candidate["constitution"]:
+                return f"体质食养条目“{name[:60]}”的对应体质错误，报告未保存"
+            amount = str(item.get("amount", "")).strip()
+            if not amount:
+                return f"体质食养条目“{name[:60]}”缺少数量或「未提供」标记，报告未保存"
+            if amount not in {"未提供", "资料未载明", "不适用"} and \
+                    _constitution_diet_text(amount) not in candidate["text"]:
+                return f"体质食养条目“{name[:60]}”的数量未能对应同一来源，报告未保存"
+            boundary = _constitution_diet_text(candidate["boundary"])
+            note = _constitution_diet_text(item.get("note", ""))
+            if boundary and boundary not in note:
+                return f"体质食养条目“{name[:60]}”未完整保留特殊人群、过敏或用药边界，报告未保存"
+            residual = note.replace(boundary, "") if boundary else note
+            import re
+            for frequency in re.findall(r"(?:每日|每天|每周|每月|疗程)[^，。；]*", residual):
+                if _constitution_diet_text(frequency) not in candidate["text"]:
+                    return f"体质食养条目“{name[:60]}”补写了来源未提供的频次或疗程，报告未保存"
+    return None
+
+
 def report_state(rec, kb_info=None, kb_categories=None) -> dict:
     """比较观察、体质评估、生成规则及各知识库版本，返回过期状态及原因。"""
     from src.derived import DERIVED_GENERATOR_VERSION, observation_input_hash
@@ -178,6 +271,38 @@ def build_report_input(rec, kb_refs: list | None = None,
     for question, answer in answered.items():
         lines.append("  - " + json.dumps(question, ensure_ascii=False)
                      + ": " + json.dumps(answer, ensure_ascii=False))
+    from constitution_store import assessment_view
+    constitution_view = assessment_view(rec.raw)
+    lines.append("")
+    lines.append("国标体质评估（独立视图，不是六经／四证结果）：")
+    constitution_missing = isinstance(kb_status, dict) and kb_status.get(
+        "constitution", "unconfigured") in {"unconfigured", "empty", "error"}
+    if constitution_missing:
+        lines.append("体质知识库不可用，本次不向模型提供既有评估结果。")
+    elif constitution_view["status"] == "unassessed":
+        lines.append("未评估；不得从观察、问诊或六经结果推导。")
+    elif constitution_view["status"] == "skipped":
+        lines.append("用户整体跳过；没有体质结果，不自动选择体质食养。")
+    elif constitution_view["status"] == "error":
+        lines.append("既有评估已过期或不可用，本次不提供其结果；"
+                     + "；".join(constitution_view["reasons"]))
+    else:
+        assessment = constitution_view["assessment"]
+        evaluation = assessment["evaluation"]
+        lines.append(f"标准：{assessment['standard_id']}；问卷："
+                     f"{assessment['questionnaire_version']}；性别：{assessment['gender']}")
+        for name, item in evaluation["results"].items():
+            score = item.get("display_score") or "未知"
+            lines.append(f"- {name}：{score}（{item['result']}）；"
+                         f"{item['source_clause']}，PDF {item['source_pdf_page']}")
+        combined = [f"{item['constitution']}（{item['result']}，{item['display_score']}）"
+                    for item in evaluation["combined_results"]]
+        lines.append("兼夹结果：" + ("、".join(combined) if combined else "无"))
+        unknown = evaluation["unknown"]
+        lines.append("未知类别：" + ("、".join(unknown["categories"])
+                                  if unknown["categories"] else "无"))
+    lines.append("不得把本区结果写入 six_diseases；不得由体质直接推导方药、剂量或疗效；"
+                 "平和或其他体质结果均不覆盖危险信号。")
     if isinstance(kb_status, dict):
         from src.retrieval import KB_CATEGORY_DEFS
         from src.retrieval.kb_status import KB_DOMAIN_DEFS
@@ -354,14 +479,46 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     unified_error = None
     if use_unified:
         try:
-            unified_refs = kb_evidence._kb_references_unified(
-                rec, {category: kb_roots.get(category)
-                      for category in KB_CATEGORY_DEFS
-                      if kb_infos[category]["status"] == "ready"},
+            active_roots = {category: kb_roots.get(category)
+                            for category in KB_CATEGORY_DEFS
+                            if kb_infos[category]["status"] == "ready"}
+            base_refs = kb_evidence._kb_references_unified(
+                rec, active_roots,
                 anchor_terms=[term for category in KB_CATEGORY_DEFS
                               if kb_infos[category]["status"] == "ready"
                               for term in anchors[category]],
                 cache_root=kb_cache_root)
+            eligible = _eligible_constitutions(rec) if all(
+                kb_infos[category]["status"] == "ready"
+                for category in ("constitution", "diet")) else []
+            assessment_refs = kb_evidence._kb_references_unified(
+                rec, active_roots,
+                anchor_terms=[f"食疗资料｜{name}：" for name in eligible],
+                cache_root=kb_cache_root, domain="diet") if eligible else []
+            assessment_refs = [ref for ref in assessment_refs
+                               if _constitution_diet_constitution(ref) in eligible]
+            unified_refs = []
+            for ref in base_refs:
+                candidate = _constitution_diet_constitution(ref)
+                if candidate is None or candidate in eligible:
+                    unified_refs.append(ref)
+            ordered = [ref for ref in unified_refs if ref.get("category") == "constitution"]
+            ordered += assessment_refs
+            ordered += [ref for ref in unified_refs if ref.get("category") != "constitution"]
+            merged = []
+            total_chars = 0
+            for ref in ordered:
+                key = (ref["file"], ref["line"])
+                if any((item["file"], item["line"]) == key for item in merged):
+                    continue
+                excerpt_chars = len(ref.get("excerpt", ""))
+                if total_chars + excerpt_chars > kb_evidence.MAX_KB_TOTAL_CHARS:
+                    continue
+                merged.append(ref)
+                total_chars += excerpt_chars
+                if len(merged) >= 10:
+                    break
+            unified_refs = merged
         except Exception as error:
             unified_error = error
             import sys
@@ -459,7 +616,7 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         if has_formula_name(md) or has_dosage_content(md):
             return {"ok": False,
                     "error": "缺少方剂知识库，模型仍输出具体方剂或剂量，报告未保存"}
-    if kb_statuses["diet"] in missing and structured.get("diet_advice"):
+    if kb_statuses["diet"] in missing and any(structured.get("diet_advice", {}).values()):
         return {"ok": False,
                 "error": "缺少食疗知识库，模型仍输出饮食建议，报告未保存"}
     if kb_statuses["constitution"] in missing and any(
@@ -467,6 +624,9 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
             ("three_views", "four_patterns", "six_diseases", "core_pathomechanism")):
         return {"ok": False,
                 "error": "缺少中医体质辨证知识库，模型仍输出结构化辨证结论，报告未保存"}
+    constitution_diet_error = _constitution_diet_output_error(structured, kb_refs, rec)
+    if constitution_diet_error:
+        return {"ok": False, "error": constitution_diet_error}
 
     import re
     import sys

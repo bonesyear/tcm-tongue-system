@@ -606,7 +606,7 @@
     <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
     <tbody>
       {% for f in report.diet_advice.daily_foods %}
-      <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+      <tr><td><b>{{ f.name }}</b>{% if f.constitution and f.source %}<div class="diet-provenance">{{ f.constitution }} · {{ f.source }}</div>{% endif %}</td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -676,7 +676,7 @@
         <thead><tr><th>食材</th><th>性味</th><th>功效</th><th>分量</th><th>备注</th></tr></thead>
         <tbody>
           {% for f in report.diet_advice.daily_foods %}
-          <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+          <tr><td><b>{{ f.name }}</b>{% if f.constitution and f.source %}<div class="diet-provenance">{{ f.constitution }} · {{ f.source }}</div>{% endif %}</td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -691,7 +691,7 @@
         <thead><tr><th>药材</th><th>性味</th><th>功效</th><th>分量</th><th>注意</th></tr></thead>
         <tbody>
           {% for f in report.diet_advice.med_foods %}
-          <tr><td><b>{{ f.name }}</b></td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
+          <tr><td><b>{{ f.name }}</b>{% if f.constitution and f.source %}<div class="diet-provenance">{{ f.constitution }} · {{ f.source }}</div>{% endif %}</td><td>{{ f.nature }}</td><td>{{ f.purpose }}</td><td>{{ f.amount }}</td><td>{{ f.note }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

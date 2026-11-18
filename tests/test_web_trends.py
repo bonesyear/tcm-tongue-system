@@ -497,7 +497,8 @@ def test_missing_diet_or_constitution_rejects_structured_output(tmp_path, monkey
     with open(daily / '2026-06-25_analysis.json', 'w', encoding='utf-8') as f:
         json.dump(raw, f, ensure_ascii=False)
     cases = [
-        ({'diet_advice': {'daily_foods': []}}, '缺少食疗知识库'),
+        ({'diet_advice': {'daily_foods': [{'name': '合成食材', 'amount': '未提供'}]}},
+         '缺少食疗知识库'),
         ({'six_diseases': '太阴'}, '缺少中医体质辨证知识库'),
     ]
     for structured, expected in cases:
