@@ -479,3 +479,32 @@ def test_general_diet_principle_remains_valid_without_candidate(tmp_path):
         diet_advice={"daily_foods": [item], "med_foods": [], "avoid": []})
     assert result["ok"], result
     assert saved["diagnosis"]["report"]["diet_advice"]["daily_foods"] == [item]
+
+
+def test_no_hit_diet_status_is_disclosed_on_detail_page(tmp_path):
+    import envfile
+    from app import create_app
+
+    def no_hits(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet.md"
+        path.write_text("无相关候选的合成内容\n", encoding="utf-8")
+
+    result, _, _ = _run_report(
+        tmp_path, _assessment("气虚质"), configure_kb=no_hits)
+    assert result["ok"], result
+    env = tmp_path / "web.env"
+    env.write_text("VISION_DISABLED=1\n", encoding="utf-8")
+    envfile.write_env(str(env), {
+        "TCM_KB_ALLOW_EXTERNAL_KB": "1",
+        "LLM_API_KEY": "sk-synthetic", "LLM_MODEL": "synthetic",
+        "LLM_BASE_URL": "https://example.invalid/v1/chat/completions",
+        **{f"TCM_KB_{category.upper()}_ROOT": str(tmp_path / category)
+           for category in ("constitution", "diet", "formula")},
+    })
+    app = create_app(env_file=str(env), data_root=str(tmp_path))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.post("/welcome", headers={"Origin": "http://localhost"})
+    html = client.get("/record/2026-11-18").get_data(as_text=True)
+    assert "食疗知识库本次未检索到相关候选条文" in html
+    assert "未经该类知识库校核" in html

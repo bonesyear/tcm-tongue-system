@@ -664,6 +664,12 @@
   </div>
   {% endif %}
 
+  {% for category, info in report.get("kb_categories", {}).items() %}
+  {% if info.status == "no_hits" %}
+  <div class="alert-note">{{ kb_category_defs[category].label }}本次未检索到相关候选条文；对应内容未经该类知识库校核。</div>
+  {% endif %}
+  {% endfor %}
+
   {% if report.diet_advice and diet_ready %}
   <div class="action-zone" id="action-zone">
     <h3 class="zone-h">方药与调护</h3>
