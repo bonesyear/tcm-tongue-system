@@ -10,11 +10,11 @@ from src.record import DailyRecord
 
 _FIXTURE = Path(__file__).parent / 'fixtures' / 'knowledge_base'
 _ANCHORS = {
-    'constitution': [],
+    'constitution': ['GB/T 46939—2025'],
     'diet': ['忌口', '适宜', '食疗'],
     'formula': ['煎服', '温覆', '方证', '方剂'],
 }
-_ALL_ANCHORS = ['忌口', '适宜', '食疗', '煎服', '温覆', '方证', '方剂']
+_ALL_ANCHORS = ['GB/T 46939—2025', '忌口', '适宜', '食疗', '煎服', '温覆', '方证', '方剂']
 _DIRECTORIES = {'constitution': 'diagnostics', 'diet': 'diet-lifestyle',
                 'formula': 'formulas'}
 

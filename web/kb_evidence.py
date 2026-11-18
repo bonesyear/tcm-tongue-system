@@ -2,15 +2,22 @@
 from __future__ import annotations
 
 from src.dimensions import DIMENSIONS
+from src.retrieval.kb_status import kb_domain_for_path
 import records_store
 
 MAX_KB_EXCERPT_CHARS = 1200
 MAX_KB_TOTAL_CHARS = 12000
 
 
+def _add_domain(ref, category=None):
+    domain = kb_domain_for_path(ref["file"], category)
+    if domain:
+        ref["domain"] = domain
+
+
 def _kb_references(rec, kb_root=None, max_hits: int = 10,
-                   anchor_terms=None, category=None, syn_map=None) -> list:
-    """按当日证候和类别锚词检索候选条文。"""
+                   anchor_terms=None, category=None, syn_map=None, domain=None) -> list:
+    """按当日证候和类别锚词检索候选条文；可显式限定资料领域。"""
     from src.scoring import score_indicators
     from src.textnorm import display_text
     if anchor_terms is None:
@@ -38,6 +45,8 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
             r = retrieve(term, context_lines=1, kb_root=kb_root, syn_map=syn_map)
             added = 0
             for h in r.get("results", []):
+                if domain is not None and kb_domain_for_path(h["file"], category) != domain:
+                    continue
                 if len(hits) >= limit or added >= 2 \
                         or total_chars >= MAX_KB_TOTAL_CHARS:
                     break
@@ -52,6 +61,7 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
                               "excerpt": excerpt, "term": display_text(term, 128)}
                 if category:
                     hits[fkey]["category"] = category
+                _add_domain(hits[fkey], category)
                 total_chars += len(excerpt)
                 added += 1
 
@@ -61,7 +71,7 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
 
 
 def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None,
-                           cache_root=None) -> list:
+                           cache_root=None, domain=None) -> list:
     """按当前可用类别形成统一检索视图，保留全局候选预算与类别溯源。"""
     from src.retrieval import KB_CATEGORY_DEFS
     from src.retrieval.kb_paths import resolve_kb_root
@@ -71,20 +81,23 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None,
               for category in KB_CATEGORY_DEFS if kb_roots.get(category)}
     if not active:
         return []
+    options = {} if domain is None else {"domain": domain}
     distinct_roots = list(dict.fromkeys(active.values()))
     if len(active) == len(KB_CATEGORY_DEFS) and len(distinct_roots) == 1:
         root = distinct_roots[0]
-        refs = _kb_references(rec, kb_root=root, anchor_terms=anchor_terms)
+        refs = _kb_references(rec, kb_root=root, anchor_terms=anchor_terms, **options)
         for ref in refs:
             ref["category"] = category_for_shared_file(ref["file"], active)
+            _add_domain(ref, ref["category"])
         return refs
 
     with unified_view(active, cache_root=cache_root) as (view, owners, merged_map):
         refs = _kb_references(rec, kb_root=view, anchor_terms=anchor_terms,
-                              syn_map=merged_map)
+                              syn_map=merged_map, **options)
         for ref in refs:
             category = owners.get(ref["file"])
             if category is None:
                 raise ValueError(f"统一知识库候选缺少类别溯源: {ref['file']}")
             ref["category"] = category
+            _add_domain(ref, category)
         return refs

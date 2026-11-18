@@ -389,6 +389,8 @@
 </div>
 {% endif %}
 
+{% set constitution_ready = kb_categories.constitution.status == "ready" %}
+{% if constitution_ready %}
 {% set ca = constitution_assessment %}
 <div class="card" id="constitution-assessment">
   <div class="card-head">
@@ -449,8 +451,10 @@
   </details>
   {% endif %}
 </div>
+{% else %}
+<div class="alert-note">缺少中医体质辨证知识库，国标体质评估不可显示。</div>
+{% endif %}
 
-{% set constitution_ready = kb_categories.constitution.status == "ready" %}
 {% set diet_ready = kb_categories.diet.status == "ready" %}
 {% set formula_ready = kb_categories.formula.status == "ready" %}
 

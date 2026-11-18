@@ -10,9 +10,40 @@ from .kb_paths import kb_map_path, resolve_kb_root
 
 _UNSET = object()
 
+KB_DOMAIN_DEFS = {
+    "constitution_standard": "国标体质标准",
+    "diet": "体质食养",
+    "disease_guideline": "疾病或特定人群指南",
+    "formula_pattern": "方证资料",
+}
+
+
+def kb_domain_for_path(relative, category=None):
+    """按既有目录契约识别资料领域；专用根可用类别补足语义。"""
+    path = (relative or "").replace("\\", "/")
+    name = path.rsplit("/", 1)[-1]
+    if name == "gbt46939-2025.md" and category in (None, "constitution"):
+        return "constitution_standard"
+    if name.startswith("nhc-") and (path.startswith("diet-lifestyle/")
+                                     or category == "diet"):
+        return "disease_guideline"
+    if path.startswith("diet-lifestyle/") or category == "diet":
+        return "diet"
+    if path.startswith("formulas/") or category == "formula":
+        return "formula_pattern"
+    return None
+
+
+def _file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 
 def inspect_kb(kb_root=_UNSET):
-    """返回知识库状态；无参数可读环境默认，显式空值表示未配置。"""
+    """返回知识库状态；内容版本不受单独时间戳变化影响。"""
     info = {"root": "", "status": "unconfigured", "file_count": 0,
             "revision": "", "error": ""}
     if kb_root is _UNSET:
@@ -40,17 +71,23 @@ def inspect_kb(kb_root=_UNSET):
         if os.path.isfile(map_path):
             paths.append(map_path)
         digest = hashlib.sha256()
+        domain_digests = {}
         for path in sorted(paths):
-            stat = os.stat(path)
             relative = os.path.relpath(path, root).replace(os.sep, "/")
-            digest.update(relative.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(str(stat.st_size).encode("ascii"))
-            digest.update(b"\0")
-            digest.update(str(stat.st_mtime_ns).encode("ascii"))
-            digest.update(b"\0")
+            file_digest = _file_digest(path).encode("ascii")
+            domain = kb_domain_for_path(relative)
+            targets = [digest]
+            if domain:
+                targets.append(domain_digests.setdefault(domain, hashlib.sha256()))
+            for target in targets:
+                target.update(relative.encode("utf-8"))
+                target.update(b"\0")
+                target.update(file_digest)
+                target.update(b"\0")
         info.update(status="ready", file_count=len(files),
-                    revision=digest.hexdigest())
+                    revision=digest.hexdigest(),
+                    domain_revisions={domain: value.hexdigest()
+                                      for domain, value in sorted(domain_digests.items())})
     except OSError as error:
         info.update(status="error", error=str(error), revision="")
     return info
