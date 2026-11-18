@@ -42,8 +42,8 @@ def _file_digest(path):
     return digest.hexdigest()
 
 
-def inspect_kb(kb_root=_UNSET):
-    """返回知识库状态；内容版本不受单独时间戳变化影响。"""
+def inspect_kb(kb_root=_UNSET, *, category=None):
+    """返回内容状态与领域版本；专用根由调用方显式声明类别。"""
     info = {"root": "", "status": "unconfigured", "file_count": 0,
             "revision": "", "error": ""}
     if kb_root is _UNSET:
@@ -75,7 +75,7 @@ def inspect_kb(kb_root=_UNSET):
         for path in sorted(paths):
             relative = os.path.relpath(path, root).replace(os.sep, "/")
             file_digest = _file_digest(path).encode("ascii")
-            domain = kb_domain_for_path(relative)
+            domain = kb_domain_for_path(relative, category)
             targets = [digest]
             if domain:
                 targets.append(domain_digests.setdefault(domain, hashlib.sha256()))
@@ -178,17 +178,19 @@ def inspect_kb_categories(config=None):
     """区分整组与自身停用；有效停用优先于专用根和综合回退。"""
     strict = _config_value(config, "TCM_KB_STRICT_CATEGORIES") == "1"
     group_disabled = _config_value(config, KB_CATEGORIES_DISABLED_KEY) == "1"
+    roots = {category: kb_category_root(category, config) for category in KB_CATEGORY_DEFS}
     result = {}
     for category, definition in KB_CATEGORY_DEFS.items():
         specific = _config_value(config, definition["env_key"])
         self_disabled = _config_value(config, definition["disabled_key"]) == "1"
         disabled = group_disabled or self_disabled
-        root = kb_category_root(category, config)
+        root = roots[category]
         if disabled or root is None:
             info = {"root": root or "", "status": "unconfigured",
                     "file_count": 0, "revision": "", "error": ""}
         else:
-            info = inspect_kb(root)
+            owner = category if list(roots.values()).count(root) == 1 else None
+            info = inspect_kb(root, category=owner)
         info.update(category=category, label=definition["label"],
                     env_key=definition["env_key"], disabled=disabled,
                     self_disabled=self_disabled, group_disabled=group_disabled,

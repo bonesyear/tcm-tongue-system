@@ -337,9 +337,15 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
         "diet": ["忌口", "适宜", "食疗"],
         "formula": ["煎服", "温覆", "方证", "方剂"],
     }
-    kb_infos = {category: (inspect_kb() if use_default_kb else
-                           inspect_kb(kb_roots.get(category)))
-                for category in KB_CATEGORY_DEFS}
+    def inspect_current(category):
+        if use_default_kb:
+            return inspect_kb()
+        root = kb_roots.get(category)
+        shared = any(other != category and kb_roots.get(other) == root
+                     for other in KB_CATEGORY_DEFS)
+        return inspect_kb(root, category=None if shared else category)
+
+    kb_infos = {category: inspect_current(category) for category in KB_CATEGORY_DEFS}
     kb_categories = {}
     kb_statuses = {}
     kb_refs = []
@@ -395,7 +401,7 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
     if use_unified:
         kb_refs = unified_refs or []
     for category, info in kb_infos.items():
-        latest = inspect_kb() if use_default_kb else inspect_kb(kb_roots.get(category))
+        latest = inspect_current(category)
         if (latest["root"], latest["revision"]) != (info["root"], info["revision"]):
             return {"ok": False,
                     "error": f"{KB_CATEGORY_DEFS[category]['label']}在报告准备期间已变化，请重试"}

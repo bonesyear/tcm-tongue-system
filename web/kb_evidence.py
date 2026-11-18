@@ -16,7 +16,8 @@ def _add_domain(ref, category=None):
 
 
 def _kb_references(rec, kb_root=None, max_hits: int = 10,
-                   anchor_terms=None, category=None, syn_map=None, domain=None) -> list:
+                   anchor_terms=None, category=None, syn_map=None, domain=None,
+                   owner_by_file=None) -> list:
     """按当日证候和类别锚词检索候选条文；可显式限定资料领域。"""
     from src.scoring import score_indicators
     from src.textnorm import display_text
@@ -45,12 +46,14 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
             r = retrieve(term, context_lines=1, kb_root=kb_root, syn_map=syn_map)
             added = 0
             for h in r.get("results", []):
-                if domain is not None and kb_domain_for_path(h["file"], category) != domain:
+                relative = h["file"].replace("\\", "/")
+                owner = owner_by_file.get(relative) if owner_by_file is not None else category
+                if domain is not None and kb_domain_for_path(relative, owner) != domain:
                     continue
                 if len(hits) >= limit or added >= 2 \
                         or total_chars >= MAX_KB_TOTAL_CHARS:
                     break
-                fkey = (h["file"].replace("\\", "/"), h["line"])
+                fkey = (relative, h["line"])
                 if fkey in hits:
                     continue
                 excerpt = display_text(h["content"], MAX_KB_EXCERPT_CHARS)
@@ -61,7 +64,7 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
                               "excerpt": excerpt, "term": display_text(term, 128)}
                 if category:
                     hits[fkey]["category"] = category
-                _add_domain(hits[fkey], category)
+                _add_domain(hits[fkey], owner)
                 total_chars += len(excerpt)
                 added += 1
 
@@ -92,6 +95,8 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None,
         return refs
 
     with unified_view(active, cache_root=cache_root) as (view, owners, merged_map):
+        if domain is not None:
+            options["owner_by_file"] = owners
         refs = _kb_references(rec, kb_root=view, anchor_terms=anchor_terms,
                               syn_map=merged_map, **options)
         for ref in refs:

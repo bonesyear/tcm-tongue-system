@@ -284,3 +284,44 @@ def test_disease_guideline_has_explicit_retrieval_boundary(tmp_path):
     assert build_report_input(_record(), refs, kb_status={
         category: "retrieved" for category in _DIRECTORIES}).count(
             "资料领域：疾病或特定人群指南") == len(refs)
+
+
+@pytest.mark.parametrize("category,relative,text,domain,query", [
+    ("diet", "custom/nhc-synthetic.md", "高血压疾病指南合成内容",
+     "disease_guideline", "高血压"),
+    ("diet", "custom/food.md", "体质食养合成内容", "diet", "体质食养"),
+    ("formula", "custom/formula.md", "方证资料合成内容", "formula_pattern", "方证资料"),
+])
+def test_custom_dedicated_root_domain_filter_and_content_revision(
+        tmp_path, category, relative, text, domain, query):
+    from src.retrieval import inspect_kb_categories
+
+    source = tmp_path / category
+    target = source / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(text, encoding="utf-8")
+    rec = _record()
+    unfiltered = _kb_references_unified(
+        rec, {category: str(source)}, [query], cache_root=str(tmp_path / "cache"))
+    filtered = _kb_references_unified(
+        rec, {category: str(source)}, [query], cache_root=str(tmp_path / "cache"),
+        domain=domain)
+    assert unfiltered and _signature(filtered) == _signature(unfiltered)
+    assert {(ref["category"], ref["domain"]) for ref in filtered} == {(category, domain)}
+
+    info = inspect_kb(str(source), category=category)
+    assert info["domain_revisions"][domain]
+    states = inspect_kb_categories({
+        "TCM_KB_ALLOW_EXTERNAL_KB": "1",
+        f"TCM_KB_{category.upper()}_ROOT": str(source),
+    })
+    assert states[category]["domain_revisions"] == info["domain_revisions"]
+    stat = target.stat()
+    target.write_text(text.replace("合成内容", "合成变更"), encoding="utf-8")
+    os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    changed = inspect_kb(str(source), category=category)
+    assert changed["domain_revisions"][domain] != info["domain_revisions"][domain]
+    target.write_text(text, encoding="utf-8")
+    os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    restored = inspect_kb(str(source), category=category)
+    assert restored["domain_revisions"] == info["domain_revisions"]
