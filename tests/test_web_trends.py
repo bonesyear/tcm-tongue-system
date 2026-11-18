@@ -136,9 +136,9 @@ def test_report_contract_writes_structured_and_diet(client, data_root,
                       "预期改善": "舌体回缩、齿痕变浅"},
         "diet_advice": {
             "daily_foods": [{"name": "山药", "nature": "平", "purpose": "健脾",
-                             "amount": "50-100克/日", "note": "煮粥"}],
+                             "amount": "未提供", "note": "合成契约数据；无候选数量"}],
             "med_foods": [{"name": "黄芪", "nature": "微温", "purpose": "补气",
-                           "amount": "5-10克/日", "note": "煎水"}],
+                           "amount": "未提供", "note": "合成契约数据；无候选数量"}],
             "avoid": [{"item": "生冷", "reason": "伤脾阳"}],
         },
     }

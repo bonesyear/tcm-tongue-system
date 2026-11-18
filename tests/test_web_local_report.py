@@ -69,16 +69,18 @@ def test_pattern_overview_aggregates_fixture():
 
 
 def test_pattern_overview_constitution_diet_inquiry():
-    """①体质格局两轴陈述；②饮食宜忌带行号出处；③问诊优先项跳过已答。"""
+    """①体质格局两轴；②饮食只给安全边界；③问诊优先项跳过已答。"""
     ov = _fixture_overview()
     zx = ov["constitution"]["zheng_xie"]
     assert "虚" in zx["text"] and "正虚证据" in zx["detail"] and "邪实证据" in zx["detail"]
     fl = ov["constitution"]["fluid"]
     assert fl["text"] == "水饮内停，津不上承"  # 水停 11 + 津亏 10 双轴皆在
-    diet = {d["name"]: d for d in ov["diet"]}
-    assert diet["水证"]["宜"].startswith("甘淡利湿")
-    assert "diet-therapy.md:52" in diet["水证"]["src"]
-    assert set(diet) == {"水证", "血证", "火证", "气证"}
+    assert len(ov["diet"]) == 1
+    diet = ov["diet"][0]
+    assert diet["name"] == "通用边界"
+    assert "具体食疗方须另有合格资料" in diet["宜"]
+    assert "食疗化经方" in diet["忌"]
+    assert "甘淡利湿" not in str(ov["diet"])
     qs = [i["q"] for i in ov["inquiry"]]
     assert len(qs) <= 3 and "口渴？" in qs  # 水/血两名倾向的鉴别项
     assert all(i["why"] for i in ov["inquiry"])
@@ -206,8 +208,9 @@ def test_detail_local_mode_replaces_report_cards(client, tmp_path):
     assert "水证倾向" in html and "血证倾向" in html
     assert "偏胖大" in html and "内置规则" in html
     assert "KB L50" not in html and "diet-therapy.md" not in html
-    assert "饮食宜忌方向（内置规则，非当前知识库引用）" in html
-    assert "甘淡利湿" in html
+    assert "饮食建议边界（内置规则，非当前知识库引用）" in html
+    assert "具体食疗方须另有合格资料" in html
+    assert "甘淡利湿" not in html
     assert "明日问诊优先项" in html and "口渴？" in html
     assert "辨证报告·提要" not in html and "辨证报告·全案" not in html
     assert 'id="btn-report"' not in html

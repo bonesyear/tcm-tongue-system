@@ -12,7 +12,8 @@ def _corpus(tmp_path):
     composite = tmp_path / "composite"
     standard = composite / "diagnostics" / "gbt46939-2025.md"
     standard.parent.mkdir(parents=True)
-    standard.write_text("# GB/T 46939—2025 合成标准\n", encoding="utf-8")
+    standard.write_text(
+        "# GB/T 46939—2025 合成标准\n标准 ID：GB/T 46939—2025\n", encoding="utf-8")
     diet = composite / "diet-lifestyle" / "constitution-diet.md"
     diet.parent.mkdir(parents=True)
     entries = []
@@ -53,7 +54,7 @@ def _assessment(constitution=None, unknown=False, skipped=False):
 
 
 def _run_report(tmp_path, assessment, diet_advice=None, six_diseases="太阴病",
-                configure_kb=None, danger_flags=None):
+                configure_kb=None, danger_flags=None, existing_report=False, before=None):
     roots = _corpus(tmp_path)
     if configure_kb:
         configure_kb(roots)
@@ -67,8 +68,13 @@ def _run_report(tmp_path, assessment, diet_advice=None, six_diseases="太阴病"
     }
     if assessment is not None:
         raw["constitution_assessment"] = assessment
+    if existing_report:
+        raw["diagnosis"] = {"report": {"markdown": "OLD-REPORT",
+                                       "generated_at": "2026-01-01T00:00:00+00:00"}}
     path = daily / "2026-11-18_analysis.json"
     path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    if before is not None:
+        before.append(path.read_bytes())
     prompts = []
 
     def fake_chat(user_input, *args, **kwargs):
@@ -185,7 +191,7 @@ def test_unsourced_amount_cross_candidate_frequency_and_missing_safety_are_rejec
             diet_advice={"daily_foods": [_diet_item(**changes)],
                          "med_foods": [], "avoid": []})
         assert result["ok"] is False, name
-        assert "体质食养" in result["error"]
+        assert "报告未保存" in result["error"]
         assert "diagnosis" not in saved
 
     result, saved, _ = _run_report(
@@ -322,3 +328,76 @@ def test_constitution_entry_anchor_ignores_title_and_explanation_noise(tmp_path)
     candidates = [ref for ref in refs if ref["excerpt"].startswith("食疗资料｜")]
     assert candidates
     assert all(ref["excerpt"].startswith("食疗资料｜阳虚质：") for ref in candidates)
+
+
+def _assert_rejected_unchanged(tmp_path, assessment, diet_advice, configure_kb=None):
+    before = []
+    result, _, _ = _run_report(
+        tmp_path, assessment, diet_advice=diet_advice, configure_kb=configure_kb,
+        existing_report=True, before=before)
+    assert result["ok"] is False, result
+    path = tmp_path / "records" / "daily" / "2026-11-18_analysis.json"
+    assert path.read_bytes() == before[0]
+    assert b"OLD-REPORT" in before[0]
+
+
+def test_unsourced_general_food_amount_is_rejected_and_preserves_old_report(tmp_path):
+    item = {"name": "普通合成食品", "nature": "", "purpose": "",
+            "amount": "普通合成食品 999 克", "note": "", "constitution": "", "source": ""}
+    _assert_rejected_unchanged(
+        tmp_path, _assessment("气虚质"),
+        {"daily_foods": [item], "med_foods": [], "avoid": []})
+
+
+def test_preparation_text_cannot_be_used_as_constitution_diet_amount(tmp_path):
+    _assert_rejected_unchanged(
+        tmp_path, _assessment("气虚质"),
+        {"daily_foods": [_diet_item(amount="合成制法")], "med_foods": [], "avoid": []})
+
+
+def test_missing_source_boundary_is_not_a_valid_constitution_candidate(tmp_path):
+    def remove_boundary(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet.md"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        lines[1] = "｜".join(part for part in lines[1].split("｜")
+                            if not part.startswith("项目边界："))
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    _assert_rejected_unchanged(
+        tmp_path, _assessment("气虚质"),
+        {"daily_foods": [_diet_item(note="")], "med_foods": [], "avoid": []},
+        configure_kb=remove_boundary)
+
+
+def test_blank_provenance_cannot_bypass_unknown_skipped_or_unassessed(tmp_path):
+    for name, assessment in (
+        ("unknown", _assessment("气虚质", unknown=True)),
+        ("skipped", _assessment(skipped=True)),
+        ("unassessed", None),
+    ):
+        item = _diet_item(amount="未提供", constitution="", source="")
+        _assert_rejected_unchanged(
+            tmp_path / name, assessment,
+            {"daily_foods": [item], "med_foods": [], "avoid": []})
+
+
+def test_eight_combined_constitutions_keep_formula_candidate_within_budget(tmp_path):
+    def add_second_candidate_per_constitution(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet-principles.md"
+        path.write_text("\n".join(
+            f"食疗资料｜{name}：{name}合成原则｜出处：合成资料｜"
+            "项目边界：合成特殊人群、过敏及用药提示。"
+            for name in CONSTITUTIONS[1:]) + "\n", encoding="utf-8")
+
+    result, saved, _ = _run_report(
+        tmp_path, _assessment(CONSTITUTIONS[1:]),
+        configure_kb=add_second_candidate_per_constitution)
+
+    assert result["ok"], result
+    refs = saved["diagnosis"]["report"]["kb_refs"]
+    assert any(ref.get("domain") == "formula_pattern" for ref in refs)
+    candidates = [ref for ref in refs if ref["excerpt"].startswith("食疗资料｜")]
+    assert {ref["excerpt"].split("｜", 2)[1].split("：", 1)[0]
+            for ref in candidates} == set(CONSTITUTIONS[1:])
+    assert len(refs) <= 10
+    assert sum(len(ref["excerpt"]) for ref in refs) <= 12000

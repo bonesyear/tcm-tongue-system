@@ -58,7 +58,7 @@ def test_settings_and_local_report_explicitly_handle_no_kb(tmp_path, monkeypatch
     detail = client.get('/record/2026-06-25').get_data(as_text=True)
     assert '缺少中医体质辨证知识库' in detail
     assert '缺少食疗知识库' in detail
-    assert '水证 · 宜' not in detail
+    assert '通用边界 · 宜' not in detail
     assert '<h3 class="sect-h">四证聚类</h3>' not in detail
     assert 'diet-therapy.md' not in detail and 'KB L' not in detail
 
@@ -151,15 +151,15 @@ def test_local_sections_follow_each_category_availability(tmp_path, monkeypatch)
     client.post('/demo')
     detail = client.get('/record/2026-06-25').get_data(as_text=True)
     assert '体质格局倾向' in detail and '四证聚类' in detail
-    assert '缺少食疗知识库' in detail and '水证 · 宜' not in detail
+    assert '缺少食疗知识库' in detail and '通用边界 · 宜' not in detail
 
     envfile.write_env(str(env), {
         'TCM_KB_CONSTITUTION_ROOT': '', 'TCM_KB_DIET_ROOT': str(diet)})
     detail = client.get('/record/2026-06-25').get_data(as_text=True)
     assert '缺少中医体质辨证知识库' in detail
     assert '体质格局倾向' not in detail
-    assert '饮食宜忌方向（内置规则，非当前知识库引用）' in detail
-    assert '水证 · 宜' in detail
+    assert '饮食建议边界（内置规则，非当前知识库引用）' in detail
+    assert '通用边界 · 宜' in detail
 
 
 def test_strict_mode_toggle_disables_and_restores_legacy_fallback(tmp_path, monkeypatch):
@@ -626,20 +626,20 @@ def test_switches_control_local_sections_without_changing_dedicated_roots(tmp_pa
     def detail():
         return client.get('/record/2026-06-25').get_data(as_text=True)
 
-    assert '体质格局倾向' in detail() and '水证 · 宜' in detail()
+    assert '体质格局倾向' in detail() and '通用边界 · 宜' in detail()
     client.post('/settings/toggle', json={'target': 'kb_composite', 'enabled': False})
-    assert '体质格局倾向' in detail() and '水证 · 宜' in detail()
+    assert '体质格局倾向' in detail() and '通用边界 · 宜' in detail()
 
     client.post('/settings/toggle', json={'target': 'kb_categories', 'enabled': False})
     html = detail()
     assert '体质格局倾向' not in html and '<h3 class="sect-h">四证聚类</h3>' not in html
     assert '缺少中医体质辨证知识库' in html and '缺少食疗知识库' in html
-    assert '水证 · 宜' not in html
+    assert '通用边界 · 宜' not in html
 
     client.post('/settings/toggle', json={'target': 'kb_categories', 'enabled': True})
-    assert '体质格局倾向' in detail() and '水证 · 宜' in detail()
+    assert '体质格局倾向' in detail() and '通用边界 · 宜' in detail()
     envfile.write_env(str(env), {
         'TCM_KB_CONSTITUTION_ROOT': '', 'TCM_KB_DIET_ROOT': ''})
-    assert '体质格局倾向' not in detail() and '水证 · 宜' not in detail()
+    assert '体质格局倾向' not in detail() and '通用边界 · 宜' not in detail()
     client.post('/settings/toggle', json={'target': 'kb_composite', 'enabled': True})
-    assert '体质格局倾向' in detail() and '水证 · 宜' in detail()
+    assert '体质格局倾向' in detail() and '通用边界 · 宜' in detail()

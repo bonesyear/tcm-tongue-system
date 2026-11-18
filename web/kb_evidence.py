@@ -74,7 +74,7 @@ def _kb_references(rec, kb_root=None, max_hits: int = 10,
 
 
 def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None,
-                           cache_root=None, domain=None) -> list:
+                           cache_root=None, domain=None, max_hits=None) -> list:
     """按当前可用类别形成统一检索视图，保留全局候选预算与类别溯源。"""
     from src.retrieval import KB_CATEGORY_DEFS
     from src.retrieval.kb_paths import resolve_kb_root
@@ -85,6 +85,8 @@ def _kb_references_unified(rec, kb_roots: dict, anchor_terms=None,
     if not active:
         return []
     options = {} if domain is None else {"domain": domain}
+    if max_hits is not None:
+        options["max_hits"] = max_hits
     distinct_roots = list(dict.fromkeys(active.values()))
     if len(active) == len(KB_CATEGORY_DEFS) and len(distinct_roots) == 1:
         root = distinct_roots[0]

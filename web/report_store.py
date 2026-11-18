@@ -13,6 +13,60 @@ import time_utils
 import wizard_store
 
 
+def _diet_text(value):
+    """只统一食疗核对所需的空白、全角数字与连接符，不做整串 NFKC。"""
+    import re
+    return re.sub(r"[\s，。；、,;]+", "", str(value).translate(
+        str.maketrans("０１２３４５６７８９Ｇｇ–—-", "0123456789Gg～～～"))).lower()
+
+
+def _diet_output_error(structured, kb_refs):
+    """具体食疗数量必须与同一完整候选的方名和原始数量对应。"""
+    diet = structured.get("diet_advice", {})
+    if not isinstance(diet, dict):
+        return None
+    candidates = []
+    for ref in kb_refs or []:
+        if not isinstance(ref, dict):
+            continue
+        category = ref.get("category", "")
+        file_name = str(ref.get("file", "")).replace("\\", "/")
+        if category != "diet" and not (not category and file_name.startswith("diet-lifestyle/")):
+            continue
+        excerpt = str(ref.get("excerpt", ""))
+        if not excerpt.startswith("食疗资料｜"):
+            continue
+        parts = excerpt.split("｜")
+        if len(parts) < 3:
+            continue
+        full_name = parts[1].strip()
+        names = {full_name, full_name.rsplit("：", 1)[-1].strip()}
+        amount_text = "｜".join(part for part in parts if part.startswith(
+            ("主要材料：", "材料与制法：", "用法用量：", "用法用量与禁忌：")))
+        candidates.append((names, _diet_text(amount_text)))
+    for group in ("daily_foods", "med_foods"):
+        items = diet.get(group, []) or []
+        if not isinstance(items, list):
+            return f"食疗字段 {group} 不是列表，报告未保存"
+        for item in items:
+            if not isinstance(item, dict):
+                return "食疗条目结构不是对象，报告未保存"
+            name = str(item.get("name", "")).strip()
+            amount = str(item.get("amount", "")).strip()
+            if not name:
+                return "食疗条目缺少名称，报告未保存"
+            if not amount:
+                return f"食疗条目“{name[:60]}”缺少数量或「未提供」标记，报告未保存"
+            if amount in {"未提供", "资料未载明", "不适用"}:
+                continue
+            normalized_amount = _diet_text(amount)
+            if not any(name in names and normalized_amount in source_text
+                       for names, source_text in candidates):
+                return (f"食疗条目“{name[:60]}”的数量未能与同一条知识库候选中的"
+                        "方名和原始数量对应，报告未保存")
+    return None
+
+
 def _all_obs_values(rec):
     """全部维度的观察值文本（禁忌核对扫描用）。"""
     for dim in DIMENSIONS:
@@ -59,6 +113,13 @@ def _constitution_diet_constitution(ref):
     return constitution if constitution in CONSTITUTIONS else None
 
 
+def _constitution_diet_boundary(ref):
+    for part in ref["excerpt"].split("｜"):
+        if part.startswith("项目边界："):
+            return part.split("：", 1)[1].strip()
+    return ""
+
+
 def _constitution_diet_text(value):
     import re
     return re.sub(r"[\s，。；、,;]+", "", str(value).translate(
@@ -67,6 +128,7 @@ def _constitution_diet_text(value):
 
 def _constitution_diet_output_error(structured, kb_refs, rec):
     """体质食养的体质、数量和安全边界必须对应同一条当前候选。"""
+    from src.constitution_assessment import CONSTITUTIONS
     diet = structured.get("diet_advice", {})
     if not isinstance(diet, dict):
         return None
@@ -77,12 +139,14 @@ def _constitution_diet_output_error(structured, kb_refs, rec):
             continue
         parts = ref["excerpt"].split("｜")
         full_name = parts[1].strip()
-        boundary = next((part.split("：", 1)[1] for part in parts
-                         if part.startswith("项目边界：") and "：" in part), "")
+        amount_text = "｜".join(part for part in parts if part.startswith(
+            ("主要材料：", "材料与制法：", "用法用量：", "用法用量与禁忌：")))
         candidates.append({
             "constitution": constitution, "names": {full_name, full_name.rsplit("：", 1)[-1]},
-            "source": f"{ref['file']}:{ref['line']}", "text": _constitution_diet_text(ref["excerpt"]),
-            "boundary": boundary,
+            "source": f"{ref['file']}:{ref['line']}",
+            "amount_text": _constitution_diet_text(amount_text),
+            "text": _constitution_diet_text(ref["excerpt"]),
+            "boundary": _constitution_diet_boundary(ref),
         })
     eligible = set(_eligible_constitutions(rec))
     for group in ("daily_foods", "med_foods"):
@@ -95,9 +159,10 @@ def _constitution_diet_output_error(structured, kb_refs, rec):
             name = str(item.get("name", "")).strip()
             constitution = str(item.get("constitution", "")).strip()
             source = str(item.get("source", "")).strip()
+            named = next((value for value in CONSTITUTIONS if value in name), "")
             matches = [candidate for candidate in candidates if name in candidate["names"]]
             if not matches:
-                if constitution or source:
+                if constitution or source or named:
                     return f"体质食养条目“{name[:60]}”未对应本次候选，报告未保存"
                 continue
             selected = [candidate for candidate in matches if candidate["source"] == source]
@@ -108,17 +173,19 @@ def _constitution_diet_output_error(structured, kb_refs, rec):
                 return f"体质食养条目“{name[:60]}”的体质未通过当前评估，报告未保存"
             if constitution != candidate["constitution"]:
                 return f"体质食养条目“{name[:60]}”的对应体质错误，报告未保存"
+            if not candidate["boundary"]:
+                return f"体质食养条目“{name[:60]}”的来源缺少安全边界，报告未保存"
             amount = str(item.get("amount", "")).strip()
             if not amount:
                 return f"体质食养条目“{name[:60]}”缺少数量或「未提供」标记，报告未保存"
             if amount not in {"未提供", "资料未载明", "不适用"} and \
-                    _constitution_diet_text(amount) not in candidate["text"]:
-                return f"体质食养条目“{name[:60]}”的数量未能对应同一来源，报告未保存"
+                    _constitution_diet_text(amount) not in candidate["amount_text"]:
+                return f"体质食养条目“{name[:60]}”的数量未能对应同一来源的材料或用法，报告未保存"
             boundary = _constitution_diet_text(candidate["boundary"])
             note = _constitution_diet_text(item.get("note", ""))
-            if boundary and boundary not in note:
+            if boundary not in note:
                 return f"体质食养条目“{name[:60]}”未完整保留特殊人群、过敏或用药边界，报告未保存"
-            residual = note.replace(boundary, "") if boundary else note
+            residual = note.replace(boundary, "")
             import re
             for frequency in re.findall(r"(?:每日|每天|每周|每月|疗程)[^，。；]*", residual):
                 if _constitution_diet_text(frequency) not in candidate["text"]:
@@ -494,17 +561,30 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
             assessment_refs = kb_evidence._kb_references_unified(
                 rec, active_roots,
                 anchor_terms=[f"食疗资料｜{name}：" for name in eligible],
-                cache_root=kb_cache_root, domain="diet") if eligible else []
+                cache_root=kb_cache_root, domain="diet",
+                max_hits=2 * len(eligible)) if eligible else []
             assessment_refs = [ref for ref in assessment_refs
-                               if _constitution_diet_constitution(ref) in eligible]
+                               if _constitution_diet_constitution(ref) in eligible
+                               and _constitution_diet_boundary(ref)]
             unified_refs = []
             for ref in base_refs:
                 candidate = _constitution_diet_constitution(ref)
-                if candidate is None or candidate in eligible:
+                if candidate is None or (candidate in eligible
+                                         and _constitution_diet_boundary(ref)):
                     unified_refs.append(ref)
-            ordered = [ref for ref in unified_refs if ref.get("category") == "constitution"]
-            ordered += assessment_refs
-            ordered += [ref for ref in unified_refs if ref.get("category") != "constitution"]
+            by_constitution = {}
+            for ref in assessment_refs:
+                by_constitution.setdefault(ref["term"], []).append(ref)
+            primary_diet = [refs[0] for refs in by_constitution.values()]
+            secondary_diet = [ref for refs in by_constitution.values() for ref in refs[1:]]
+            constitution_refs = [ref for ref in unified_refs
+                                 if ref.get("category") == "constitution"]
+            formula_refs = [ref for ref in unified_refs if ref.get("category") == "formula"]
+            ordered = constitution_refs[:1] + primary_diet + formula_refs[:1]
+            ordered += secondary_diet + constitution_refs[1:]
+            ordered += [ref for ref in unified_refs
+                        if ref.get("category") not in ("constitution", "formula")]
+            ordered += formula_refs[1:]
             merged = []
             total_chars = 0
             for ref in ordered:
@@ -624,6 +704,9 @@ def generate_and_store_report(daily_dir: str, backup_dir: str, date_str: str,
             ("three_views", "four_patterns", "six_diseases", "core_pathomechanism")):
         return {"ok": False,
                 "error": "缺少中医体质辨证知识库，模型仍输出结构化辨证结论，报告未保存"}
+    diet_error = _diet_output_error(structured, kb_refs)
+    if diet_error:
+        return {"ok": False, "error": diet_error}
     constitution_diet_error = _constitution_diet_output_error(structured, kb_refs, rec)
     if constitution_diet_error:
         return {"ok": False, "error": constitution_diet_error}
