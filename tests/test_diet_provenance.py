@@ -158,3 +158,10 @@ def test_diet_amount_rejects_preparation_only_text():
     error = report_store._diet_output_error(
         _diet("橘皮饭", "同粳米煮饭，佐餐食用"), [ORANGE])
     assert error and "报告未保存" in error
+
+
+def test_unknown_amount_does_not_exempt_recipe_candidate():
+    assert report_store._diet_output_error(_diet("橘皮饭", "未提供"), [ORANGE]) is None
+    error = report_store._diet_output_error(_diet("橘皮饭", "未提供"), [])
+    assert error and "未提供" in error and "候选" in error
+    assert report_store._diet_output_error(_diet("一般饮食原则", "未提供"), []) is None

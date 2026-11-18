@@ -401,3 +401,40 @@ def test_eight_combined_constitutions_keep_formula_candidate_within_budget(tmp_p
             for ref in candidates} == set(CONSTITUTIONS[1:])
     assert len(refs) <= 10
     assert sum(len(ref["excerpt"]) for ref in refs) <= 12000
+
+
+def test_short_recipe_name_cannot_bypass_unknown_or_missing_candidate(tmp_path):
+    def no_candidate(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet.md"
+        path.write_text("没有候选的合成资料\n", encoding="utf-8")
+
+    cases = (
+        ("unknown", _assessment("气虚质", unknown=True), None),
+        ("skipped", _assessment(skipped=True), None),
+        ("unassessed", None, None),
+        ("no-candidate", _assessment("气虚质"), no_candidate),
+    )
+    for name, assessment, configure in cases:
+        item = _diet_item(name="参芪鹌鹑汤", amount="未提供",
+                          constitution="", source="")
+        _assert_rejected_unchanged(
+            tmp_path / name, assessment,
+            {"daily_foods": [item], "med_foods": [], "avoid": []},
+            configure_kb=configure)
+
+
+def test_legal_short_recipe_name_uses_current_candidate_and_provenance(tmp_path):
+    def add_short_candidate(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet.md"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write("食疗资料｜气虚质：参芪鹌鹑汤｜出处：合成资料｜"
+                         "主要材料：党参 15 克｜项目边界：合成特殊人群、过敏及用药提示。\n")
+
+    item = _diet_item(name="参芪鹌鹑汤", amount="未提供",
+                      source="diet-lifestyle/constitution-diet.md:10")
+    result, saved, _ = _run_report(
+        tmp_path, _assessment("气虚质"),
+        diet_advice={"daily_foods": [item], "med_foods": [], "avoid": []},
+        configure_kb=add_short_candidate)
+    assert result["ok"], result
+    assert saved["diagnosis"]["report"]["diet_advice"]["daily_foods"][0] == item
