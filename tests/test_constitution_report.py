@@ -438,3 +438,44 @@ def test_legal_short_recipe_name_uses_current_candidate_and_provenance(tmp_path)
         configure_kb=add_short_candidate)
     assert result["ok"], result
     assert saved["diagnosis"]["report"]["diet_advice"]["daily_foods"][0] == item
+
+
+_SHORT_RECIPE_NAMES = {
+    "气虚质": "参芪鹌鹑汤", "阳虚质": "枸杞炖羊肉", "阴虚质": "乌鸡汤",
+    "痰湿质": "荷叶粥", "湿热质": "薏米绿豆汤", "血瘀质": "山楂红糖水",
+    "气郁质": "杞瑰茶", "特禀质": "乌梅粥",
+}
+
+
+def test_all_recipe_short_names_require_candidate_in_every_empty_state(tmp_path):
+    def no_candidate(roots):
+        path = Path(roots["diet"]) / "diet-lifestyle" / "constitution-diet.md"
+        path.write_text("没有候选的合成资料\n", encoding="utf-8")
+
+    for constitution, short_name in _SHORT_RECIPE_NAMES.items():
+        cases = (
+            ("unknown", _assessment(constitution, unknown=True), None),
+            ("skipped", _assessment(skipped=True), None),
+            ("unassessed", None, None),
+            ("no-candidate", _assessment(constitution), no_candidate),
+            ("missing-diet", _assessment(constitution),
+             lambda roots: roots.__setitem__("diet", None)),
+        )
+        for state, assessment, configure in cases:
+            item = _diet_item(name=short_name, amount="未提供",
+                              constitution="", source="")
+            _assert_rejected_unchanged(
+                tmp_path / constitution / state, assessment,
+                {"daily_foods": [item], "med_foods": [], "avoid": []},
+                configure_kb=configure)
+
+
+def test_general_diet_principle_remains_valid_without_candidate(tmp_path):
+    item = {"name": "一般饮食原则", "nature": "资料未载明",
+            "purpose": "资料未载明", "amount": "未提供",
+            "note": "均衡、规律饮食；具体条目仍需候选。", "constitution": "", "source": ""}
+    result, saved, _ = _run_report(
+        tmp_path, None,
+        diet_advice={"daily_foods": [item], "med_foods": [], "avoid": []})
+    assert result["ok"], result
+    assert saved["diagnosis"]["report"]["diet_advice"]["daily_foods"] == [item]

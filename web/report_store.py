@@ -58,15 +58,11 @@ def _diet_output_error(structured, kb_refs):
             if not amount:
                 return f"食疗条目“{name[:60]}”缺少数量或「未提供」标记，报告未保存"
             if amount in {"未提供", "资料未载明", "不适用"}:
-                import re
                 general_principle = name in {"一般饮食原则", "均衡饮食", "规律饮食",
-                                           "均衡、规律饮食"} or name.endswith("原则")
-                recipe_like = re.search(r"汤|粥|茶|饮|羹|饭|糕|膳|剂|方|炖|煮|煲|炒|煎|蒸|拌",
-                                        name)
-                if not general_principle and recipe_like and not any(
-                        name in names for names, _ in candidates):
+                                           "均衡、规律饮食"}
+                if not general_principle and not any(name in names for names, _ in candidates):
                     return (f"食疗条目“{name[:60]}”的「{amount}」只豁免数量，"
-                            "具体方名仍须对应当前候选，报告未保存")
+                            "具体条目仍须对应当前候选，报告未保存")
                 continue
             normalized_amount = _diet_text(amount)
             if not any(name in names and normalized_amount in source_text

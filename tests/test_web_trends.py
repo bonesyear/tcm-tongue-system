@@ -145,6 +145,14 @@ def test_report_contract_writes_structured_and_diet(client, data_root,
     monkeypatch.setattr(
         llm_client, "chat",
         lambda *a, **k: _contract("# 报告\n\n**太阴**水饮，宜山药。", structured))
+    monkeypatch.setattr(
+        "kb_evidence._kb_references_unified",
+        lambda *a, **k: [
+            {"file": "diet-lifecycle/synthetic.md", "line": 1, "term": "合成",
+             "excerpt": "食疗资料｜山药｜出处：合成资料｜主要材料：山药", "category": "diet"},
+            {"file": "diet-lifecycle/synthetic.md", "line": 2, "term": "合成",
+             "excerpt": "食疗资料｜黄芪｜出处：合成资料｜主要材料：黄芪", "category": "diet"},
+        ])
     resp = client.post("/record/2026-06-25/report")
     assert resp.status_code == 200, resp.get_json()
 
